@@ -5,10 +5,10 @@
 | Item | Description |
 |---|---|
 | Course |  |
-| Class |  |
+| Class | SE20A02 |
 | Semester | SU26 |
-| Group |  |
-| Topic |  |
+| Group | 4 |
+| Topic | A Web-based Appointment Management System for Small Motorcycle Repair Shops |
 | Repository |  |
 
 ---
