@@ -4,7 +4,7 @@
 
 | Item | Description |
 |---|---|
-| Course |  |
+| Course | SWP391 |
 | Class | SE20A02 |
 | Semester | SU26 |
 | Group | 4 |
