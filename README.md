@@ -18,7 +18,7 @@
 | No | Student ID | Full Name | GitHub Username | Role | Main Responsibility |
 |---:|---|---|---|---|---|
 | 1 |DE170572| Phan Thanh Nghĩa  | Nghia0782| Leader |  |
-| 2 | DE181058 |  Nguyễn Trần Vĩnh Khánh| Nkkhang04 | Member |  |
+| 2 | DE181058 |  Nguyễn Trần Vĩnh Khánh| Ngkhanh04 | Member |  |
 | 3 | DE160156| Trần Nhân Chánh | trannhanhchanh | Member |  |
 | 4 | DE180321  | Hồ Sỹ Hưng | hwn-0704 | Member |  |
 
