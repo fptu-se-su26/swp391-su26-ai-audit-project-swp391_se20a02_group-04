@@ -1,0 +1,46 @@
+.attendance-hero {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff6d1f 0%, #f25e10 60%, #111827 100%);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.attendance-hero h3 {
+  margin: 16px 0 8px;
+  font-size: 28px;
+}
+
+.attendance-hero p {
+  max-width: 620px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.55;
+}
+
+.attendance-hero .status-pill {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.attendance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.attendance-actions .secondary-button {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+@media (max-width: 900px) {
+  .attendance-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

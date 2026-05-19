@@ -1,0 +1,124 @@
+.profile-card {
+  overflow: hidden;
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.profile-cover {
+  height: 112px;
+  background: linear-gradient(135deg, rgba(255, 109, 31, 0.18), rgba(15, 23, 42, 0.12));
+}
+
+.profile-avatar-large {
+  display: grid;
+  width: 96px;
+  height: 96px;
+  margin: -48px auto 0;
+  place-items: center;
+  color: var(--primary);
+  background: #fff;
+  border: 6px solid #fff;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+
+.profile-avatar-large .material-symbols-outlined {
+  font-size: 44px;
+}
+
+.profile-card h3 {
+  margin: 16px 0 4px;
+  font-size: 24px;
+}
+
+.profile-card > p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 24px 0;
+}
+
+.profile-badges span {
+  padding: 6px 10px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 900;
+  background: var(--primary-soft);
+  border-radius: 999px;
+}
+
+.profile-score {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin-top: 24px;
+  background: var(--border-soft);
+  border-top: 1px solid var(--border-soft);
+}
+
+.profile-score div {
+  padding: 18px 8px;
+  background: #fff;
+}
+
+.profile-score strong,
+.profile-score span {
+  display: block;
+}
+
+.profile-score strong {
+  font-size: 22px;
+}
+
+.profile-score span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.profile-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.profile-form input {
+  min-height: 44px;
+  padding: 0 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  outline: none;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 900px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,114 @@
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
+  gap: 32px;
+}
+
+.work-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  padding: 20px;
+}
+
+.stat-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.stat-card strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 32px;
+  font-weight: 900;
+}
+
+.stat-card > span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs button {
+  padding: 14px 24px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+}
+
+.tabs button.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.jobs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.history-panel {
+  overflow: hidden;
+  margin-top: 24px;
+}
+
+.panel-head {
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.panel-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.panel-head button {
+  color: var(--primary);
+  font-weight: 800;
+  background: transparent;
+  border: 0;
+}
+
+@media (max-width: 1180px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .stats-grid,
+  .jobs-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .tabs {
+    flex-direction: column;
+  }
+
+  .tabs button {
+    text-align: left;
+  }
+}
