@@ -6,7 +6,7 @@ export default function StaffProfile() {
   return (
     <>
       <PageHeader title="Hồ sơ nhân viên" subtitle="Thông tin cá nhân, kỹ năng và hiệu suất làm việc" actions={false} />
-      <div className="page-grid">
+      <div className="page-grid profile-grid">
         <section className="profile-card">
           <div className="profile-cover">
             <div className="profile-avatar-large">

@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { Icon, PageHeader } from "./StaffComponents";
 import { materialUsages, materials } from "./staffData";
 import "../../styles/staff/StaffMaterials.css";
@@ -14,10 +15,10 @@ export default function StaffMaterials() {
               <Icon name="inventory_2" />
               Tồn kho khả dụng
             </h3>
-            <button className="primary-button" type="button">
+            <Link className="primary-button" to="/staff/jobs/APT-20260519-015/materials">
               <Icon name="add" />
               Thêm vật tư đã dùng
-            </button>
+            </Link>
           </div>
 
           <div className="table-wrap">
@@ -46,7 +47,7 @@ export default function StaffMaterials() {
                       </span>
                     </td>
                     <td>
-                      <button className="secondary-button small-button" type="button">Sử dụng</button>
+                      <Link className="secondary-button small-button" to="/staff/jobs/APT-20260519-015/materials">Sử dụng</Link>
                     </td>
                   </tr>
                 ))}
@@ -93,7 +94,7 @@ export default function StaffMaterials() {
             </select>
             <label>Số lượng</label>
             <input type="number" defaultValue="1" min="1" />
-            <button className="primary-button full" type="button">Lưu vật tư</button>
+            <Link className="primary-button full" to="/staff/jobs/APT-20260519-015/complete">Lưu vật tư</Link>
           </section>
         </aside>
       </div>

@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 
 export function Icon({ name, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -62,14 +62,14 @@ export function PageHeader({ title, subtitle, actions = true }) {
       </div>
       {actions && (
         <div className="topbar-actions">
-          <button className="secondary-button large" type="button">
+          <Link className="secondary-button large" to="/staff/attendance">
             <Icon name="logout" />
             Check out
-          </button>
-          <button className="primary-button large" type="button">
+          </Link>
+          <Link className="primary-button large" to="/staff/attendance">
             <Icon name="login" />
             Check in ca
-          </button>
+          </Link>
         </div>
       )}
     </header>
@@ -87,6 +87,23 @@ export function StatCard({ icon, label, value, helper, tone }) {
       <span>{helper}</span>
     </article>
   );
+}
+
+function getPrimaryLink(job) {
+  if (job.statusKey === "assigned") {
+    return `/staff/jobs/${job.id}/start`;
+  }
+  if (job.statusKey === "in_progress") {
+    return `/staff/jobs/${job.id}/complete`;
+  }
+  return `/staff/jobs/${job.id}`;
+}
+
+function getSecondaryLink(job) {
+  if (job.statusKey === "in_progress") {
+    return `/staff/jobs/${job.id}/materials`;
+  }
+  return `/staff/jobs/${job.id}`;
 }
 
 export function JobCard({ job, compact = false }) {
@@ -123,8 +140,8 @@ export function JobCard({ job, compact = false }) {
       </div>
 
       <div className="job-actions">
-        <button className="secondary-button" type="button">{job.actions[0]}</button>
-        <button className={buttonClass} type="button">{primaryAction}</button>
+        <Link className="secondary-button" to={getSecondaryLink(job)}>{job.actions[0]}</Link>
+        <Link className={buttonClass} to={getPrimaryLink(job)}>{primaryAction}</Link>
       </div>
     </article>
   );
@@ -144,9 +161,9 @@ export function InventoryAlert({ item }) {
         <Icon name="warehouse" />
         Còn {item.stock} {item.unit}, ngưỡng tối thiểu {item.min} {item.unit}
       </p>
-      <button className={urgent ? "primary-button full" : "secondary-button full"} type="button">
+      <Link className={urgent ? "primary-button full" : "secondary-button full"} to="/staff/materials">
         {urgent ? "Báo quản lý" : "Xem tồn kho"}
-      </button>
+      </Link>
     </article>
   );
 }
@@ -156,7 +173,7 @@ export function WorkHistory({ rows }) {
     <section className="history-panel">
       <div className="panel-head">
         <h3>Lịch sử công việc 7 ngày</h3>
-        <button type="button">Xem tất cả</button>
+        <Link to="/staff/jobs">Xem tất cả</Link>
       </div>
       <div className="table-wrap">
         <table>

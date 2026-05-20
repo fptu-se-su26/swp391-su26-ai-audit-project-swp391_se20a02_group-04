@@ -1,9 +1,12 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { Icon, JobCard, PageHeader, QuickNote } from "./StaffComponents";
 import { jobs } from "./staffData";
 import "../../styles/staff/StaffJobs.css";
 
 export default function StaffJobs() {
+  const nextJob = jobs[0];
+
   return (
     <>
       <PageHeader title="Công việc được giao" subtitle="Danh sách lịch hẹn và việc kỹ thuật trong ca hôm nay" />
@@ -36,9 +39,13 @@ export default function StaffJobs() {
               Việc tiếp theo
             </h3>
             <div className="next-job">
-              <span className="status-pill status-blue">09:30</span>
-              <h4>Honda Vision - 59A1-234.56</h4>
-              <p>Rửa xe cao cấp và kiểm tra phanh sau. Ưu tiên hoàn thành trước 10:30.</p>
+              <span className="status-pill status-blue">{nextJob.time}</span>
+              <h4>{nextJob.vehicle} - {nextJob.plate}</h4>
+              <p>{nextJob.service}. Ưu tiên hoàn thành trước 10:30.</p>
+              <Link className="primary-button full" to={`/staff/jobs/${nextJob.id}/start`}>
+                <Icon name="play_circle" />
+                Bắt đầu việc này
+              </Link>
             </div>
           </section>
           <QuickNote />

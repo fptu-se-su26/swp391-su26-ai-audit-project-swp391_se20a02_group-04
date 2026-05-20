@@ -12,7 +12,13 @@ export const jobs = [
     status: "ĐƯỢC GIAO",
     statusKey: "assigned",
     statusClass: "status-blue",
-    actions: ["Chi tiết", "Bắt đầu"]
+    actions: ["Chi tiết", "Bắt đầu"],
+    model: "Vision 2021",
+    mileage: "18.240 km",
+    issue: "Phanh sau phát tiếng kêu nhẹ khi bóp mạnh.",
+    estimate: "45 phút",
+    laborCost: "180.000đ",
+    recommendation: "Vệ sinh bố thắng sau, kiểm tra bạc đạn bánh."
   },
   {
     id: "APT-20260519-015",
@@ -27,7 +33,13 @@ export const jobs = [
     status: "ĐANG LÀM",
     statusKey: "in_progress",
     statusClass: "status-yellow",
-    actions: ["Thêm vật tư", "Hoàn thành"]
+    actions: ["Thêm vật tư", "Hoàn thành"],
+    model: "Sirius FI",
+    mileage: "31.560 km",
+    issue: "Máy yếu, phanh trước ăn không đều.",
+    estimate: "70 phút",
+    laborCost: "220.000đ",
+    recommendation: "Nên thay bugi và kiểm tra lọc gió ở lần bảo dưỡng tới."
   },
   {
     id: "APT-20260519-018",
@@ -42,7 +54,13 @@ export const jobs = [
     status: "HOÀN THÀNH",
     statusKey: "completed",
     statusClass: "status-green",
-    actions: ["Chi tiết", "Gửi quản lý"]
+    actions: ["Chi tiết", "Gửi quản lý"],
+    model: "Air Blade 125",
+    mileage: "22.010 km",
+    issue: "Rửa xe định kỳ.",
+    estimate: "30 phút",
+    laborCost: "80.000đ",
+    recommendation: "Đã hoàn tất, chờ quản lý kiểm tra chi phí."
   },
   {
     id: "APT-20260519-021",
@@ -57,7 +75,13 @@ export const jobs = [
     status: "ĐƯỢC GIAO",
     statusKey: "assigned",
     statusClass: "status-blue",
-    actions: ["Chi tiết", "Bắt đầu"]
+    actions: ["Chi tiết", "Bắt đầu"],
+    model: "Wave Alpha 110",
+    mileage: "44.900 km",
+    issue: "Xe rung khi tăng ga, sên chùng.",
+    estimate: "60 phút",
+    laborCost: "160.000đ",
+    recommendation: "Kiểm tra nhông sên dĩa nếu tiếng rung còn sau khi tăng sên."
   }
 ];
 
