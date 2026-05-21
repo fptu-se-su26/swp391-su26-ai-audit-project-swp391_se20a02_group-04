@@ -7,11 +7,11 @@ export function Icon({ name, className = "" }) {
 
 export function Sidebar() {
   const navItems = [
-    { icon: "dashboard", label: "Dashboard", to: "/staff/dashboard" },
+    { icon: "dashboard", label: "Tổng quan", to: "/staff/dashboard" },
     { icon: "assignment", label: "Công việc được giao", to: "/staff/jobs" },
     { icon: "inventory_2", label: "Sử dụng vật tư", to: "/staff/materials" },
-    { icon: "schedule", label: "Check in/out", to: "/staff/attendance" },
-    { icon: "person", label: "Hồ sơ", to: "/staff/profile" }
+    { icon: "schedule", label: "Chấm công", to: "/staff/attendance" },
+    { icon: "person", label: "Hồ sơ", to: "/staff/profile" },
   ];
 
   return (
@@ -64,11 +64,11 @@ export function PageHeader({ title, subtitle, actions = true }) {
         <div className="topbar-actions">
           <Link className="secondary-button large" to="/staff/attendance">
             <Icon name="logout" />
-            Check out
+            Kết thúc ca
           </Link>
           <Link className="primary-button large" to="/staff/attendance">
             <Icon name="login" />
-            Check in ca
+            Vào ca
           </Link>
         </div>
       )}
@@ -111,14 +111,16 @@ export function JobCard({ job, compact = false }) {
   const buttonClass = [
     "primary-button",
     primaryAction === "Hoàn thành" ? "success" : "",
-    primaryAction === "Gửi quản lý" ? "dark" : ""
+    primaryAction === "Gửi quản lý" ? "dark" : "",
   ].join(" ");
 
   return (
     <article className={`job-card ${compact ? "compact-card" : ""}`}>
       <div className="job-card-head">
         <div>
-          <h4>{job.vehicle} - {job.plate}</h4>
+          <h4>
+            {job.vehicle} - {job.plate}
+          </h4>
           <span>#{job.id}</span>
         </div>
         <span className={`status-pill ${job.statusClass}`}>{job.status}</span>
@@ -127,7 +129,9 @@ export function JobCard({ job, compact = false }) {
       <div className="job-info">
         <div>
           <Icon name="person" />
-          <span>{job.customer} - {job.time}</span>
+          <span>
+            {job.customer} - {job.time}
+          </span>
         </div>
         <div>
           <Icon name={job.serviceIcon} />
@@ -140,8 +144,12 @@ export function JobCard({ job, compact = false }) {
       </div>
 
       <div className="job-actions">
-        <Link className="secondary-button" to={getSecondaryLink(job)}>{job.actions[0]}</Link>
-        <Link className={buttonClass} to={getPrimaryLink(job)}>{primaryAction}</Link>
+        <Link className="secondary-button" to={getSecondaryLink(job)}>
+          {job.actions[0]}
+        </Link>
+        <Link className={buttonClass} to={getPrimaryLink(job)}>
+          {primaryAction}
+        </Link>
       </div>
     </article>
   );
@@ -190,7 +198,9 @@ export function WorkHistory({ rows }) {
             {rows.map((row) => (
               <tr key={row.date}>
                 <td>{row.date}</td>
-                <td><strong>{row.jobs}</strong></td>
+                <td>
+                  <strong>{row.jobs}</strong>
+                </td>
                 <td>{row.materials}</td>
                 <td>{row.duration}</td>
                 <td>
@@ -224,7 +234,7 @@ export function ShiftSummary() {
       </div>
       <div className="checkin-card">
         <div>
-          <span>Check in lúc</span>
+          <span>Vào ca lúc</span>
           <strong>07:45 AM</strong>
         </div>
         <Icon name="schedule" />
@@ -241,8 +251,10 @@ export function QuickNote() {
         Ghi chú kỹ thuật
       </h3>
       <label htmlFor="technical-note">Ghi chú nhanh</label>
-      <textarea id="technical-note" placeholder="Nhập tình trạng xe, khuyến nghị thay thế, hoặc lưu ý cho quản lý..." />
-      <button className="dark-button full" type="button">Lưu ghi chú</button>
+      <textarea id="technical-note" placeholder="Nhập tình trạng xe, khuyến nghị thay thế hoặc lưu ý cho quản lý..." />
+      <button className="dark-button full" type="button">
+        Lưu ghi chú
+      </button>
     </section>
   );
 }

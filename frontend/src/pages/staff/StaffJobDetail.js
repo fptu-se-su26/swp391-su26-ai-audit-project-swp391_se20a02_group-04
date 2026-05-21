@@ -46,7 +46,7 @@ function InfoList({ job }) {
     ["two_wheeler", "Dòng xe", job.model],
     ["speed", "Số km", job.mileage],
     ["report", "Tình trạng", job.issue],
-    ["sticky_note_2", "Ghi chú", job.note]
+    ["sticky_note_2", "Ghi chú", job.note],
   ];
 
   return (
@@ -79,15 +79,15 @@ function ActionRail({ job }) {
         <div className="action-stack">
           <Link className="primary-button full" to={`/staff/jobs/${job.id}/start`}>
             <Icon name="play_circle" />
-            Start Job
+            Bắt đầu công việc
           </Link>
           <Link className="secondary-button full" to={`/staff/jobs/${job.id}/materials`}>
             <Icon name="inventory_2" />
-            Add Material
+            Thêm vật tư
           </Link>
           <Link className="primary-button success full" to={`/staff/jobs/${job.id}/complete`}>
             <Icon name="task_alt" />
-            Complete Job
+            Hoàn thành công việc
           </Link>
         </div>
       </section>
@@ -141,10 +141,10 @@ export function StaffJobStart() {
           <div className="confirm-grid">
             <div>
               <span>Trạng thái sau xác nhận</span>
-              <strong>IN_PROGRESS</strong>
+              <strong>ĐANG XỬ LÝ</strong>
             </div>
             <div>
-              <span>Start time</span>
+              <span>Thời điểm bắt đầu</span>
               <strong>09:32 AM</strong>
             </div>
             <div>
@@ -263,7 +263,7 @@ export function StaffJobComplete() {
             <Link className="secondary-button" to={`/staff/jobs/${job.id}/materials`}>Thêm vật tư</Link>
             <Link className="primary-button success" to="/staff/jobs">
               <Icon name="check_circle" />
-              Mark Completed
+              Đánh dấu hoàn thành
             </Link>
           </div>
         </section>
