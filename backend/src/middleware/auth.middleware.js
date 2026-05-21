@@ -32,12 +32,21 @@ const authenticate = async (req, res, next) => {
       return errorResponse(res, 401, 'User account is deactivated');
     }
 
+    const userRoles = await UserRole.find({ user_id: user._id })
+      .populate('role_id', 'role_name permissions is_active');
+
+    const activeRoles = userRoles
+      .filter(ur => ur.role_id && ur.role_id.is_active)
+      .map(ur => ur.role_id);
+
     // Attach user to request
     req.user = {
       userId: user._id,
       email: user.email,
       phone: user.phone,
-      verified: user.verified
+      verified: user.verified,
+      roles: activeRoles.map(role => role.role_name),
+      permissions: [...new Set(activeRoles.flatMap(role => role.permissions || []))]
     };
 
     next();
@@ -63,16 +72,11 @@ const authorize = (...allowedRoles) => {
         return errorResponse(res, 401, 'Authentication required');
       }
 
-      // Get user roles
-      const userRoles = await UserRole.find({ user_id: req.user.userId })
-        .populate('role_id', 'role_name');
+      const roleNames = req.user.roles || [];
 
-      if (!userRoles || userRoles.length === 0) {
+      if (!roleNames.length) {
         return errorResponse(res, 403, 'No roles assigned to user');
       }
-
-      // Extract role names
-      const roleNames = userRoles.map(ur => ur.role_id.role_name);
 
       // Check if user has any of the allowed roles
       const hasPermission = allowedRoles.some(role => 
@@ -86,9 +90,6 @@ const authorize = (...allowedRoles) => {
           `Access denied. Required roles: ${allowedRoles.join(', ')}`
         );
       }
-
-      // Attach roles to request
-      req.user.roles = roleNames;
 
       next();
     } catch (error) {
