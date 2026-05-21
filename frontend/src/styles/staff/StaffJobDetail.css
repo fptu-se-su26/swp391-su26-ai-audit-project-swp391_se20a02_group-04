@@ -1,0 +1,245 @@
+.job-detail-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px;
+  margin-bottom: 24px;
+  color: #fff;
+  background: linear-gradient(135deg, #0f172a 0%, #334155 54%, #ff6d1f 100%);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.job-detail-hero h3 {
+  margin: 14px 0 8px;
+  font-size: 30px;
+}
+
+.job-detail-hero p {
+  max-width: 680px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.55;
+}
+
+.job-hero-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.job-hero-meta div,
+.confirm-grid div {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+}
+
+.job-hero-meta span,
+.confirm-grid span {
+  display: block;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.job-hero-meta strong,
+.confirm-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 20px;
+}
+
+.detail-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detail-item {
+  display: grid;
+  grid-template-columns: 24px minmax(120px, 0.42fr) 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 16px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.detail-item .material-symbols-outlined {
+  color: var(--primary);
+  font-size: 22px;
+}
+
+.detail-item span,
+.material-pick-card span,
+.cost-list span,
+.muted-copy {
+  color: var(--muted);
+}
+
+.detail-item span {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.detail-item strong {
+  line-height: 1.45;
+}
+
+.action-stack,
+.form-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.action-stack {
+  flex-direction: column;
+}
+
+.muted-copy {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.confirm-panel,
+.complete-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.confirm-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.confirm-grid div {
+  color: var(--text);
+  background: var(--surface-muted);
+  border-color: var(--border-soft);
+}
+
+.confirm-grid span {
+  color: var(--muted);
+}
+
+.confirm-grid strong {
+  font-size: 18px;
+}
+
+.form-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.material-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.material-pick-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(96px, 0.28fr);
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.material-pick-card h4 {
+  margin: 4px 0;
+}
+
+.material-pick-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.material-pick-card label,
+.confirm-panel label,
+.complete-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.material-pick-card input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  outline: none;
+}
+
+.cost-list {
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.cost-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.cost-list div:first-child {
+  border-top: 0;
+}
+
+.cost-total {
+  background: var(--primary-soft);
+}
+
+.cost-total strong {
+  color: var(--primary);
+  font-size: 20px;
+}
+
+@media (max-width: 900px) {
+  .job-detail-hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .detail-list,
+  .confirm-grid,
+  .material-pick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .material-pick-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .detail-item {
+    grid-template-columns: 24px 1fr;
+  }
+
+  .detail-item strong {
+    grid-column: 1 / -1;
+  }
+}

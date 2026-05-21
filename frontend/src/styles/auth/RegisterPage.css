@@ -1,0 +1,400 @@
+.register-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+  color: #191c1d;
+  font-family: "Be Vietnam Pro", "Inter", system-ui, sans-serif;
+}
+
+.register-shell {
+  display: flex;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.register-hero {
+  position: relative;
+  display: flex;
+  width: 60%;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 48px;
+  background: #2e3132;
+}
+
+.register-hero > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.42;
+  filter: grayscale(0.35) contrast(1.08);
+}
+
+.register-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(45deg, rgba(160, 65, 0, 0.44), rgba(46, 49, 50, 0.25) 48%, rgba(46, 49, 50, 0.72)),
+    radial-gradient(circle at 20% 20%, rgba(255, 107, 0, 0.28), transparent 34%);
+}
+
+.register-hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 580px;
+  color: #fff;
+}
+
+.industrial-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  margin-bottom: 32px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: #ff6b00;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.register-hero-content h1 {
+  margin: 0;
+  font-size: clamp(42px, 6vw, 68px);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+.register-hero-content h1 strong {
+  color: #ffdbcc;
+}
+
+.register-hero-content p {
+  max-width: 520px;
+  margin: 20px 0 0;
+  color: #e1e3e4;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.register-feature-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin-top: 34px;
+  padding-top: 28px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.register-feature-list div {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.register-feature-list .material-symbols-outlined {
+  color: #ffdbcc;
+}
+
+.register-panel {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 44px 64px;
+  background: #f8f9fa;
+}
+
+.register-card {
+  width: min(100%, 460px);
+}
+
+.register-mobile-brand {
+  display: none;
+}
+
+.register-heading {
+  margin-bottom: 30px;
+}
+
+.register-heading h2 {
+  margin: 0 0 8px;
+  color: #191c1d;
+  font-size: 32px;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+}
+
+.register-heading p {
+  margin: 0;
+  color: #5d5e61;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.register-form {
+  display: grid;
+  gap: 18px;
+}
+
+.register-field {
+  display: grid;
+  gap: 7px;
+}
+
+.register-field > span {
+  color: #5a4136;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.register-field > div {
+  position: relative;
+}
+
+.register-field .material-symbols-outlined {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  color: #636467;
+  transform: translateY(-50%);
+  transition: color 0.2s ease;
+}
+
+.register-field div:focus-within .material-symbols-outlined {
+  color: #a04100;
+}
+
+.register-field input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #e2bfb0;
+  border-radius: 10px;
+  background: #fff;
+  color: #191c1d;
+  font: inherit;
+  outline: 0;
+  padding: 0 14px 0 42px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.register-field input:hover {
+  border-color: #8e7164;
+}
+
+.register-field input:focus {
+  border-color: #a04100;
+  box-shadow: 0 0 0 4px rgba(255, 107, 0, 0.14);
+}
+
+.register-field input::placeholder {
+  color: rgba(99, 100, 103, 0.62);
+}
+
+.register-password-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.terms-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 6px 0;
+  color: #5a4136;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.terms-row input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: #a04100;
+}
+
+.terms-row a,
+.register-footer-links a {
+  color: #a04100;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.terms-row a:hover,
+.register-footer-links a:hover {
+  text-decoration: underline;
+}
+
+.register-submit {
+  min-height: 58px;
+  border: 0;
+  border-radius: 10px;
+  background: #ff6b00;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  box-shadow: 0 16px 32px rgba(255, 107, 0, 0.16);
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.register-submit:hover {
+  background: #a04100;
+  box-shadow: 0 20px 42px rgba(160, 65, 0, 0.22);
+}
+
+.register-submit:active {
+  transform: scale(0.985);
+}
+
+.register-footer-links {
+  display: grid;
+  gap: 18px;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #e1e3e4;
+}
+
+.register-footer-links p {
+  margin: 0;
+  color: #5d5e61;
+  text-align: center;
+}
+
+.register-footer-links p a {
+  margin-left: 6px;
+}
+
+.register-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #636467;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.register-divider span {
+  height: 1px;
+  flex: 1;
+  background: rgba(226, 191, 176, 0.5);
+}
+
+.register-social-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.register-social-grid button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1px solid #e2bfb0;
+  border-radius: 10px;
+  background: #fff;
+  color: #191c1d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.register-social-grid button:hover {
+  background: #f3f4f5;
+}
+
+.register-social-grid img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.facebook-icon {
+  color: #1877f2;
+}
+
+.register-copyright {
+  margin: 28px 0 0;
+  color: rgba(99, 100, 103, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .register-hero {
+    width: 50%;
+  }
+
+  .register-panel {
+    padding: 40px 28px;
+  }
+}
+
+@media (max-width: 860px) {
+  .register-shell {
+    display: block;
+    min-height: 100vh;
+  }
+
+  .register-hero {
+    display: none;
+  }
+
+  .register-panel {
+    min-height: 100vh;
+    padding: 38px 18px;
+  }
+
+  .register-mobile-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 34px;
+    color: #a04100;
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    text-decoration: none;
+  }
+
+  .register-mobile-brand span {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border-radius: 10px;
+    background: #ff6b00;
+    color: #fff;
+  }
+}
+
+@media (max-width: 560px) {
+  .register-heading h2 {
+    font-size: 28px;
+  }
+
+  .register-password-grid,
+  .register-social-grid {
+    grid-template-columns: 1fr;
+  }
+}
