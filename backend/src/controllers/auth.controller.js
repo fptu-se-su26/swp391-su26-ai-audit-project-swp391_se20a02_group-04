@@ -7,6 +7,7 @@ const { generateAccessToken, generateRefreshToken } = require('../utils/jwt.util
 const { successResponse, errorResponse } = require('../utils/response.util');
 const { verifyGoogleToken } = require('../utils/googleAuth.util');
 const { 
+  sendVerificationOTP,
   sendVerificationEmail, 
   sendPasswordResetEmail,
   sendWelcomeEmail 
@@ -44,8 +45,8 @@ const register = async (req, res) => {
       auth_provider: 'local'
     });
 
-    // Generate verification token
-    const verificationToken = user.generateVerificationToken();
+    // Generate verification OTP
+    const verificationOTP = user.generateVerificationOTP();
     await user.save();
 
     // Assign default CUSTOMER role
@@ -58,11 +59,11 @@ const register = async (req, res) => {
       });
     }
 
-    // Send verification email
+    // Send OTP verification email
     try {
-      await sendVerificationEmail(email, full_name, verificationToken);
+      await sendVerificationOTP(email, full_name, verificationOTP);
     } catch (emailError) {
-      console.error('Failed to send verification email:', emailError);
+      console.error('Failed to send OTP email:', emailError);
       // Continue registration even if email fails
     }
 
@@ -349,6 +350,128 @@ const googleAuth = async (req, res) => {
     });
 
     return errorResponse(res, 401, 'Google authentication failed');
+  }
+};
+
+/**
+ * Verify email with OTP
+ * POST /api/auth/verify-otp
+ */
+const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return errorResponse(res, 400, 'Email and OTP are required');
+    }
+
+    // Find user with valid OTP
+    const user = await User.findOne({
+      email,
+      verification_otp: otp,
+      verification_otp_expires: { $gt: Date.now() }
+    }).select('+verification_otp +verification_otp_expires');
+
+    if (!user) {
+      // Log failed attempt
+      await UserAudit.create({
+        user_id: null,
+        action: 'OTP_VERIFY',
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+        status: 'FAILED',
+        error_message: 'Invalid or expired OTP',
+        metadata: { email }
+      });
+
+      return errorResponse(res, 400, 'Invalid or expired OTP code');
+    }
+
+    if (user.verified) {
+      return errorResponse(res, 400, 'Email already verified');
+    }
+
+    // Verify user
+    user.verified = true;
+    user.email_verified_at = new Date();
+    user.verification_otp = undefined;
+    user.verification_otp_expires = undefined;
+    await user.save();
+
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(user.email, user.full_name);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+    }
+
+    // Log verification
+    await UserAudit.create({
+      user_id: user._id,
+      action: 'OTP_VERIFY',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
+
+    return successResponse(res, 200, 'Email verified successfully', {
+      user: user.toSafeObject()
+    });
+
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    return errorResponse(res, 500, 'OTP verification failed');
+  }
+};
+
+/**
+ * Resend OTP verification code
+ * POST /api/auth/resend-otp
+ */
+const resendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return errorResponse(res, 400, 'Email is required');
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return errorResponse(res, 404, 'User not found');
+    }
+
+    if (user.verified) {
+      return errorResponse(res, 400, 'Email already verified');
+    }
+
+    // Generate new OTP
+    const verificationOTP = user.generateVerificationOTP();
+    await user.save();
+
+    // Send OTP email
+    try {
+      await sendVerificationOTP(email, user.full_name, verificationOTP);
+    } catch (emailError) {
+      console.error('Failed to send OTP email:', emailError);
+      return errorResponse(res, 500, 'Failed to send OTP email');
+    }
+
+    // Log resend
+    await UserAudit.create({
+      user_id: user._id,
+      action: 'OTP_RESEND',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
+
+    return successResponse(res, 200, 'OTP code sent successfully to your email');
+
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    return errorResponse(res, 500, 'Failed to resend OTP');
   }
 };
 
@@ -649,6 +772,8 @@ module.exports = {
   register,
   login,
   googleAuth,
+  verifyOTP,
+  resendOTP,
   verifyEmail,
   resendVerification,
   forgotPassword,

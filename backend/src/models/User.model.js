@@ -56,6 +56,14 @@ const userSchema = new mongoose.Schema({
     type: Date,
     select: false
   },
+  verification_otp: {
+    type: String,
+    select: false
+  },
+  verification_otp_expires: {
+    type: Date,
+    select: false
+  },
   reset_password_token: {
     type: String,
     select: false
@@ -135,6 +143,14 @@ userSchema.methods.toSafeObject = function() {
   delete user.account_locked_until;
   delete user.__v;
   return user;
+};
+
+// Method to generate email verification OTP (6 digits)
+userSchema.methods.generateVerificationOTP = function() {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+  this.verification_otp = otp;
+  this.verification_otp_expires = Date.now() + (parseInt(process.env.OTP_EXPIRE) || 10) * 60 * 1000; // 10 minutes default
+  return otp;
 };
 
 // Method to generate email verification token
