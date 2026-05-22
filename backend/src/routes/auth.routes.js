@@ -41,8 +41,22 @@ router.post('/login', authLimiter, loginValidation, validate, authController.log
 router.post('/google', authLimiter, googleAuthValidation, validate, authController.googleAuth);
 
 /**
+ * @route   POST /api/auth/verify-otp
+ * @desc    Verify email with OTP code
+ * @access  Public
+ */
+router.post('/verify-otp', emailVerificationLimiter, authController.verifyOTP);
+
+/**
+ * @route   POST /api/auth/resend-otp
+ * @desc    Resend OTP verification code
+ * @access  Public
+ */
+router.post('/resend-otp', emailVerificationLimiter, authController.resendOTP);
+
+/**
  * @route   GET /api/auth/verify-email/:token
- * @desc    Verify email address
+ * @desc    Verify email address (old method - kept for backward compatibility)
  * @access  Public
  */
 router.get('/verify-email/:token', verifyEmailValidation, validate, authController.verifyEmail);
