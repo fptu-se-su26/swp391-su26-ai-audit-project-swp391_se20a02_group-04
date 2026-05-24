@@ -9,8 +9,10 @@
 .calendar-layout {
     display: flex;
     height: 100vh;
-    background-color: #f3f4f6; /* Premium light gray background */
-    color: #374151; /* Dark gray for crisp, readable body text */
+    background-color: #f3f4f6;
+    /* Premium light gray background */
+    color: #374151;
+    /* Dark gray for crisp, readable body text */
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     overflow: hidden;
 }
@@ -18,8 +20,10 @@
 /* SIDEBAR (Unified with AdminDashboard.css) */
 .sidebar {
     width: 256px;
-    background-color: #ffffff; /* Crisp white background */
-    border-right: 1px solid #e5e7eb; /* Subtle gray border */
+    background-color: #ffffff;
+    /* Crisp white background */
+    border-right: 1px solid #e5e7eb;
+    /* Subtle gray border */
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -30,7 +34,8 @@
 }
 
 .sidebar-brand h1 {
-    color: #111827; /* Rich black text */
+    color: #111827;
+    /* Rich black text */
     font-size: 1.5rem;
     font-weight: 800;
     letter-spacing: 0.05em;
@@ -38,7 +43,8 @@
 }
 
 .sidebar-brand p {
-    color: #ff6b00; /* Enterprise brand orange accent */
+    color: #ff6b00;
+    /* Enterprise brand orange accent */
     font-size: 0.75rem;
     font-weight: 600;
     margin-top: 4px;
@@ -57,21 +63,27 @@
     display: flex;
     align-items: center;
     padding: 12px 24px;
-    color: #4b5563; /* High contrast muted gray text */
+    color: #4b5563;
+    /* High contrast muted gray text */
     text-decoration: none;
     font-weight: 600;
     transition: all 0.2s ease;
 }
 
 .nav-item:hover {
-    background-color: #f9fafb; /* Light hover background */
-    color: #111827; /* Dark hover text */
+    background-color: #f9fafb;
+    /* Light hover background */
+    color: #111827;
+    /* Dark hover text */
 }
 
 .nav-item.active {
-    background-color: #fff7ed; /* Light orange tint accent background */
-    border-left: 4px solid #ff6b00; /* Thick brand border */
-    color: #ff6b00; /* Brand orange active text */
+    background-color: #fff7ed;
+    /* Light orange tint accent background */
+    border-left: 4px solid #ff6b00;
+    /* Thick brand border */
+    color: #ff6b00;
+    /* Brand orange active text */
 }
 
 .nav-icon {
@@ -158,8 +170,10 @@
     align-items: center;
     justify-content: space-between;
     padding: 20px 40px;
-    background: #ffffff; /* Solid premium white background */
-    border-bottom: 1px solid #e5e7eb; /* Fine border */
+    background: #ffffff;
+    /* Solid premium white background */
+    border-bottom: 1px solid #e5e7eb;
+    /* Fine border */
 }
 
 .header-left h2 {
@@ -253,6 +267,11 @@
 /* CALENDAR BODY */
 .calendar-body {
     padding: 30px 40px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    /* Stretch to fill the remaining vertical space */
+
 }
 
 .page-title {
@@ -464,7 +483,8 @@
 
 .status-badge.pending {
     background: rgba(234, 179, 8, 0.1);
-    color: #d97706; /* Darker amber for readability in light mode */
+    color: #d97706;
+    /* Darker amber for readability in light mode */
     border: 1px solid rgba(234, 179, 8, 0.2);
 }
 
@@ -491,10 +511,10 @@
 
 /* FOOTER */
 .footer {
-    padding: 50px 0;
+    padding: 50px 0 20px 0;
     text-align: center;
     border-top: 1px solid #e5e7eb;
-    margin-top: 50px;
+    margin-top: auto;
 }
 
 .footer h4 {
@@ -507,6 +527,7 @@
 
 .footer-links {
     display: flex;
+    flex-direction: row;
     justify-content: center;
     gap: 20px;
     margin-bottom: 10px;

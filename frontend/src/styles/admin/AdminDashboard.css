@@ -9,8 +9,10 @@
 .dashboard-layout {
     display: flex;
     height: 100vh;
-    background-color: #f3f4f6; /* Nền xám nhạt cao cấp */
-    color: #374151; /* Chữ tối đậm nét */
+    background-color: #f3f4f6;
+    /* Nền xám nhạt cao cấp */
+    color: #374151;
+    /* Chữ tối đậm nét */
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     overflow: hidden;
 }
@@ -18,8 +20,10 @@
 /* SIDEBAR */
 .sidebar {
     width: 256px;
-    background-color: #ffffff; /* Nền trắng tinh khôi */
-    border-right: 1px solid #e5e7eb; /* Đường viền mỏng nhẹ */
+    background-color: #ffffff;
+    /* Nền trắng tinh khôi */
+    border-right: 1px solid #e5e7eb;
+    /* Đường viền mỏng nhẹ */
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -30,7 +34,8 @@
 }
 
 .sidebar-brand h1 {
-    color: #111827; /* Tên thương hiệu chữ đậm đen */
+    color: #111827;
+    /* Tên thương hiệu chữ đậm đen */
     font-size: 1.5rem;
     font-weight: 800;
     letter-spacing: 0.05em;
@@ -38,7 +43,8 @@
 }
 
 .sidebar-brand p {
-    color: #ff6b00; /* Dòng chữ phụ màu cam nổi bật */
+    color: #ff6b00;
+    /* Dòng chữ phụ màu cam nổi bật */
     font-size: 0.75rem;
     font-weight: 600;
     margin-top: 4px;
@@ -57,21 +63,26 @@
     display: flex;
     align-items: center;
     padding: 12px 24px;
-    color: #4b5563; /* Chữ xám đậm */
+    color: #4b5563;
+    /* Chữ xám đậm */
     text-decoration: none;
     font-weight: 600;
     transition: all 0.2s ease;
 }
 
 .nav-item:hover {
-    background-color: #f9fafb; /* Hiệu ứng hover nền nhạt */
+    background-color: #f9fafb;
+    /* Hiệu ứng hover nền nhạt */
     color: #111827;
 }
 
 .nav-item.active {
-    background-color: #fff7ed; /* Nền màu cam sữa nhạt cực kỳ cao cấp */
-    border-left: 4px solid #ff6b00; /* Viền dọc cam nổi bật */
-    color: #ff6b00; /* Chữ chuyển cam */
+    background-color: #fff7ed;
+    /* Nền màu cam sữa nhạt cực kỳ cao cấp */
+    border-left: 4px solid #ff6b00;
+    /* Viền dọc cam nổi bật */
+    color: #ff6b00;
+    /* Chữ chuyển cam */
 }
 
 .nav-icon {
@@ -270,6 +281,8 @@
     display: flex;
     flex-direction: column;
     gap: 24px;
+    flex: 1;
+    /* Stretch to fill the remaining vertical space */
 }
 
 /* STATS ROW */
@@ -326,7 +339,8 @@
 }
 
 .stat-value-white {
-    color: #111827; /* Thay trắng bằng đen đậm */
+    color: #111827;
+    /* Thay trắng bằng đen đậm */
     font-size: 2.5rem;
     font-weight: 800;
     margin-top: 12px;
@@ -334,7 +348,8 @@
 }
 
 .stat-meta-green {
-    color: #16a34a; /* Xanh lá dễ nhìn hơn trên nền sáng */
+    color: #16a34a;
+    /* Xanh lá dễ nhìn hơn trên nền sáng */
     font-size: 0.75rem;
     font-weight: 600;
     margin-top: 8px;
@@ -680,8 +695,9 @@
 
 /* FOOTER */
 .footer {
-    margin-top: 48px;
-    padding-top: 24px;
+    margin-top: auto;
+    /* Push the footer to the bottom of the container */
+    padding-top: 48px;
     border-top: 1px solid #e5e7eb;
     text-align: center;
 }
@@ -696,6 +712,8 @@
 
 .footer-links {
     display: flex;
+    flex-direction: row;
+    /* Override global column layout leak from HomePage.css */
     justify-content: center;
     gap: 24px;
     font-size: 0.875rem;

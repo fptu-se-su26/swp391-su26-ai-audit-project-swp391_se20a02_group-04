@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import "../../styles/home/HomePage.css";
+import { profileService } from "../../services/profileService";
 
 const services = [
   {
@@ -58,6 +59,45 @@ function MaterialIcon({ children, className = "" }) {
 }
 
 export default function HomePage() {
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [user, setUser] = useState({
+    fullname: "Nguyễn Hoàng Nam",
+    email: "namnh.customer@gmail.com",
+    avatar: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6d1f"/></svg>'
+  });
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const res = await profileService.getMe();
+        if (res && res.success && res.data) {
+          const apiUser = res.data.user || res.data;
+          setUser({
+            fullname: apiUser.full_name || apiUser.fullname || "Nguyễn Hoàng Nam",
+            email: apiUser.email || "namnh.customer@gmail.com",
+            avatar: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6d1f"/></svg>'
+          });
+        }
+      } catch (e) {
+        console.log("Offline or not logged in, using default profile info");
+      }
+    };
+    fetchUserData();
+  }, []);
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (showUserMenu && !event.target.closest(".home-actions")) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [showUserMenu]);
+
   return (
     <div className="home-page">
       <header className="home-header">
@@ -72,16 +112,48 @@ export default function HomePage() {
           <a href="#/booking">Lịch hẹn</a>
           <a href="#about">Về chúng tôi</a>
         </nav>
-        <div className="home-actions">
+        <div className="home-actions" style={{ position: "relative" }}>
           <button className="icon-button" type="button" aria-label="Tìm kiếm">
             <MaterialIcon>search</MaterialIcon>
           </button>
           <a className="home-contact-button" href="#contact">
             Liên hệ ngay
           </a>
-          <button className="icon-button mobile-only" type="button" aria-label="Menu">
+          <button className="user-menu-trigger" type="button" aria-label="Menu" onClick={() => setShowUserMenu(!showUserMenu)}>
             <MaterialIcon>menu</MaterialIcon>
           </button>
+
+          {showUserMenu && (
+            <div className="user-dropdown-menu">
+              <a href="#/profile?tab=info" className="dropdown-user-info" onClick={() => setShowUserMenu(false)}>
+                <div className="dropdown-avatar">
+                  <img src={user.avatar} alt="User Avatar" />
+                </div>
+                <div className="dropdown-user-details">
+                  <strong>{user.fullname}</strong>
+                  <span>{user.email}</span>
+                </div>
+              </a>
+              <div className="dropdown-divider" />
+              <a href="#/profile?tab=info" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                <span className="material-symbols-outlined">person</span>
+                <span>Hồ sơ cá nhân</span>
+              </a>
+              <a href="#/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                <span className="material-symbols-outlined">two_wheeler</span>
+                <span>Nhà xe của tôi</span>
+              </a>
+              <a href="#/booking" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                <span className="material-symbols-outlined">event_available</span>
+                <span>Lịch hẹn của tôi</span>
+              </a>
+              <div className="dropdown-divider" />
+              <a href="#/home" className="dropdown-item text-danger" onClick={() => setShowUserMenu(false)}>
+                <span className="material-symbols-outlined">logout</span>
+                <span>Đăng xuất</span>
+              </a>
+            </div>
+          )}
         </div>
       </header>
 
