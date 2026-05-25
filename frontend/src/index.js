@@ -6,6 +6,7 @@ import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import BookingPage from "./pages/customer/BookingPage";
+import UserProfile from "./pages/customer/UserProfile";
 import HomePage from "./pages/home/HomePage";
 import StaffLayout from "./pages/staff/StaffLayout";
 
@@ -19,6 +20,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/booking" element={<BookingPage />} />
+        <Route path="/profile" element={<UserProfile />} />
         <Route path="/admin/*" element={<App />} />
         <Route path="/*" element={<StaffLayout />} />
       </Routes>
