@@ -55,7 +55,7 @@ export default function RegisterPage() {
       });
 
       saveAuthSession(response.data);
-      navigate(getDefaultRouteByRoles(response.data?.roles || ["CUSTOMER"]), { replace: true });
+      navigate(`/verify-otp?email=${encodeURIComponent(formData.email.trim())}`, { replace: true });
     } catch (error) {
       setStatus({ type: "error", message: error.message || "Đăng ký thất bại. Vui lòng thử lại." });
     } finally {
@@ -96,7 +96,7 @@ export default function RegisterPage() {
 
         <section className="register-panel">
           <div className="register-card">
-            <a className="register-mobile-brand" href="#/home">
+            <a className="register-mobile-brand" href="/home">
               <span>
                 <MaterialIcon>build</MaterialIcon>
               </span>
@@ -205,8 +205,8 @@ export default function RegisterPage() {
                   type="checkbox"
                 />
                 <span>
-                  Tôi đồng ý với các <a href="#/register">Điều khoản dịch vụ</a> và{" "}
-                  <a href="#/register">Chính sách bảo mật</a> của MOTOCORE.
+                  Tôi đồng ý với các <a href="/register">Điều khoản dịch vụ</a> và{" "}
+                  <a href="/register">Chính sách bảo mật</a> của MOTOCORE.
                 </span>
               </label>
 
@@ -218,7 +218,7 @@ export default function RegisterPage() {
             <div className="register-footer-links">
               <p>
                 Đã có tài khoản?
-                <a href="#/login">Đăng nhập</a>
+                <a href="/login">Đăng nhập</a>
               </p>
               <div className="register-divider">
                 <span />

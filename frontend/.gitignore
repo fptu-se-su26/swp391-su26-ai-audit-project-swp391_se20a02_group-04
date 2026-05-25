@@ -20,6 +20,7 @@ coverage/
 # Environment Variables
 # =========================
 .env
+.emv
 .env.local
 .env.development.local
 .env.test.local

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { getDefaultRouteByRoles, login, saveAuthSession } from "../../services/authApi";
 import "../../styles/auth/LoginPage.css";
 
@@ -16,6 +16,7 @@ export default function LoginPage() {
   });
   const [status, setStatus] = useState({ type: "", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const location = useLocation();
   const navigate = useNavigate();
 
   const handleChange = (event) => {
@@ -38,7 +39,8 @@ export default function LoginPage() {
       });
 
       saveAuthSession(response.data);
-      navigate(getDefaultRouteByRoles(response.data?.roles), { replace: true });
+      const fromPath = location.state?.from?.pathname;
+      navigate(fromPath || getDefaultRouteByRoles(response.data?.roles), { replace: true });
     } catch (error) {
       setStatus({ type: "error", message: error.message || "Đăng nhập thất bại. Vui lòng thử lại." });
     } finally {
@@ -66,7 +68,7 @@ export default function LoginPage() {
 
         <section className="login-panel">
           <div className="login-card">
-            <a className="mobile-login-brand" href="#/home">
+            <a className="mobile-login-brand" href="/home">
               <MaterialIcon>handyman</MaterialIcon>
               <span>MOTOCORE</span>
             </a>
@@ -102,7 +104,7 @@ export default function LoginPage() {
               <label className="login-field" htmlFor="password">
                 <span className="password-label-row">
                   <span>Mật khẩu</span>
-                  <a href="#/forgot-password">Quên mật khẩu?</a>
+                  <a href="/forgot-password">Quên mật khẩu?</a>
                 </span>
                 <div className="login-input-wrap">
                   <MaterialIcon>lock</MaterialIcon>
@@ -152,16 +154,16 @@ export default function LoginPage() {
 
             <p className="signup-copy">
               Chưa có tài khoản?
-              <a href="#/register">Đăng ký ngay</a>
+              <a href="/register">Đăng ký ngay</a>
             </p>
           </div>
         </section>
       </main>
 
       <footer className="login-support-footer">
-        <a href="#/home">Điều khoản</a>
-        <a href="#/home">Bảo mật</a>
-        <a href="#/home">Hỗ trợ kỹ thuật: 1900 xxxx</a>
+        <a href="/home">Điều khoản</a>
+        <a href="/home">Bảo mật</a>
+        <a href="/home">Hỗ trợ kỹ thuật: 1900 xxxx</a>
       </footer>
     </div>
   );

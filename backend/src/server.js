@@ -10,6 +10,9 @@ const { apiLimiter } = require('./middleware/rateLimiter.middleware');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const appointmentRoutes = require('./routes/appointment.routes');
+const adminUserRoutes = require('./routes/admin.user.routes');
+const adminAppointmentRoutes = require('./routes/admin.appointment.routes');
+const adminInventoryRoutes = require('./routes/admin.inventory.routes');
 
 const app = express();
 
@@ -42,6 +45,9 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/admin', adminUserRoutes);
+app.use('/api/admin', adminAppointmentRoutes);
+app.use('/api/admin', adminInventoryRoutes);
 
 // 404 handler
 app.use((req, res) => {

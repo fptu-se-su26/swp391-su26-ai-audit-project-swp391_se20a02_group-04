@@ -36,20 +36,20 @@ export default function ForgotPasswordPage() {
     <div className="forgot-page">
       <header className="forgot-header">
         <div className="forgot-header-inner">
-          <a className="forgot-logo" href="#/home">
+          <a className="forgot-logo" href="/home">
             MOTOCORE
           </a>
           <nav className="forgot-nav" aria-label="Điều hướng khôi phục mật khẩu">
-            <a href="#/home">Giải pháp</a>
-            <a href="#/home">Quy trình</a>
-            <a href="#/home">Kho vật tư</a>
-            <a href="#/home">Hỗ trợ</a>
+            <a href="/home">Giải pháp</a>
+            <a href="/home">Quy trình</a>
+            <a href="/home">Kho vật tư</a>
+            <a href="/home">Hỗ trợ</a>
           </nav>
           <div className="forgot-header-actions">
-            <a className="forgot-login-link" href="#/login">
+            <a className="forgot-login-link" href="/login">
               Đăng nhập
             </a>
-            <a className="forgot-register-link" href="#/register">
+            <a className="forgot-register-link" href="/register">
               Đăng ký
             </a>
           </div>
@@ -104,7 +104,7 @@ export default function ForgotPasswordPage() {
                 {isSubmitting ? "Đang gửi..." : "Gửi liên kết khôi phục"}
               </button>
 
-              <a className="back-login-link" href="#/login">
+              <a className="back-login-link" href="/login">
                 <MaterialIcon>arrow_back</MaterialIcon>
                 Quay lại đăng nhập
               </a>
@@ -128,10 +128,10 @@ export default function ForgotPasswordPage() {
         <div>
           <strong>MOTOCORE</strong>
           <nav aria-label="Liên kết chân trang">
-            <a href="#/home">Chính sách bảo mật</a>
-            <a href="#/home">Điều khoản dịch vụ</a>
-            <a href="#/home">Tìm garage</a>
-            <a href="#/staff/dashboard">Cổng kỹ thuật viên</a>
+            <a href="/home">Chính sách bảo mật</a>
+            <a href="/home">Điều khoản dịch vụ</a>
+            <a href="/home">Tìm garage</a>
+            <a href="/staff/dashboard">Cổng kỹ thuật viên</a>
           </nav>
           <span>Copyright 2024 MOTOCORE Industrial Systems.</span>
         </div>

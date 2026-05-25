@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Filter,
   Clock,
+  User,
 } from "lucide-react";
 import "../../styles/admin/AdminCalendar.css";
 
@@ -79,17 +80,28 @@ const AdminCalendar = ({ onViewChange }) => {
               <Calendar className="nav-icon" />
               <span>Lịch hẹn</span>
             </a>
-            <a href="#" className="nav-item">
+            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
               <Wrench className="nav-icon" />
               <span>Dịch vụ</span>
             </a>
-            <a href="#" className="nav-item">
+            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
               <Users className="nav-icon" />
               <span>Khách hàng</span>
             </a>
-            <a href="#" className="nav-item">
+            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
               <BarChart2 className="nav-icon" />
               <span>Báo cáo</span>
+            </a>
+            <a
+              href="#"
+              className="nav-item"
+              onClick={(event) => {
+                event.preventDefault();
+                if (onViewChange) onViewChange("profile");
+              }}
+            >
+              <User className="nav-icon" />
+              <span>Hồ sơ</span>
             </a>
           </nav>
         </div>
@@ -120,9 +132,9 @@ const AdminCalendar = ({ onViewChange }) => {
             </div>
             <div className="header-icons">
               <Bell className="header-icon" />
-              <Settings className="header-icon" />
-              <div className="avatar">
-                <img src="/api/placeholder/32/32" alt="Quản trị viên" />
+              <Settings className="header-icon" onClick={() => { if (onViewChange) onViewChange("profile"); }} style={{ cursor: "pointer" }} />
+              <div className="avatar" onClick={() => { if (onViewChange) onViewChange("profile"); }}>
+                <img src='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6b00"/></svg>' alt="Quản trị viên" />
               </div>
             </div>
           </div>

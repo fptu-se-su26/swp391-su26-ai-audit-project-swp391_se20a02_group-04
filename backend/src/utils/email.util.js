@@ -4,7 +4,7 @@ const nodemailer = require('nodemailer');
  * Create email transporter
  */
 const createTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT),
     secure: process.env.SMTP_SECURE === 'true',
@@ -16,7 +16,81 @@ const createTransporter = () => {
 };
 
 /**
- * Send email verification
+ * Send OTP verification email
+ * @param {String} email - Recipient email
+ * @param {String} name - Recipient name
+ * @param {String} otp - 6-digit OTP code
+ */
+const sendVerificationOTP = async (email, name, otp) => {
+  const transporter = createTransporter();
+  
+  const mailOptions = {
+    from: process.env.EMAIL_FROM,
+    to: email,
+    subject: 'Email Verification OTP - Motorcycle Repair Booking',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #4CAF50; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background: #f9f9f9; }
+          .otp-box { background: white; border: 2px dashed #4CAF50; padding: 20px; text-align: center; margin: 20px 0; border-radius: 10px; }
+          .otp-code { font-size: 36px; font-weight: bold; color: #4CAF50; letter-spacing: 8px; font-family: 'Courier New', monospace; }
+          .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+          .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 15px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🏍️ Email Verification</h1>
+          </div>
+          <div class="content">
+            <h2>Hello ${name || 'there'}!</h2>
+            <p>Thank you for registering with Motorcycle Repair Booking System.</p>
+            <p>Please use the following OTP code to verify your email address:</p>
+            
+            <div class="otp-box">
+              <p style="margin: 0; font-size: 14px; color: #666;">Your OTP Code</p>
+              <div class="otp-code">${otp}</div>
+              <p style="margin: 10px 0 0 0; font-size: 12px; color: #999;">Valid for 10 minutes</p>
+            </div>
+            
+            <div class="warning">
+              <strong>⚠️ Security Notice:</strong>
+              <ul style="margin: 5px 0;">
+                <li>This OTP will expire in <strong>10 minutes</strong></li>
+                <li>Do not share this code with anyone</li>
+                <li>If you didn't request this, please ignore this email</li>
+              </ul>
+            </div>
+            
+            <p style="margin-top: 20px;">Enter this code on the verification page to complete your registration.</p>
+          </div>
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} Motorcycle Repair Booking. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ OTP verification email sent to ${email}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending OTP email:', error);
+    throw new Error('Failed to send OTP email');
+  }
+};
+
+/**
+ * Send email verification (old method - kept for backward compatibility)
  * @param {String} email - Recipient email
  * @param {String} name - Recipient name
  * @param {String} token - Verification token
@@ -222,6 +296,7 @@ const sendWelcomeEmail = async (email, name) => {
 };
 
 module.exports = {
+  sendVerificationOTP,
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail

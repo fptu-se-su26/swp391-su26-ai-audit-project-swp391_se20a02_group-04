@@ -48,6 +48,13 @@ const AUTH_MESSAGE_TRANSLATIONS = [
   ["Password reset link has been sent to your email", "Liên kết khôi phục mật khẩu đã được gửi đến email của bạn."],
   ["Failed to process password reset request", "Không thể xử lý yêu cầu khôi phục mật khẩu."],
   ["Failed to send password reset email", "Không thể gửi email khôi phục mật khẩu."],
+  ["Email verified successfully", "Xác thực email thành công."],
+  ["Invalid or expired OTP code", "Mã OTP không đúng hoặc đã hết hạn."],
+  ["Email already verified", "Email đã được xác thực trước đó."],
+  ["OTP has been resent to your email", "Mã OTP mới đã được gửi đến email của bạn."],
+  ["Password reset successfully. You can now login with your new password.", "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới."],
+  ["Invalid or expired reset token", "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn."],
+  ["New password must be different from your current password", "Mật khẩu mới phải khác mật khẩu hiện tại."],
   ["Request failed", "Yêu cầu thất bại. Vui lòng thử lại."],
 ];
 
@@ -120,6 +127,16 @@ export function getAuthSession() {
   const user = parseStoredJson("authUser", null);
   const roles = normalizeRoles(parseStoredJson("authRoles", []));
 
+  if (accessToken && !isUsableJwt(accessToken)) {
+    clearAuthSession();
+    return {
+      accessToken: null,
+      refreshToken: null,
+      user: null,
+      roles: [],
+    };
+  }
+
   return {
     accessToken,
     refreshToken,
@@ -179,6 +196,27 @@ function parseStoredJson(key, fallbackValue) {
   }
 }
 
+function isUsableJwt(token) {
+  try {
+    const [, payloadPart] = token.split(".");
+
+    if (!payloadPart) {
+      return false;
+    }
+
+    const normalizedPayload = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(normalizedPayload));
+
+    if (!payload.exp) {
+      return true;
+    }
+
+    return payload.exp * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 export function login(credentials) {
   return request("/auth/login", {
     method: "POST",
@@ -197,5 +235,26 @@ export function forgotPassword(email) {
   return request("/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify({ email }),
+  });
+}
+
+export function verifyOtp(email, otp) {
+  return request("/auth/verify-otp", {
+    method: "POST",
+    body: JSON.stringify({ email, otp }),
+  });
+}
+
+export function resendOtp(email) {
+  return request("/auth/resend-otp", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword({ token, new_password, confirm_password }) {
+  return request("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, new_password, confirm_password }),
   });
 }
