@@ -9,6 +9,7 @@ const { apiLimiter } = require('./middleware/rateLimiter.middleware');
 // Import routes
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const appointmentRoutes = require('./routes/appointment.routes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/appointments', appointmentRoutes);
 
 // 404 handler
 app.use((req, res) => {
