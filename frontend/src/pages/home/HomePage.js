@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "../../styles/home/HomePage.css";
+import { clearAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
 
 const services = [
@@ -98,25 +99,30 @@ export default function HomePage() {
     };
   }, [showUserMenu]);
 
+  const handleLogout = () => {
+    clearAuthSession();
+    setShowUserMenu(false);
+  };
+
   return (
     <div className="home-page">
       <header className="home-header">
-        <a className="home-logo" href="#/home">
+        <a className="home-logo" href="/home">
           MOTOCORE
         </a>
         <nav className="home-nav" aria-label="Điều hướng chính">
-          <a className="active" href="#/home">
+          <a className="active" href="/home">
             Trang chủ
           </a>
-          <a href="#services">Dịch vụ</a>
-          <a href="#/booking">Lịch hẹn</a>
-          <a href="#about">Về chúng tôi</a>
+          <a href="/home">Dịch vụ</a>
+          <a href="/booking">Lịch hẹn</a>
+          <a href="/about">Về chúng tôi</a>
         </nav>
         <div className="home-actions" style={{ position: "relative" }}>
           <button className="icon-button" type="button" aria-label="Tìm kiếm">
             <MaterialIcon>search</MaterialIcon>
           </button>
-          <a className="home-contact-button" href="#contact">
+          <a className="home-contact-button" href="/booking">
             Liên hệ ngay
           </a>
           <button className="user-menu-trigger" type="button" aria-label="Menu" onClick={() => setShowUserMenu(!showUserMenu)}>
@@ -125,7 +131,7 @@ export default function HomePage() {
 
           {showUserMenu && (
             <div className="user-dropdown-menu">
-              <a href="#/profile?tab=info" className="dropdown-user-info" onClick={() => setShowUserMenu(false)}>
+              <a href="/profile?tab=info" className="dropdown-user-info" onClick={() => setShowUserMenu(false)}>
                 <div className="dropdown-avatar">
                   <img src={user.avatar} alt="User Avatar" />
                 </div>
@@ -135,20 +141,20 @@ export default function HomePage() {
                 </div>
               </a>
               <div className="dropdown-divider" />
-              <a href="#/profile?tab=info" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+              <a href="/profile?tab=info" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">person</span>
                 <span>Hồ sơ cá nhân</span>
               </a>
-              <a href="#/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+              <a href="/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">two_wheeler</span>
                 <span>Nhà xe của tôi</span>
               </a>
-              <a href="#/booking" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+              <a href="/booking" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">event_available</span>
                 <span>Lịch hẹn của tôi</span>
               </a>
               <div className="dropdown-divider" />
-              <a href="#/home" className="dropdown-item text-danger" onClick={() => setShowUserMenu(false)}>
+              <a href="/home" className="dropdown-item text-danger" onClick={handleLogout}>
                 <span className="material-symbols-outlined">logout</span>
                 <span>Đăng xuất</span>
               </a>
@@ -180,10 +186,10 @@ export default function HomePage() {
               tiến. Nơi hội tụ kỹ thuật viên tay nghề cao dành riêng cho xe PKL.
             </p>
             <div className="home-hero-buttons">
-              <a className="primary-button" href="#/booking">
+              <a className="primary-button" href="/booking">
                 Đặt lịch bảo dưỡng
               </a>
-              <a className="secondary-button" href="#services">
+              <a className="secondary-button" href="/home">
                 Xem bảng giá
               </a>
             </div>
@@ -210,7 +216,7 @@ export default function HomePage() {
               <span>Dịch vụ của chúng tôi</span>
               <h2>Giải Pháp Chuyên Sâu</h2>
             </div>
-            <a href="#contact">
+            <a href="/booking">
               Tất cả dịch vụ <MaterialIcon>arrow_forward</MaterialIcon>
             </a>
           </div>
@@ -227,7 +233,7 @@ export default function HomePage() {
                     <h3>{service.title}</h3>
                   </div>
                   <p>{service.description}</p>
-                  <a href="#contact">
+                  <a href="/booking">
                     Xem chi tiết <MaterialIcon>east</MaterialIcon>
                   </a>
                 </div>
@@ -316,7 +322,7 @@ export default function HomePage() {
       <footer className="home-footer">
         <div className="footer-main">
           <div>
-            <a className="footer-logo" href="#/home">
+            <a className="footer-logo" href="/home">
               MOTOCORE
             </a>
             <p>
@@ -325,9 +331,10 @@ export default function HomePage() {
             </p>
           </div>
           <div className="footer-links">
-            <a href="#home">Trang chủ</a>
-            <a href="#services">Dịch vụ</a>
-            <a href="#/booking">Lịch hẹn</a>
+            <a href="/home">Trang chủ</a>
+            <a href="/home">Dịch vụ</a>
+            <a href="/booking">Lịch hẹn</a>
+            <a href="/about">Về chúng tôi</a>
           </div>
           <label className="newsletter">
             <span>Đăng ký bản tin</span>
@@ -342,30 +349,30 @@ export default function HomePage() {
         <div className="footer-bottom">
           <span>© 2024 MOTOCORE Industrial. Bảo lưu mọi quyền.</span>
           <div>
-            <a href="#home">Facebook</a>
-            <a href="#home">Instagram</a>
-            <a href="#home">Youtube</a>
+            <a href="/home">Facebook</a>
+            <a href="/home">Instagram</a>
+            <a href="/home">Youtube</a>
           </div>
         </div>
       </footer>
 
       <nav className="mobile-bottom-nav" aria-label="Điều hướng di động">
-        <a href="#/home">
+        <a href="/home">
           <MaterialIcon>home</MaterialIcon>
           Trang chủ
         </a>
-        <a href="#/booking">
+        <a href="/booking">
           <MaterialIcon>event_available</MaterialIcon>
           Đặt lịch
         </a>
-        <a className="floating-action" href="#services">
+        <a className="floating-action" href="/home">
           <MaterialIcon>handyman</MaterialIcon>
         </a>
-        <a href="#contact">
+        <a href="/booking">
           <MaterialIcon>support_agent</MaterialIcon>
           Hỗ trợ
         </a>
-        <a href="#/staff/dashboard">
+        <a href="/staff/dashboard">
           <MaterialIcon>person</MaterialIcon>
           Tài khoản
         </a>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { clearAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
 import "../../styles/customer/UserProfile.css";
 
@@ -121,6 +122,11 @@ export default function UserProfile() {
       document.removeEventListener("mousedown", handleOutsideClick);
     };
   }, [showUserMenu]);
+
+  const handleLogout = () => {
+    clearAuthSession();
+    setShowUserMenu(false);
+  };
 
   /**
    * Fetch Activity logs from Backend API if tab active
@@ -280,20 +286,20 @@ export default function UserProfile() {
 
       {/* Header (Cohesive with BookingPage) */}
       <header className="booking-header">
-        <a className="booking-logo" href="#/home">
+        <a className="booking-logo" href="/home">
           MOTOCORE
         </a>
         <nav className="booking-nav" aria-label="Điều hướng tài khoản">
-          <a href="#/home">Trang chủ</a>
-          <a href="#/home">Dịch vụ</a>
-          <a href="#/booking">Lịch hẹn</a>
-          <a href="#/home">Về chúng tôi</a>
+          <a href="/home">Trang chủ</a>
+          <a href="/home">Dịch vụ</a>
+          <a href="/booking">Lịch hẹn</a>
+          <a href="/about">Về chúng tôi</a>
         </nav>
         <div className="booking-actions" style={{ position: "relative" }}>
           <button className="icon-button" type="button" aria-label="Tìm kiếm" disabled>
             <MaterialIcon>search</MaterialIcon>
           </button>
-          <a className="booking-contact-button" href="#/home">
+          <a className="booking-contact-button" href="/home">
             Liên hệ ngay
           </a>
           <button className="user-menu-trigger" type="button" aria-label="Menu" onClick={() => setShowUserMenu(!showUserMenu)}>
@@ -302,7 +308,7 @@ export default function UserProfile() {
 
           {showUserMenu && (
             <div className="user-dropdown-menu">
-              <a href="#/profile?tab=info" className="dropdown-user-info" onClick={() => setShowUserMenu(false)}>
+              <a href="/profile?tab=info" className="dropdown-user-info" onClick={() => setShowUserMenu(false)}>
                 <div className="dropdown-avatar">
                   <img src={user.avatar} alt="User Avatar" />
                 </div>
@@ -312,20 +318,20 @@ export default function UserProfile() {
                 </div>
               </a>
               <div className="dropdown-divider" />
-              <a href="#/profile?tab=info" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+              <a href="/profile?tab=info" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">person</span>
                 <span>Hồ sơ cá nhân</span>
               </a>
-              <a href="#/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+              <a href="/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">two_wheeler</span>
                 <span>Nhà xe của tôi</span>
               </a>
-              <a href="#/booking" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+              <a href="/booking" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">event_available</span>
                 <span>Lịch hẹn của tôi</span>
               </a>
               <div className="dropdown-divider" />
-              <a href="#/home" className="dropdown-item text-danger" onClick={() => setShowUserMenu(false)}>
+              <a href="/home" className="dropdown-item text-danger" onClick={handleLogout}>
                 <span className="material-symbols-outlined">logout</span>
                 <span>Đăng xuất</span>
               </a>

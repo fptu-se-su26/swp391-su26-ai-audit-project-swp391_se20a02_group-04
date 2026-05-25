@@ -350,6 +350,30 @@
   filter: brightness(1.05);
 }
 
+.booking-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.booking-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.booking-alert .material-symbols-outlined {
+  flex: 0 0 auto;
+}
+
+.booking-alert-error {
+  background: #fff0f0;
+  color: #a21c1c;
+}
+
 .booking-side {
   display: grid;
   align-content: start;
@@ -481,9 +505,55 @@
   padding: 6px 9px;
 }
 
+.appointment-empty {
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid rgba(226, 191, 176, 0.5);
+  color: #5a4136;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.appointment-actions-inline {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.appointment-actions-inline button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #e2bfb0;
+  border-radius: 999px;
+  background: #fff;
+  color: #a21c1c;
+  cursor: pointer;
+}
+
+.appointment-actions-inline button:hover {
+  background: #fff0f0;
+}
+
+.appointment-actions-inline .material-symbols-outlined {
+  font-size: 18px;
+}
+
 .status-pending {
   background: #fff3d6;
   color: #9a6200;
+}
+
+.status-confirmed {
+  background: #e8f0ff;
+  color: #174ea6;
+}
+
+.status-progress {
+  background: #f1e8ff;
+  color: #5f259f;
 }
 
 .status-completed {
@@ -494,6 +564,11 @@
 .status-paid {
   background: #e8f0ff;
   color: #174ea6;
+}
+
+.status-cancelled {
+  background: #f2f2f2;
+  color: #5d5d5d;
 }
 
 @media (max-width: 1080px) {

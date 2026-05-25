@@ -1,0 +1,362 @@
+:root {
+  --about-primary: #a04100;
+  --about-primary-bright: #ff6b00;
+  --about-soft: #fff3ec;
+  --about-ink: #191c1d;
+  --about-muted: #5a4136;
+  --about-line: #e2bfb0;
+  --about-surface: #f8f9fa;
+  --about-dark: #2e3132;
+}
+
+.about-page {
+  min-height: 100vh;
+  background: var(--about-surface);
+  color: var(--about-ink);
+  font-family: "Be Vietnam Pro", "Inter", system-ui, sans-serif;
+}
+
+.about-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(100%, 1440px);
+  height: 80px;
+  margin: 0 auto;
+  padding: 0 32px;
+  border-bottom: 1px solid rgba(226, 191, 176, 0.5);
+  background: rgba(248, 249, 250, 0.94);
+  backdrop-filter: blur(14px);
+}
+
+.about-logo {
+  color: var(--about-primary);
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  text-decoration: none;
+}
+
+.about-nav {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 34px;
+}
+
+.about-nav a {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  border-bottom: 2px solid transparent;
+  color: var(--about-muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.about-nav a:hover,
+.about-nav a.active {
+  border-color: var(--about-primary);
+  color: var(--about-primary);
+}
+
+.about-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.about-contact-button,
+.about-menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border-radius: 12px;
+  text-decoration: none;
+}
+
+.about-contact-button {
+  padding: 0 20px;
+  background: var(--about-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.about-menu-button {
+  width: 42px;
+  border: 1px solid rgba(226, 191, 176, 0.5);
+  background: #fff;
+  color: var(--about-muted);
+}
+
+.about-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: min(100%, 1440px);
+  min-height: 620px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.about-hero-image,
+.about-hero-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.about-hero-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.about-hero-overlay {
+  background: linear-gradient(90deg, rgba(248, 249, 250, 0.96), rgba(248, 249, 250, 0.76) 48%, rgba(248, 249, 250, 0.18));
+}
+
+.about-hero-content {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 100%);
+  padding: 72px 32px;
+}
+
+.about-eyebrow,
+.about-section-label {
+  color: var(--about-primary);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.about-hero h1,
+.about-story h2,
+.about-section-heading h2 {
+  margin: 12px 0 0;
+  font-size: clamp(36px, 5vw, 62px);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+.about-hero p {
+  max-width: 650px;
+  margin: 24px 0 34px;
+  color: var(--about-muted);
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+.about-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.about-stats,
+.about-story,
+.about-values,
+.about-process,
+.about-team {
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: 72px 32px;
+}
+
+.about-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  padding-top: 34px;
+  padding-bottom: 34px;
+  background: #fff;
+}
+
+.about-stats div {
+  padding: 24px;
+  border: 1px solid rgba(226, 191, 176, 0.55);
+  border-radius: 18px;
+  background: var(--about-soft);
+}
+
+.about-stats strong {
+  display: block;
+  color: var(--about-primary);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.about-stats span {
+  display: block;
+  margin-top: 10px;
+  color: var(--about-muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.about-story {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 64px;
+  align-items: start;
+}
+
+.about-story h2,
+.about-section-heading h2 {
+  font-size: clamp(30px, 4vw, 44px);
+}
+
+.about-story p {
+  margin: 0;
+  color: var(--about-muted);
+  font-size: 17px;
+  line-height: 1.8;
+}
+
+.about-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  padding-top: 0;
+}
+
+.about-values article,
+.process-grid article,
+.team-grid article {
+  border: 1px solid rgba(226, 191, 176, 0.55);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 22px 58px rgba(25, 28, 29, 0.06);
+}
+
+.about-values article {
+  padding: 30px;
+}
+
+.about-values .material-symbols-outlined {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: 16px;
+  background: #ffdbcc;
+  color: var(--about-primary);
+  font-size: 30px;
+}
+
+.about-values h3,
+.process-grid h3,
+.team-grid h3 {
+  margin: 22px 0 10px;
+  font-size: 21px;
+}
+
+.about-values p,
+.process-grid p,
+.team-grid p {
+  margin: 0;
+  color: var(--about-muted);
+  line-height: 1.7;
+}
+
+.about-process {
+  background: var(--about-dark);
+}
+
+.about-process .about-section-label,
+.about-process h2 {
+  color: #ffb693;
+}
+
+.process-grid,
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 42px;
+}
+
+.process-grid article {
+  padding: 26px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.process-grid article > span {
+  color: #ffb693;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.process-grid p {
+  color: #d5d5d7;
+}
+
+.team-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.team-grid article {
+  padding: 30px;
+}
+
+.team-avatar {
+  display: grid;
+  width: 70px;
+  height: 70px;
+  place-items: center;
+  border-radius: 18px;
+  background: var(--about-soft);
+  color: var(--about-primary);
+}
+
+.team-avatar .material-symbols-outlined {
+  font-size: 36px;
+}
+
+.team-grid strong {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--about-primary);
+}
+
+@media (max-width: 980px) {
+  .about-header {
+    padding: 0 18px;
+  }
+
+  .about-nav,
+  .about-contact-button {
+    display: none;
+  }
+
+  .about-story,
+  .about-values,
+  .process-grid,
+  .team-grid,
+  .about-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .about-hero-content,
+  .about-stats,
+  .about-story,
+  .about-values,
+  .about-process,
+  .about-team {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+}

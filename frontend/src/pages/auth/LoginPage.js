@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { getDefaultRouteByRoles, login, saveAuthSession } from "../../services/authApi";
 import "../../styles/auth/LoginPage.css";
 
 function MaterialIcon({ children, className = "" }) {
@@ -7,6 +9,44 @@ function MaterialIcon({ children, className = "" }) {
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    identifier: "",
+    password: "",
+    remember: false,
+  });
+  const [status, setStatus] = useState({ type: "", message: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleChange = (event) => {
+    const { name, type, checked, value } = event.target;
+    setFormData((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setStatus({ type: "", message: "" });
+    setIsSubmitting(true);
+
+    try {
+      const response = await login({
+        identifier: formData.identifier.trim(),
+        password: formData.password,
+      });
+
+      saveAuthSession(response.data);
+      const fromPath = location.state?.from?.pathname;
+      navigate(fromPath || getDefaultRouteByRoles(response.data?.roles), { replace: true });
+    } catch (error) {
+      setStatus({ type: "error", message: error.message || "Đăng nhập thất bại. Vui lòng thử lại." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="login-page">
@@ -22,16 +62,13 @@ export default function LoginPage() {
               <MaterialIcon className="brand-icon">settings_input_component</MaterialIcon>
               <h2>MOTOCORE</h2>
             </div>
-            <p>
-              Giải pháp quản lý garage thông minh, tối ưu hóa mọi quy trình
-              dịch vụ và chăm sóc khách hàng chuyên nghiệp.
-            </p>
+            <p>Giải pháp quản lý garage thông minh, tối ưu hóa quy trình dịch vụ và chăm sóc khách hàng.</p>
           </div>
         </section>
 
         <section className="login-panel">
           <div className="login-card">
-            <a className="mobile-login-brand" href="#/home">
+            <a className="mobile-login-brand" href="/home">
               <MaterialIcon>handyman</MaterialIcon>
               <span>MOTOCORE</span>
             </a>
@@ -41,27 +78,44 @@ export default function LoginPage() {
               <p>Đăng nhập để quản lý lịch hẹn và dịch vụ của bạn</p>
             </div>
 
-            <form className="login-form">
+            <form className="login-form" onSubmit={handleSubmit}>
+              {status.message && (
+                <div className={`auth-message auth-message-${status.type}`} role="alert" aria-live="polite">
+                  {status.message}
+                </div>
+              )}
+
               <label className="login-field" htmlFor="username">
                 <span>Email/Số điện thoại</span>
                 <div className="login-input-wrap">
                   <MaterialIcon>person</MaterialIcon>
-                  <input id="username" name="username" placeholder="name@company.com" type="text" />
+                  <input
+                    id="username"
+                    name="identifier"
+                    onChange={handleChange}
+                    placeholder="name@company.com"
+                    required
+                    type="text"
+                    value={formData.identifier}
+                  />
                 </div>
               </label>
 
               <label className="login-field" htmlFor="password">
                 <span className="password-label-row">
                   <span>Mật khẩu</span>
-                  <a href="#/forgot-password">Quên mật khẩu?</a>
+                  <a href="/forgot-password">Quên mật khẩu?</a>
                 </span>
                 <div className="login-input-wrap">
                   <MaterialIcon>lock</MaterialIcon>
                   <input
                     id="password"
                     name="password"
-                    placeholder="••••••••"
+                    onChange={handleChange}
+                    placeholder="********"
+                    required
                     type={showPassword ? "text" : "password"}
+                    value={formData.password}
                   />
                   <button
                     className="password-toggle"
@@ -75,12 +129,12 @@ export default function LoginPage() {
               </label>
 
               <label className="remember-row">
-                <input name="remember" type="checkbox" />
+                <input checked={formData.remember} name="remember" onChange={handleChange} type="checkbox" />
                 <span>Ghi nhớ đăng nhập</span>
               </label>
 
-              <button className="login-submit" type="submit">
-                Đăng nhập
+              <button className="login-submit" disabled={isSubmitting} type="submit">
+                {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
                 <MaterialIcon>arrow_forward</MaterialIcon>
               </button>
             </form>
@@ -90,34 +144,26 @@ export default function LoginPage() {
             </div>
 
             <div className="social-login-grid">
-              <button type="button">
-                <img
-                  alt="Google"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8xjh7rgI8v0w9j5QNjnk479dibLjiQ2UJ3sfUov7gXgl-DEmSzkxSzyZmJOKoaq1D9OqQqqkglwYYDSuP1GGXfmM8_NUA6kKzt9Z5hOe-zWLaf06wzZkOSZuDWWdoIBINGwbOlppSz0VeRCZkyHyg3B-hhIR36nLtLEDBE3n4ekPjQXVF6wwNIefj7fPcIGNak6MTb4kPYO6wDxv3K3YcTQ9kjaBQkPhtcHz-jzYwhzoMiMfUHIu73QO4BC_ZTpueNb9YLRfTTyE"
-                />
+              <button type="button" disabled>
                 Google
               </button>
-              <button type="button">
-                <img
-                  alt="Facebook"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuB6CH8ZQ4dk_y_GAH7I_ywHy5FKP6BOw3fCkexN9xcar16oRlkRR2soSdaZGQQhzFpNMPPZPYXLXj3Ep6qE6aUqFoSl9VER1AwqNwGDdGzVWQgc4fckCJBeCLvwbj3D9Q3SZna4n7bS0gAygxl5ham-J3gF1tfFxtK9w5Xm5kV1VJeYMWFpQT3Och3-Oor0-ogfkA09Ch3bR3-ewMpyxpJnpg0vqFX-GBaI0dWclRiqMFG-_LibAzabXMiGntzaMdA3I1n4YjMR-so"
-                />
+              <button type="button" disabled>
                 Facebook
               </button>
             </div>
 
             <p className="signup-copy">
               Chưa có tài khoản?
-              <a href="#/register">Đăng ký ngay</a>
+              <a href="/register">Đăng ký ngay</a>
             </p>
           </div>
         </section>
       </main>
 
       <footer className="login-support-footer">
-        <a href="#/home">Điều khoản</a>
-        <a href="#/home">Bảo mật</a>
-        <a href="#/home">Hỗ trợ kỹ thuật: 1900 xxxx</a>
+        <a href="/home">Điều khoản</a>
+        <a href="/home">Bảo mật</a>
+        <a href="/home">Hỗ trợ kỹ thuật: 1900 xxxx</a>
       </footer>
     </div>
   );
