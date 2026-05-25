@@ -2,8 +2,22 @@ const fs = require("fs");
 const path = require("path");
 
 const rootDir = path.resolve(__dirname, "..");
+const repoDir = path.resolve(rootDir, "..");
 const buildDir = path.join(rootDir, "build");
-const outputDir = path.join(rootDir, "github-pages");
+const outputDirs = [
+  {
+    dir: path.join(rootDir, "github-pages"),
+    label: "frontend/github-pages",
+    clean: "all",
+    readme: "README.md",
+  },
+  {
+    dir: path.join(repoDir, "docs"),
+    label: "docs",
+    clean: "generated",
+    readme: "GITHUB_PAGES_README.md",
+  },
+];
 
 const staffJobId = "APT-20260519-015";
 
@@ -38,18 +52,37 @@ function ensureBuildExists() {
   }
 }
 
-function resetOutputDir() {
-  fs.rmSync(outputDir, { recursive: true, force: true });
-  fs.mkdirSync(outputDir, { recursive: true });
+function resetOutputDir(output) {
+  fs.mkdirSync(output.dir, { recursive: true });
+
+  if (output.clean === "all") {
+    fs.rmSync(output.dir, { recursive: true, force: true });
+    fs.mkdirSync(output.dir, { recursive: true });
+    return;
+  }
+
+  for (const page of pages) {
+    fs.rmSync(path.join(output.dir, page.file), { force: true });
+  }
+
+  fs.rmSync(path.join(output.dir, "static"), { recursive: true, force: true });
+  fs.rmSync(path.join(output.dir, output.readme), { force: true });
 }
 
-function copyBuildAssets() {
+function copyBuildAssets(output) {
   for (const item of fs.readdirSync(buildDir)) {
     if (item === "index.html") continue;
+    if (item === "asset-manifest.json") continue;
 
     const source = path.join(buildDir, item);
-    const target = path.join(outputDir, item);
-    fs.cpSync(source, target, { recursive: true });
+    const target = path.join(output.dir, item);
+    const stats = fs.statSync(source);
+
+    if (stats.isDirectory()) {
+      fs.cpSync(source, target, { recursive: true });
+    } else {
+      fs.copyFileSync(source, target);
+    }
   }
 }
 
@@ -125,15 +158,15 @@ function createPageHtml(template, page) {
   return html.replace("<script defer", `${createBootScript(page)}<script defer`);
 }
 
-function writePages() {
+function writePages(output) {
   const template = fs.readFileSync(path.join(buildDir, "index.html"), "utf8");
 
   for (const page of pages) {
-    fs.writeFileSync(path.join(outputDir, page.file), createPageHtml(template, page), "utf8");
+    fs.writeFileSync(path.join(output.dir, page.file), createPageHtml(template, page), "utf8");
   }
 
   fs.writeFileSync(
-    path.join(outputDir, "README.md"),
+    path.join(output.dir, output.readme),
     [
       "# MotoCare GitHub Pages Static Preview",
       "",
@@ -155,8 +188,10 @@ function writePages() {
 }
 
 ensureBuildExists();
-resetOutputDir();
-copyBuildAssets();
-writePages();
 
-console.log(`Generated ${pages.length} static HTML pages in ${path.relative(rootDir, outputDir)}.`);
+for (const output of outputDirs) {
+  resetOutputDir(output);
+  copyBuildAssets(output);
+  writePages(output);
+  console.log(`Generated ${pages.length} static HTML pages in ${output.label}.`);
+}
