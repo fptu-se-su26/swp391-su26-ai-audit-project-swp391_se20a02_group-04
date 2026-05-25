@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { forgotPassword } from "../../services/authApi";
 import "../../styles/auth/ForgotPasswordPage.css";
 
 function MaterialIcon({ children, className = "" }) {
@@ -6,6 +7,31 @@ function MaterialIcon({ children, className = "" }) {
 }
 
 export default function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState({ type: "", message: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setStatus({ type: "", message: "" });
+
+    if (!email.includes("@")) {
+      setStatus({ type: "error", message: "Chức năng quên mật khẩu hiện chỉ hỗ trợ email." });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await forgotPassword(email.trim());
+      setStatus({ type: "success", message: response.message || "Đã gửi email khôi phục mật khẩu." });
+    } catch (error) {
+      setStatus({ type: "error", message: error.message || "Không thể gửi yêu cầu khôi phục." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="forgot-page">
       <header className="forgot-header">
@@ -39,10 +65,7 @@ export default function ForgotPasswordPage() {
           <div className="forgot-hero-overlay" />
           <div className="forgot-hero-copy">
             <h1>Khôi phục tài khoản</h1>
-            <p>
-              Tiếp tục duy trì hiệu suất hoạt động của xưởng với hệ thống quản
-              trị thông minh MOTOCORE.
-            </p>
+            <p>Tiếp tục duy trì hiệu suất hoạt động của xưởng với MOTOCORE.</p>
           </div>
         </section>
 
@@ -51,28 +74,34 @@ export default function ForgotPasswordPage() {
             <div className="forgot-heading">
               <MaterialIcon className="reset-icon">lock_reset</MaterialIcon>
               <h2>Quên mật khẩu?</h2>
-              <p>
-                Nhập email hoặc số điện thoại để nhận mã khôi phục tài khoản
-                của bạn.
-              </p>
+              <p>Nhập email để nhận liên kết khôi phục tài khoản của bạn.</p>
             </div>
 
-            <form className="forgot-form">
+            <form className="forgot-form" onSubmit={handleSubmit}>
+              {status.message && (
+                <div className={`auth-message auth-message-${status.type}`} role="alert" aria-live="polite">
+                  {status.message}
+                </div>
+              )}
+
               <label className="forgot-field" htmlFor="recovery-identity">
-                <span>Email/Số điện thoại</span>
+                <span>Email</span>
                 <div>
                   <MaterialIcon>contact_mail</MaterialIcon>
                   <input
                     id="recovery-identity"
-                    name="recoveryIdentity"
+                    name="email"
+                    onChange={(event) => setEmail(event.target.value)}
                     placeholder="example@motocore.vn"
-                    type="text"
+                    required
+                    type="email"
+                    value={email}
                   />
                 </div>
               </label>
 
-              <button className="forgot-submit" type="submit">
-                Gửi mã xác nhận
+              <button className="forgot-submit" disabled={isSubmitting} type="submit">
+                {isSubmitting ? "Đang gửi..." : "Gửi liên kết khôi phục"}
               </button>
 
               <a className="back-login-link" href="#/login">
@@ -104,7 +133,7 @@ export default function ForgotPasswordPage() {
             <a href="#/home">Tìm garage</a>
             <a href="#/staff/dashboard">Cổng kỹ thuật viên</a>
           </nav>
-          <span>© 2024 MOTOCORE Industrial Systems. Bảo lưu mọi quyền.</span>
+          <span>Copyright 2024 MOTOCORE Industrial Systems.</span>
         </div>
       </footer>
     </div>
