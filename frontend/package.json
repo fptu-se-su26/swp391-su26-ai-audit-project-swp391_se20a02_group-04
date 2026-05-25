@@ -5,6 +5,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "static:pages": "npm run build && node scripts/generate-static-pages.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
