@@ -15,18 +15,17 @@ export default function StaffLayout() {
       <Sidebar />
       <main className="main-content">
         <Routes>
-          <Route path="/" element={<Navigate to="/staff/dashboard" replace />} />
-          <Route path="/staff" element={<Navigate to="/staff/dashboard" replace />} />
-          <Route path="/staff/dashboard" element={<StaffDashboard />} />
-          <Route path="/staff/assignments" element={<Navigate to="/staff/jobs" replace />} />
-          <Route path="/staff/jobs" element={<StaffJobs />} />
-          <Route path="/staff/jobs/:jobId" element={<StaffJobDetail />} />
-          <Route path="/staff/jobs/:jobId/start" element={<StaffJobStart />} />
-          <Route path="/staff/jobs/:jobId/materials" element={<StaffJobMaterials />} />
-          <Route path="/staff/jobs/:jobId/complete" element={<StaffJobComplete />} />
-          <Route path="/staff/materials" element={<StaffMaterials />} />
-          <Route path="/staff/attendance" element={<StaffAttendance />} />
-          <Route path="/staff/profile" element={<StaffProfile />} />
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<StaffDashboard />} />
+          <Route path="assignments" element={<Navigate to="../jobs" replace />} />
+          <Route path="jobs" element={<StaffJobs />} />
+          <Route path="jobs/:jobId" element={<StaffJobDetail />} />
+          <Route path="jobs/:jobId/start" element={<StaffJobStart />} />
+          <Route path="jobs/:jobId/materials" element={<StaffJobMaterials />} />
+          <Route path="jobs/:jobId/complete" element={<StaffJobComplete />} />
+          <Route path="materials" element={<StaffMaterials />} />
+          <Route path="attendance" element={<StaffAttendance />} />
+          <Route path="profile" element={<StaffProfile />} />
         </Routes>
       </main>
     </div>

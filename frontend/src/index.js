@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./index.css";
 import App from "./App";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -15,9 +15,15 @@ import UserProfile from "./pages/customer/UserProfile";
 import HomePage from "./pages/home/HomePage";
 import StaffLayout from "./pages/staff/StaffLayout";
 
+const staticRoute = window.__MOTOCARE_STATIC_ROUTE__;
+const Router = staticRoute ? MemoryRouter : BrowserRouter;
+const routerProps = staticRoute
+  ? { initialEntries: [staticRoute] }
+  : {};
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <Router {...routerProps}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/home" element={<HomePage />} />
@@ -61,6 +67,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         />
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
-    </BrowserRouter>
+    </Router>
   </React.StrictMode>
 );
