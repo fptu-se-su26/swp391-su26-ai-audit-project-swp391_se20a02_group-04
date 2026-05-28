@@ -1,11 +1,13 @@
 import React from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { clearAuthSession } from "../../services/authApi";
 
 export function Icon({ name, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 }
 
 export function Sidebar() {
+  const navigate = useNavigate();
   const navItems = [
     { icon: "dashboard", label: "Tổng quan", to: "/staff/dashboard" },
     { icon: "assignment", label: "Công việc được giao", to: "/staff/jobs" },
@@ -45,7 +47,16 @@ export function Sidebar() {
           <p>Trần Minh Khoa</p>
           <span>ID: ST024</span>
         </div>
-        <button className="icon-button" type="button" aria-label="Đăng xuất">
+        <button
+          className="icon-button"
+          type="button"
+          aria-label="Đăng xuất"
+          title="Đăng xuất"
+          onClick={() => {
+            clearAuthSession();
+            navigate("/login", { replace: true });
+          }}
+        >
           <Icon name="logout" />
         </button>
       </div>

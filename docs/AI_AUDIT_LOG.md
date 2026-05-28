@@ -4,363 +4,379 @@
 
 | Thông tin | Nội dung |
 |---|---|
-| Môn học |  |
-| Mã môn học |  |
-| Lớp |  |
-| Học kỳ |  |
-| Tên bài tập / Project |  |
-| Tên sinh viên / Nhóm |  |
-| MSSV / Danh sách MSSV |  |
-| Giảng viên hướng dẫn |  |
-| Ngày bắt đầu |  |
-| Ngày hoàn thành |  |
+| Môn học | SWP391 |
+| Lớp | SE20A11 |
+| Học kỳ | SU26 |
+| Tên project | Hệ thống quản lý đặt lịch sửa/rửa xe máy |
+| Nhóm | Group 04 |
+| Ngày bắt đầu ghi log | 21/05/2026 |
+| Ngày cập nhật gần nhất | 25/05/2026 |
+
+Ghi chú: file này được nhóm dùng để ghi lại các phần có sử dụng AI trong quá trình làm project. Nội dung AI đưa ra không được nộp nguyên xi, nhóm có kiểm tra lại, chỉnh sửa code và chạy thử trước khi commit.
 
 ---
 
 ## 2. Công cụ AI đã sử dụng
 
-Đánh dấu các công cụ AI đã sử dụng trong quá trình thực hiện bài tập/project.
+- ChatGPT / Codex: hỗ trợ đọc code, gợi ý hướng xử lý lỗi, tạo nháp giao diện và cập nhật tài liệu.
 
-- [ ] ChatGPT
-- [ ] Gemini
-- [ ] Claude
-- [ ] GitHub Copilot
-- [ ] Cursor
-- [ ] Antigravity
-- [ ] Perplexity
-- [ ] Microsoft Copilot
-- [ ] Công cụ khác: ....................................
+Nhóm không dùng AI để thay thế hoàn toàn phần làm bài. AI chủ yếu được dùng như công cụ hỗ trợ khi cần debug nhanh, chuyển ý tưởng màn hình thành code React hoặc kiểm tra lại luồng xử lý.
 
 ---
 
 ## 3. Mục tiêu sử dụng AI
 
-Mô tả ngắn gọn sinh viên/nhóm đã sử dụng AI để hỗ trợ những công việc nào.
+Nhóm sử dụng AI cho các mục tiêu chính sau:
 
-Ví dụ:
-
-- Phân tích yêu cầu bài toán
-- Gợi ý ý tưởng giải pháp
-- Thiết kế database
-- Thiết kế giao diện
-- Viết code mẫu
-- Debug lỗi
-- Tối ưu code
-- Viết test case
-- Kiểm tra bảo mật
-- Viết báo cáo
-- Chuẩn bị slide thuyết trình
-- Tìm hiểu công nghệ mới
-
-### Mô tả mục tiêu sử dụng AI
-
-```text
-Viết tại đây...
-
-## 4. Nhật ký sử dụng AI chi tiết
-
-> Mỗi lần sử dụng AI cho một phần quan trọng của bài tập/project, sinh viên cần ghi lại theo mẫu bên dưới.  
-> Sinh viên/nhóm có thể nhân bản mẫu “Lần sử dụng AI” nhiều lần tùy theo số lần sử dụng AI thực tế.
+- Hỗ trợ xử lý lỗi merge code từ nhánh `main`.
+- Rà soát cấu trúc frontend React sau khi merge.
+- Tạo và chỉnh sửa các màn hình Home, Login, Register, Forgot Password.
+- Xây dựng trang đặt lịch cho customer.
+- Rà lại luồng chính của role Staff: xem việc, bắt đầu việc, ghi vật tư, hoàn thành việc, chấm công và hồ sơ.
+- Hỗ trợ phần API đặt lịch ở backend và service gọi API ở frontend.
+- Sửa lỗi hiển thị tiếng Việt, lỗi route và lỗi build.
+- Viết lại file audit log để ghi nhận việc sử dụng AI minh bạch hơn.
 
 ---
 
-### Lần sử dụng AI số 1
+## 4. Nhật ký sử dụng AI
+
+### Lần 1 - Hỗ trợ xử lý Git merge
 
 | Nội dung | Thông tin |
 |---|---|
-| Ngày sử dụng |  |
-| Công cụ AI | ChatGPT / Gemini / Claude / GitHub Copilot / Cursor / Antigravity / Khác |
-| Mục đích sử dụng |  |
-| Phần việc liên quan | Requirement / Design / Database / Frontend / Backend / Testing / Debug / Report / Presentation / Other |
-| Mức độ sử dụng | Hỗ trợ ý tưởng / Hỗ trợ một phần / Hỗ trợ nhiều / Sinh chính nội dung |
+| Ngày | 21/05/2026 |
+| Công cụ | ChatGPT / Codex |
+| Phần việc | Git, merge conflict, kiểm tra source |
+| Mức độ sử dụng | AI hỗ trợ nhiều, nhóm tự quyết định file cần giữ |
 
-#### 4.1. Prompt đã sử dụng
-
-```text
-Dán nguyên văn prompt đã hỏi AI tại đây.
-```
-
-#### 4.2. Kết quả AI gợi ý
-
-Tóm tắt nội dung AI đã trả lời hoặc gợi ý.
+Prompt đã dùng:
 
 ```text
-Viết tại đây...
+cách tiến hành lấy code nhánh main về và merge vào
+git merge origin/main lỗi gì
+kiểm tra lại src code của tôi sau khi merge vào main lỗi ở đâu
 ```
 
-#### 4.3. Phần sinh viên/nhóm đã sử dụng từ AI
+Kết quả AI hỗ trợ:
 
-Mô tả rõ phần nào được sử dụng lại từ gợi ý của AI.
+- Giải thích nguyên nhân Git không merge được do còn thay đổi local.
+- Hướng dẫn kiểm tra bằng `git status`.
+- Gợi ý cách xử lý conflict ở frontend.
+- Nhắc kiểm tra lại build sau khi resolve conflict.
 
-```text
-Viết tại đây...
-```
+Nhóm đã dùng phần hướng dẫn này để kiểm tra các file conflict như `frontend/package.json`, `frontend/package-lock.json`, `frontend/public/index.html`, `frontend/src/index.js`. Khi có lựa chọn giữa code mặc định của Create React App và code giao diện đang làm, nhóm giữ phần giao diện của project vì phù hợp với yêu cầu hơn.
 
-#### 4.4. Phần sinh viên/nhóm tự chỉnh sửa hoặc cải tiến
+Minh chứng:
 
-Mô tả sinh viên/nhóm đã thay đổi, kiểm tra, sửa lỗi hoặc cải tiến gì so với gợi ý ban đầu của AI.
-
-```text
-Viết tại đây...
-```
-
-#### 4.5. Minh chứng
-
-| Loại minh chứng | Nội dung |
+| Nội dung | Kết quả |
 |---|---|
-| Link commit |  |
-| File liên quan |  |
-| Screenshot |  |
-| Kết quả chạy/test |  |
-| Link video demo |  |
-| Ghi chú khác |  |
-
-#### 4.6. Nhận xét cá nhân/nhóm
-
-Sinh viên/nhóm học được gì sau lần sử dụng AI này?
-
-```text
-Viết tại đây...
-```
+| File liên quan | `frontend/package.json`, `frontend/package-lock.json`, `frontend/public/index.html`, `frontend/src/index.js` |
+| Kiểm tra | Chạy build frontend sau khi xử lý conflict |
+| Ghi chú | Repository còn một số file cache trong `node_modules/.cache`, nhóm cần hạn chế commit các file này ở các lần sau |
 
 ---
 
-### Lần sử dụng AI số 2
+### Lần 2 - Xây dựng giao diện Home và điều hướng
 
 | Nội dung | Thông tin |
 |---|---|
-| Ngày sử dụng |  |
-| Công cụ AI | ChatGPT / Gemini / Claude / GitHub Copilot / Cursor / Antigravity / Khác |
-| Mục đích sử dụng |  |
-| Phần việc liên quan | Requirement / Design / Database / Frontend / Backend / Testing / Debug / Report / Presentation / Other |
-| Mức độ sử dụng | Hỗ trợ ý tưởng / Hỗ trợ một phần / Hỗ trợ nhiều / Sinh chính nội dung |
+| Ngày | 21/05/2026 |
+| Công cụ | ChatGPT / Codex |
+| Phần việc | Frontend UI |
+| Mức độ sử dụng | AI sinh nháp chính, nhóm chỉnh lại nội dung |
 
-#### 4.1. Prompt đã sử dụng
-
-```text
-Dán nguyên văn prompt đã hỏi AI tại đây.
-```
-
-#### 4.2. Kết quả AI gợi ý
+Prompt đã dùng:
 
 ```text
-Viết tại đây...
+code trang home dựa trên code này
 ```
 
-#### 4.3. Phần sinh viên/nhóm đã sử dụng từ AI
+Kết quả AI hỗ trợ:
 
-```text
-Viết tại đây...
-```
+- Chuyển layout trang Home thành React component.
+- Tách CSS riêng cho trang Home.
+- Thêm route cho Home.
+- Gợi ý bố cục header, hero, dịch vụ, phần giới thiệu và footer.
 
-#### 4.4. Phần sinh viên/nhóm tự chỉnh sửa hoặc cải tiến
+Nhóm đã chỉnh lại phần menu để trang Home chỉ hiển thị các mục public như Trang chủ, Dịch vụ, Lịch hẹn, Về chúng tôi. Các link nội bộ như Admin, Staff, Login, Register không để lẫn trong menu chính của Home.
 
-```text
-Viết tại đây...
-```
+Minh chứng:
 
-#### 4.5. Minh chứng
-
-| Loại minh chứng | Nội dung |
+| Nội dung | Kết quả |
 |---|---|
-| Link commit |  |
-| File liên quan |  |
-| Screenshot |  |
-| Kết quả chạy/test |  |
-| Link video demo |  |
-| Ghi chú khác |  |
-
-#### 4.6. Nhận xét cá nhân/nhóm
-
-```text
-Viết tại đây...
-```
+| File liên quan | `frontend/src/pages/home/HomePage.js`, `frontend/src/styles/home/HomePage.css`, `frontend/src/index.js` |
+| Route kiểm tra | `/#/home`, `/` |
 
 ---
 
-### Lần sử dụng AI số 3
+### Lần 3 - Xây dựng màn hình xác thực
 
 | Nội dung | Thông tin |
 |---|---|
-| Ngày sử dụng |  |
-| Công cụ AI | ChatGPT / Gemini / Claude / GitHub Copilot / Cursor / Antigravity / Khác |
-| Mục đích sử dụng |  |
-| Phần việc liên quan | Requirement / Design / Database / Frontend / Backend / Testing / Debug / Report / Presentation / Other |
-| Mức độ sử dụng | Hỗ trợ ý tưởng / Hỗ trợ một phần / Hỗ trợ nhiều / Sinh chính nội dung |
+| Ngày | 21/05/2026 |
+| Công cụ | ChatGPT / Codex |
+| Phần việc | Login, Register, Forgot Password |
+| Mức độ sử dụng | AI hỗ trợ tạo nháp UI, nhóm kiểm tra route |
 
-#### 4.1. Prompt đã sử dụng
-
-```text
-Dán nguyên văn prompt đã hỏi AI tại đây.
-```
-
-#### 4.2. Kết quả AI gợi ý
+Prompt đã dùng:
 
 ```text
-Viết tại đây...
+tiếp trang login
+tiếp trang đăng ký
+tiếp tục trang quên mật khẩu
 ```
 
-#### 4.3. Phần sinh viên/nhóm đã sử dụng từ AI
+Kết quả AI hỗ trợ:
 
-```text
-Viết tại đây...
-```
+- Tạo các trang đăng nhập, đăng ký và quên mật khẩu.
+- Tách component và CSS theo từng màn hình.
+- Gợi ý route `/login`, `/register`, `/forgot-password`.
 
-#### 4.4. Phần sinh viên/nhóm tự chỉnh sửa hoặc cải tiến
+Nhóm đã kiểm tra lại các link chuyển trang như "Đăng ký ngay", "Quên mật khẩu" và link quay về trang chủ. Sau đó tiếp tục chỉnh để có thể dùng chung với service xác thực ở frontend.
 
-```text
-Viết tại đây...
-```
+Minh chứng:
 
-#### 4.5. Minh chứng
-
-| Loại minh chứng | Nội dung |
+| Nội dung | Kết quả |
 |---|---|
-| Link commit |  |
-| File liên quan |  |
-| Screenshot |  |
-| Kết quả chạy/test |  |
-| Link video demo |  |
-| Ghi chú khác |  |
+| File liên quan | `frontend/src/pages/auth/LoginPage.js`, `frontend/src/pages/auth/RegisterPage.js`, `frontend/src/pages/auth/ForgotPasswordPage.js`, `frontend/src/services/authApi.js` |
+| Route kiểm tra | `/#/login`, `/#/register`, `/#/forgot-password` |
 
-#### 4.6. Nhận xét cá nhân/nhóm
+---
+
+### Lần 4 - Xây dựng trang đặt lịch của Customer
+
+| Nội dung | Thông tin |
+|---|---|
+| Ngày | 21/05/2026 |
+| Công cụ | ChatGPT / Codex |
+| Phần việc | Customer Booking |
+| Mức độ sử dụng | AI hỗ trợ nhiều, nhóm chỉnh nghiệp vụ |
+
+Prompt đã dùng:
 
 ```text
-Viết tại đây...
+dựa vào luồng code này có thể code cho tôi trang lịch hẹn được không
+giữ lại header giống của trang home, và ở Chọn loại dịch vụ thêm dịch vụ bảo dưỡng nữa
 ```
+
+Kết quả AI hỗ trợ:
+
+- Tạo trang đặt lịch với các nhóm dịch vụ: rửa xe, bảo dưỡng, sửa xe.
+- Tạo form nhập thông tin xe, ngày giờ, ghi chú.
+- Hiển thị tóm tắt lịch hẹn trước khi gửi.
+- Chuẩn bị cấu trúc để sau này nối API tạo appointment.
+
+Nhóm đã chỉnh lại nội dung dịch vụ cho đúng bối cảnh xe máy và bổ sung lựa chọn bảo dưỡng. Phần này sau đó được nối thêm với service gọi API đặt lịch ở frontend.
+
+Minh chứng:
+
+| Nội dung | Kết quả |
+|---|---|
+| File liên quan | `frontend/src/pages/customer/BookingPage.js`, `frontend/src/styles/customer/BookingPage.css`, `frontend/src/services/appointmentApi.js` |
+| Route kiểm tra | `/#/booking` |
+
+---
+
+### Lần 5 - Rà soát use case chính của Staff
+
+| Nội dung | Thông tin |
+|---|---|
+| Ngày | 21/05/2026 - 25/05/2026 |
+| Công cụ | ChatGPT / Codex |
+| Phần việc | Staff module |
+| Mức độ sử dụng | AI hỗ trợ rà soát và gợi ý phân tách luồng |
+
+Prompt đã dùng:
+
+```text
+tất cả các use case chính của role staff
+```
+
+Kết quả AI hỗ trợ:
+
+- Rà các route trong `StaffLayout`.
+- Xác định các use case chính theo màn hình và theo nghiệp vụ.
+- Gợi ý cách mô tả luồng Staff để nhóm đưa vào tài liệu hoặc thuyết trình.
+
+Các use case chính của Staff trong source hiện tại:
+
+| Use case | Mô tả ngắn | Route/màn hình |
+|---|---|---|
+| Xem tổng quan ca làm | Xem số việc, việc đang làm, cảnh báo vật tư và lịch sử gần đây | `/staff/dashboard` |
+| Xem danh sách công việc | Xem các lịch hẹn/công việc được giao trong ngày | `/staff/jobs` |
+| Xem chi tiết công việc | Xem thông tin khách hàng, xe, dịch vụ, ghi chú và khuyến nghị | `/staff/jobs/:jobId` |
+| Bắt đầu công việc | Xác nhận nhận xe và chuyển trạng thái sang đang xử lý | `/staff/jobs/:jobId/start` |
+| Ghi nhận vật tư sử dụng | Chọn vật tư, nhập số lượng và tính chi phí | `/staff/jobs/:jobId/materials` |
+| Hoàn thành công việc | Tổng kết công, vật tư, ghi chú kỹ thuật và đánh dấu hoàn thành | `/staff/jobs/:jobId/complete` |
+| Xem kho/vật tư | Xem tồn kho, tình trạng sắp hết và lịch sử dùng vật tư | `/staff/materials` |
+| Chấm công | Vào ca, kết thúc ca và xem lịch sử ca làm | `/staff/attendance` |
+| Xem/cập nhật hồ sơ | Xem thông tin cá nhân, liên hệ và kinh nghiệm làm việc | `/staff/profile` |
+
+Nhóm dùng phần rà soát này để hiểu rõ hơn actor Staff làm gì trong hệ thống, từ đó dễ giải thích khi demo.
+
+Minh chứng:
+
+| Nội dung | Kết quả |
+|---|---|
+| File liên quan | `frontend/src/pages/staff/*`, `frontend/src/styles/staff/*` |
+| Route chính | `/#/staff/dashboard`, `/#/staff/jobs`, `/#/staff/materials`, `/#/staff/attendance`, `/#/staff/profile` |
+
+---
+
+### Lần 6 - Hỗ trợ backend Appointment API và bảo vệ route
+
+| Nội dung | Thông tin |
+|---|---|
+| Ngày | 25/05/2026 |
+| Công cụ | ChatGPT / Codex |
+| Phần việc | Backend API, frontend service, protected route |
+| Mức độ sử dụng | AI hỗ trợ đọc code và gợi ý cách nối module |
+
+Prompt tiêu biểu:
+
+```text
+kiểm tra và cập nhật phần đặt lịch / auth để chạy được
+```
+
+Kết quả AI hỗ trợ:
+
+- Rà cấu trúc backend Express.
+- Gợi ý tách `Appointment.model`, `appointment.controller`, `appointment.routes`.
+- Hỗ trợ cập nhật middleware validate và server route.
+- Gợi ý frontend service gọi API appointment.
+- Thêm `ProtectedRoute` để kiểm soát màn hình theo role.
+
+Nhóm vẫn kiểm tra lại cách đặt tên field, route và role để khớp với project. Những phần chưa nối dữ liệu thật hoàn toàn được giữ ở mức chuẩn bị cho bước tiếp theo.
+
+Minh chứng:
+
+| Nội dung | Kết quả |
+|---|---|
+| Backend | `backend/src/models/Appointment.model.js`, `backend/src/controllers/appointment.controller.js`, `backend/src/routes/appointment.routes.js`, `backend/src/server.js` |
+| Frontend | `frontend/src/services/appointmentApi.js`, `frontend/src/components/ProtectedRoute.js`, `frontend/src/index.js` |
+
+---
+
+### Lần 7 - Cập nhật AI Audit Log
+
+| Nội dung | Thông tin |
+|---|---|
+| Ngày | 25/05/2026 |
+| Công cụ | ChatGPT / Codex |
+| Phần việc | Tài liệu |
+| Mức độ sử dụng | AI hỗ trợ viết lại, nhóm kiểm tra trước khi commit |
+
+Prompt đã dùng:
+
+```text
+cập nhật file AI_AUDIT_LOG để tôi đẩy code lên git . đảm bảo giống người làm
+```
+
+Kết quả AI hỗ trợ:
+
+- Sửa lại lỗi hiển thị tiếng Việt trong file audit.
+- Rút gọn các đoạn quá dài và quá giống mẫu.
+- Bổ sung phần Staff use case và Appointment API theo source hiện tại.
+- Giữ cách viết gần với nhật ký làm việc của nhóm hơn.
 
 ---
 
 ## 5. Bảng tổng hợp mức độ sử dụng AI
 
-Đánh dấu mức độ AI hỗ trợ ở từng hạng mục.
-
-| Hạng mục | Không dùng AI | AI hỗ trợ ít | AI hỗ trợ nhiều | AI sinh chính | Ghi chú |
+| Hạng mục | Không dùng AI | AI hỗ trợ ít | AI hỗ trợ nhiều | AI sinh nháp chính | Ghi chú |
 |---|:---:|:---:|:---:|:---:|---|
-| Phân tích yêu cầu |  |  |  |  |  |
-| Viết user story/use case |  |  |  |  |  |
-| Thiết kế database |  |  |  |  |  |
-| Thiết kế kiến trúc hệ thống |  |  |  |  |  |
-| Thiết kế giao diện |  |  |  |  |  |
-| Code frontend |  |  |  |  |  |
-| Code backend |  |  |  |  |  |
-| Debug lỗi |  |  |  |  |  |
-| Viết test case |  |  |  |  |  |
-| Kiểm thử sản phẩm |  |  |  |  |  |
-| Tối ưu code |  |  |  |  |  |
-| Viết báo cáo |  |  |  |  |  |
-| Làm slide thuyết trình |  |  |  |  |  |
+| Phân tích yêu cầu |  | x | x |  | AI hỗ trợ tách luồng theo role |
+| Thiết kế database | x |  |  |  | Nhóm chưa dùng AI cho thiết kế DB chính thức |
+| Thiết kế route frontend |  |  | x |  | Dùng để kiểm tra Home, Auth, Booking, Staff |
+| Code frontend |  |  | x | x | AI tạo nháp nhiều màn hình, nhóm chỉnh nội dung |
+| Code backend |  | x | x |  | Hỗ trợ Appointment API và route |
+| Debug lỗi merge/build |  |  | x |  | Git conflict, dependency, route |
+| Kiểm thử thủ công |  | x | x |  | Nhóm tự chạy và tự kiểm tra |
+| Viết tài liệu |  |  | x | x | AI hỗ trợ nháp audit log |
 
 ---
 
-## 6. Các lỗi hoặc hạn chế từ AI
+## 6. Lỗi và hạn chế khi dùng AI
 
-Ghi lại các trường hợp AI trả lời sai, thiếu, chưa phù hợp hoặc sinh code không chạy.
-
-| STT | Lỗi/hạn chế từ AI | Cách phát hiện | Cách xử lý/cải tiến |
+| STT | Vấn đề | Cách phát hiện | Cách nhóm xử lý |
 |---:|---|---|---|
-| 1 |  |  |  |
-| 2 |  |  |  |
-| 3 |  |  |  |
+| 1 | Một số text ban đầu chưa đúng tiếng Việt hoặc bị thiếu dấu | Xem giao diện và đọc source | Sửa lại text theo ngữ cảnh Việt Nam |
+| 2 | Có lúc file bị lỗi mã hóa tiếng Việt sau khi merge | Nội dung hiển thị thành ký tự lạ | Viết lại bằng UTF-8 và kiểm tra lại |
+| 3 | AI có thể gợi ý UI đẹp nhưng chưa khớp nghiệp vụ | So với flow nhóm đã thống nhất | Chỉnh lại menu, dịch vụ và trạng thái |
+| 4 | Một số chức năng frontend vẫn là mock UI | Đọc code thấy chưa gọi API thật | Ghi nhận rõ và chuẩn bị service/API cho bước sau |
+| 5 | Lệnh `npm run build` trên PowerShell có thể lỗi policy | Terminal báo lỗi script `.ps1` | Dùng `npm.cmd run build` |
 
 ---
 
-## 7. Kiểm chứng kết quả AI
+## 7. Kiểm chứng kết quả
 
-Mô tả cách sinh viên/nhóm kiểm tra lại kết quả do AI gợi ý.
+Nhóm kiểm chứng các phần AI hỗ trợ bằng các cách sau:
 
-Có thể bao gồm:
+- Đọc lại source code sau khi AI sửa.
+- Kiểm tra `git status` trước khi commit.
+- Chạy build frontend khi có thay đổi lớn.
+- Kiểm tra thủ công các route chính:
+  - `/#/home`
+  - `/#/login`
+  - `/#/register`
+  - `/#/forgot-password`
+  - `/#/booking`
+  - `/#/staff/dashboard`
+  - `/#/staff/jobs`
+  - `/#/admin`
+- Rà lại các file có text tiếng Việt để tránh lỗi mã hóa.
 
-- Chạy thử chương trình
-- Viết test case
-- So sánh với yêu cầu đề bài
-- Kiểm tra output
-- Đối chiếu tài liệu môn học
-- Hỏi lại giảng viên
-- Review cùng thành viên nhóm
-- Kiểm tra lỗi bảo mật
-- Kiểm tra bằng dữ liệu mẫu
-- So sánh trước và sau khi dùng AI
-
-### Nội dung kiểm chứng
+Lệnh build thường dùng:
 
 ```text
-Viết tại đây...
+npm.cmd run build
 ```
 
 ---
 
-## 8. Đóng góp cá nhân hoặc đóng góp nhóm
+## 8. Đóng góp nhóm
 
-### 8.1. Đối với bài cá nhân
+| Thành viên | Nhiệm vụ chính | Có dùng AI không? | Minh chứng |
+|---|---|---|---|
+| Member 1 | Authentication, Login/Register/Forgot Password | Có | Các màn hình auth và service xác thực |
+| Member 2 | Customer Home và Booking | Có | Home, Booking, appointment service |
+| Member 3 | Staff Job Module | Có | Staff Dashboard, Jobs, Materials, Attendance, Profile |
+| Member 4 | Admin/Manager và hỗ trợ backend | Có | Admin UI, Appointment API, route server |
 
-Mô tả phần sinh viên tự làm, phần AI hỗ trợ và phần đã tự cải tiến.
-
-```text
-Viết tại đây...
-```
-
-### 8.2. Đối với bài nhóm
-
-| Thành viên | MSSV | Nhiệm vụ chính | Có sử dụng AI không? | Minh chứng đóng góp |
-|---|---|---|---|---|
-|  |  |  | Có / Không |  |
-|  |  |  | Có / Không |  |
-|  |  |  | Có / Không |  |
-|  |  |  | Có / Không |  |
+Ghi chú: nhóm sẽ cập nhật lại tên thành viên và MSSV theo danh sách nộp chính thức.
 
 ---
 
-## 9. Reflection cuối bài
+## 9. Reflection
 
-### 9.1. AI đã hỗ trợ em/nhóm ở điểm nào?
+### AI hỗ trợ tốt nhất ở phần nào?
 
-```text
-Viết tại đây...
-```
+AI hỗ trợ tốt nhất ở phần đọc nhanh cấu trúc project, gợi ý cách sửa lỗi merge, tạo nháp giao diện React và nhắc nhóm kiểm tra route/build. Nhờ vậy nhóm tiết kiệm thời gian ở những phần lặp lại nhiều.
 
-### 9.2. Phần nào em/nhóm không sử dụng theo gợi ý của AI? Vì sao?
+### Nhóm không dùng nguyên gợi ý AI ở đâu?
 
-```text
-Viết tại đây...
-```
+Nhóm không dùng nguyên các gợi ý khi chưa đúng flow project. Ví dụ menu Home được chỉnh lại để không lẫn link nội bộ, phần Booking được thêm dịch vụ bảo dưỡng, và module Staff được giữ theo luồng công việc thực tế của nhân viên kỹ thuật.
 
-### 9.3. Em/nhóm đã kiểm tra tính đúng đắn của kết quả AI như thế nào?
+### Nhóm kiểm tra kết quả AI như thế nào?
 
-```text
-Viết tại đây...
-```
+Nhóm đọc lại code, chạy thử route, kiểm tra giao diện, xem lỗi build và đối chiếu với yêu cầu của project. Nếu thấy text sai, route sai hoặc chức năng chưa thật sự nối API, nhóm ghi nhận và chỉnh lại.
 
-### 9.4. Nếu không có AI, phần nào sẽ khó khăn nhất?
+### Bài học rút ra
 
-```text
-Viết tại đây...
-```
-
-### 9.5. Sau bài tập/project này, em/nhóm học được gì về môn học?
-
-```text
-Viết tại đây...
-```
-
-### 9.6. Sau bài tập/project này, em/nhóm học được gì về cách sử dụng AI có trách nhiệm?
-
-```text
-Viết tại đây...
-```
+AI giúp làm nhanh hơn nhưng không thay thế việc hiểu code. Khi dùng AI, nhóm phải biết mình đang sửa file nào, vì sao sửa, kết quả có chạy được không và có giải thích được khi demo hay không.
 
 ---
 
 ## 10. Cam kết học thuật
 
-Sinh viên/nhóm cam kết rằng:
+Nhóm cam kết:
 
-- Nội dung AI hỗ trợ đã được ghi nhận trung thực.
+- Có ghi nhận các phần đã sử dụng AI trong quá trình làm project.
 - Không nộp nguyên văn kết quả AI mà không kiểm tra.
-- Có khả năng giải thích các phần đã nộp.
-- Chịu trách nhiệm về tính đúng đắn của sản phẩm cuối cùng.
-- Hiểu rằng việc sử dụng AI không khai báo có thể ảnh hưởng đến kết quả đánh giá.
+- Có đọc lại, chỉnh sửa và chịu trách nhiệm với source code đã commit.
+- Có thể giải thích các màn hình, route và luồng chính của hệ thống.
 
-| Đại diện sinh viên/nhóm | Ngày xác nhận |
+| Đại diện nhóm | Ngày xác nhận |
 |---|---|
-|  |  |
+| Group 04 | 25/05/2026 |

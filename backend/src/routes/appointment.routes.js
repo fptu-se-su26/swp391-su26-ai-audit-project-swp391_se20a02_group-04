@@ -69,12 +69,14 @@ const cancelAppointmentValidation = [
 router.post('/',
   authenticate,
   authorize('CUSTOMER'),
+
   createAppointmentValidation,
   validate,
   appointmentController.createAppointment
 );
 
 /**
+
  * @route   GET /api/appointments
  * @desc    Get customer's appointments
  * @access  Private/Customer
@@ -87,12 +89,14 @@ router.get('/',
   query('status').optional().isIn(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
   query('date_from').optional().isISO8601(),
   query('date_to').optional().isISO8601(),
+
   validate,
   appointmentController.getMyAppointments
 );
 
 /**
  * @route   GET /api/appointments/:id
+
  * @desc    Get appointment by ID
  * @access  Private/Customer
  */
@@ -133,3 +137,4 @@ router.delete('/:id',
 );
 
 module.exports = router;
+

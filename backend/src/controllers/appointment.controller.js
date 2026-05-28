@@ -1,4 +1,5 @@
 const Appointment = require('../models/Appointment.model');
+
 const Service = require('../models/Service.model');
 const User = require('../models/User.model');
 const UserAudit = require('../models/UserAudit.model');
@@ -6,10 +7,12 @@ const { successResponse, errorResponse } = require('../utils/response.util');
 
 /**
  * Create new appointment (Customer)
+
  * POST /api/appointments
  */
 const createAppointment = async (req, res) => {
   try {
+
     const {
       service_id,
       appointment_date,
@@ -79,12 +82,14 @@ const createAppointment = async (req, res) => {
     });
 
   } catch (error) {
+
     console.error('Create appointment error:', error);
     return errorResponse(res, 500, 'Failed to create appointment');
   }
 };
 
 /**
+
  * Get customer's appointments
  * GET /api/appointments
  */
@@ -128,14 +133,17 @@ const getMyAppointments = async (req, res) => {
         .sort({ [sort_by]: sortOrder })
         .limit(parseInt(limit))
         .skip(skip),
+
       Appointment.countDocuments(query)
     ]);
 
     return successResponse(res, 200, 'Appointments retrieved successfully', {
       appointments,
       pagination: {
+
         page: parseInt(page),
         limit: parseInt(limit),
+
         total,
         pages: Math.ceil(total / limit)
       }
@@ -148,6 +156,7 @@ const getMyAppointments = async (req, res) => {
 };
 
 /**
+
  * Get appointment by ID (Customer can only see their own)
  * GET /api/appointments/:id
  */
@@ -163,6 +172,7 @@ const getAppointmentById = async (req, res) => {
       .populate('service_id', 'service_name description base_price estimated_duration category')
       .populate('cancelled_by', 'full_name');
 
+
     if (!appointment) {
       return errorResponse(res, 404, 'Appointment not found');
     }
@@ -172,12 +182,15 @@ const getAppointmentById = async (req, res) => {
     });
 
   } catch (error) {
+
     console.error('Get appointment by ID error:', error);
+
     return errorResponse(res, 500, 'Failed to retrieve appointment');
   }
 };
 
 /**
+
  * Update appointment (Customer can only update their own pending appointments)
  * PUT /api/appointments/:id
  */
@@ -194,12 +207,14 @@ const updateAppointment = async (req, res) => {
 
     const appointment = await Appointment.findOne({
       _id: id,
+
       customer_id: req.user.userId
     });
 
     if (!appointment) {
       return errorResponse(res, 404, 'Appointment not found');
     }
+
 
     if (!appointment.canBeModified()) {
       return errorResponse(res, 400, 'Appointment cannot be modified in current status');
@@ -312,9 +327,11 @@ const cancelAppointment = async (req, res) => {
     appointment.status = 'CANCELLED';
     appointment.cancellation_reason = reason || 'Cancelled by customer';
     appointment.cancelled_by = req.user.userId;
+
     appointment.cancelled_at = new Date();
 
     await appointment.save();
+
 
     // Log audit
     await UserAudit.create({
@@ -331,6 +348,7 @@ const cancelAppointment = async (req, res) => {
 
     return successResponse(res, 200, 'Appointment cancelled successfully');
 
+ main
   } catch (error) {
     console.error('Cancel appointment error:', error);
     return errorResponse(res, 500, 'Failed to cancel appointment');
@@ -340,7 +358,9 @@ const cancelAppointment = async (req, res) => {
 module.exports = {
   createAppointment,
   getMyAppointments,
+
   getAppointmentById,
   updateAppointment,
   cancelAppointment
 };
+
