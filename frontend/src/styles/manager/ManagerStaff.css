@@ -1,0 +1,133 @@
+/* ManagerStaff.css */
+
+/* VIEW 3: STAFF ASSIGNMENT TECHNICIANS GRID */
+.manager-layout .techs-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.manager-layout .tech-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.manager-layout .tech-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 20px -3px rgba(0, 0, 0, 0.04);
+}
+
+.manager-layout .tech-avatar-container {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #ffedd5;
+    background-color: #fff7ed;
+}
+
+.manager-layout .tech-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.manager-layout .tech-name {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-top: 14px;
+    margin-bottom: 0;
+}
+
+.manager-layout .tech-specialty-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
+    background-color: #f1f5f9;
+    padding: 4px 10px;
+    border-radius: 999px;
+    margin-top: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+.manager-layout .tech-workload-row {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.manager-layout .workload-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #94a3b8;
+}
+
+.manager-layout .workload-badge {
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+.manager-layout .workload-badge.available { background-color: #ecfdf5; color: #10b981; }
+.manager-layout .workload-badge.busy { background-color: #fffbeb; color: #f59e0b; }
+.manager-layout .workload-badge.overload { background-color: #fdf2f2; color: #ef4444; }
+
+.manager-layout .tech-active-tasks {
+    width: 100%;
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.manager-layout .active-task-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.manager-layout .tech-task-item {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #334155;
+    background-color: #f8fafc;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 3px solid #ff6b00;
+}
+
+.manager-layout .tech-no-tasks {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-style: italic;
+    text-align: center;
+    margin-top: 6px;
+}
+
+/* RESPONSIVE SCALING */
+@media (max-width: 1280px) {
+    .manager-layout .techs-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .manager-layout .techs-grid {
+        grid-template-columns: 1fr;
+    }
+}
