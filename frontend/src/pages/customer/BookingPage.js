@@ -1,9 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  cancelAppointment,
-  createAppointment,
-  getMyAppointments,
-} from "../../services/appointmentApi";
+import React, { useEffect, useMemo, useState } from "react";
+import { createAppointment } from "../../services/appointmentApi";
 import "../../styles/customer/BookingPage.css";
 import { clearAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
@@ -96,13 +92,13 @@ function formatAppointmentTime(appointment) {
 
 function getStatusLabel(status) {
   const labels = {
-    PENDING: "Cho xac nhan",
-    CONFIRMED: "Da xac nhan",
-    IN_PROGRESS: "Dang xu ly",
-    COMPLETED: "Hoan thanh",
-    PAID: "Da thanh toan",
-    CANCELLED: "Da huy",
-    REJECTED: "Tu choi",
+    PENDING: "Chờ xác nhận",
+    CONFIRMED: "Đã xác nhận",
+    IN_PROGRESS: "Đang xử lý",
+    COMPLETED: "Hoàn thành",
+    PAID: "Đã thanh toán",
+    CANCELLED: "Đã hủy",
+    REJECTED: "Từ chối",
   };
 
   return labels[status] || status || "";
@@ -137,28 +133,11 @@ export default function BookingPage() {
   const [repairIssue, setRepairIssue] = useState(repairIssues[0]);
   const [timeSlot, setTimeSlot] = useState(timeSlots[1]);
   const [appointmentDate, setAppointmentDate] = useState(getTomorrowDateValue());
-  const [appointmentsList, setAppointmentsList] = useState([]);
-  const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
   const [submitError, setSubmitError] = useState("");
-
-  const loadAppointments = useCallback(async () => {
-    setIsLoadingAppointments(true);
-
-    try {
-      const response = await getMyAppointments({ page: 1, limit: 5 });
-      setAppointmentsList(response.data?.appointments || []);
-    } catch (error) {
-      setSubmitError(error.message);
-    } finally {
-      setIsLoadingAppointments(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadAppointments();
-  }, [loadAppointments]);
+  const appointmentsList = [];
+  const isLoadingAppointments = false;
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [user, setUser] = useState({
     fullname: "Nguyễn Hoàng Nam",
@@ -272,7 +251,6 @@ export default function BookingPage() {
       const response = await createAppointment(payload);
       const appointment = response.data?.appointment;
       setSubmitResult(appointment);
-      await loadAppointments();
       formElement.reset();
       setAppointmentDate(getTomorrowDateValue());
       setTimeSlot(timeSlots[1]);
@@ -283,21 +261,12 @@ export default function BookingPage() {
     }
   };
 
-  const handleCancelAppointment = async (appointmentId) => {
-    setSubmitError("");
-
-    try {
-      await cancelAppointment(appointmentId, "Customer cancelled from booking page");
-      await loadAppointments();
-    } catch (error) {
-      setSubmitError(error.message);
-    }
-  };
-
   const handleLogout = () => {
     clearAuthSession();
     setShowUserMenu(false);
   };
+
+  const handleCancelAppointment = () => {};
 
   return (
     <div className="booking-page">
@@ -307,7 +276,7 @@ export default function BookingPage() {
         </a>
         <nav className="booking-nav" aria-label="Điều hướng đặt lịch">
           <a href="/home">Trang chủ</a>
-          <a href="/home">Dịch vụ</a>
+          <a href="/services">Dịch vụ</a>
           <a className="active" href="/booking">
             Lịch hẹn
           </a>
@@ -344,7 +313,7 @@ export default function BookingPage() {
                 <span className="material-symbols-outlined">two_wheeler</span>
                 <span>Nhà xe của tôi</span>
               </a>
-              <a href="/booking" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+              <a href="/profile?tab=appointments" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">event_available</span>
                 <span>Lịch hẹn của tôi</span>
               </a>
@@ -596,8 +565,8 @@ export default function BookingPage() {
               )}
             </div>
 
-            <div className="my-appointments">
-              <div className="side-heading">
+            <div className="booking-help-card">
+              <div className="booking-help-icon">
                 <h2>Lịch hẹn của tôi</h2>
                 <a href="/booking">Xem tất cả</a>
               </div>
