@@ -2,139 +2,83 @@ const express = require('express');
 const router = express.Router();
 const appointmentController = require('../controllers/appointment.controller');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
-const { body, param, query, validationResult } = require('express-validator');
+const {
+  appointmentIdValidation,
+  cancelAppointmentValidation,
+  createAppointmentValidation,
+  listCustomerAppointmentsValidation,
+  validate,
+  validateAllowedBodyFields,
+  validateAllowedQueryFields
+} = require('../middleware/validator.middleware');
 
-// Validation middleware
-const validate = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors: errors.array()
-    });
-  }
-  next();
-};
-
-// Validation rules
-const createAppointmentValidation = [
-  body('service_id').notEmpty().isMongoId()
-    .withMessage('Valid service ID is required'),
-  body('appointment_date').notEmpty().isISO8601()
-    .withMessage('Valid appointment date is required (YYYY-MM-DD)'),
-  body('start_time').notEmpty().matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
-    .withMessage('Valid start time is required (HH:MM format)'),
-  body('customer_notes').optional().trim().isLength({ max: 1000 })
-    .withMessage('Customer notes cannot exceed 1000 characters'),
-  body('vehicle_info.brand').optional().trim().isLength({ min: 1, max: 50 })
-    .withMessage('Vehicle brand must be between 1 and 50 characters'),
-  body('vehicle_info.model').optional().trim().isLength({ min: 1, max: 50 })
-    .withMessage('Vehicle model must be between 1 and 50 characters'),
-  body('vehicle_info.year').optional().isInt({ min: 1900, max: new Date().getFullYear() + 1 })
-    .withMessage('Vehicle year must be valid'),
-  body('vehicle_info.license_plate').optional().trim().isLength({ min: 1, max: 20 })
-    .withMessage('License plate must be between 1 and 20 characters')
+const createAppointmentFields = [
+  'service_type',
+  'service_package',
+  'repair_issue',
+  'issue_description',
+  'vehicle_brand',
+  'vehicle_model',
+  'license_plate',
+  'odometer',
+  'appointment_date',
+  'time_slot',
+  'contact_phone',
+  'note'
 ];
 
-const updateAppointmentValidation = [
-  body('service_id').optional().isMongoId()
-    .withMessage('Valid service ID is required'),
-  body('appointment_date').optional().isISO8601()
-    .withMessage('Valid appointment date is required (YYYY-MM-DD)'),
-  body('start_time').optional().matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
-    .withMessage('Valid start time is required (HH:MM format)'),
-  body('customer_notes').optional().trim().isLength({ max: 1000 })
-    .withMessage('Customer notes cannot exceed 1000 characters'),
-  body('vehicle_info.brand').optional().trim().isLength({ min: 1, max: 50 })
-    .withMessage('Vehicle brand must be between 1 and 50 characters'),
-  body('vehicle_info.model').optional().trim().isLength({ min: 1, max: 50 })
-    .withMessage('Vehicle model must be between 1 and 50 characters'),
-  body('vehicle_info.year').optional().isInt({ min: 1900, max: new Date().getFullYear() + 1 })
-    .withMessage('Vehicle year must be valid'),
-  body('vehicle_info.license_plate').optional().trim().isLength({ min: 1, max: 20 })
-    .withMessage('License plate must be between 1 and 20 characters')
-];
-
-const cancelAppointmentValidation = [
-  body('reason').optional().trim().isLength({ max: 500 })
-    .withMessage('Cancellation reason cannot exceed 500 characters')
-];
+router.use(authenticate, authorize('CUSTOMER'));
 
 /**
  * @route   POST /api/appointments
- * @desc    Create new appointment
- * @access  Private/Customer
+ * @desc    Create appointment as customer
+ * @access  Private - CUSTOMER
  */
-router.post('/',
-  authenticate,
-  authorize('CUSTOMER'),
-
+router.post(
+  '/',
+  validateAllowedBodyFields(createAppointmentFields),
   createAppointmentValidation,
   validate,
   appointmentController.createAppointment
 );
 
 /**
-
- * @route   GET /api/appointments
- * @desc    Get customer's appointments
- * @access  Private/Customer
+ * @route   GET /api/appointments/my
+ * @desc    Get current customer's appointments
+ * @access  Private - CUSTOMER
  */
-router.get('/',
-  authenticate,
-  authorize('CUSTOMER'),
-  query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 100 }),
-  query('status').optional().isIn(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
-  query('date_from').optional().isISO8601(),
-  query('date_to').optional().isISO8601(),
-
+router.get(
+  '/my',
+  validateAllowedQueryFields(['page', 'limit', 'status', 'from_date', 'to_date']),
+  listCustomerAppointmentsValidation,
   validate,
   appointmentController.getMyAppointments
 );
 
 /**
  * @route   GET /api/appointments/:id
-
- * @desc    Get appointment by ID
- * @access  Private/Customer
+ * @desc    Get current customer's appointment detail
+ * @access  Private - CUSTOMER
  */
-router.get('/:id',
-  authenticate,
-  authorize('CUSTOMER'),
-  param('id').isMongoId().withMessage('Invalid appointment ID'),
+router.get(
+  '/:id',
+  appointmentIdValidation,
   validate,
-  appointmentController.getAppointmentById
+  appointmentController.getMyAppointmentById
 );
 
 /**
- * @route   PUT /api/appointments/:id
- * @desc    Update appointment
- * @access  Private/Customer
+ * @route   PATCH /api/appointments/:id/cancel
+ * @desc    Cancel current customer's appointment
+ * @access  Private - CUSTOMER
  */
-router.put('/:id',
-  authenticate,
-  authorize('CUSTOMER'),
-  param('id').isMongoId().withMessage('Invalid appointment ID'),
-  updateAppointmentValidation,
-  validate,
-  appointmentController.updateAppointment
-);
-
-/**
- * @route   DELETE /api/appointments/:id
- * @desc    Cancel appointment
- * @access  Private/Customer
- */
-router.delete('/:id',
-  authenticate,
-  authorize('CUSTOMER'),
-  param('id').isMongoId().withMessage('Invalid appointment ID'),
+router.patch(
+  '/:id/cancel',
+  validateAllowedBodyFields(['cancel_reason']),
+  appointmentIdValidation,
   cancelAppointmentValidation,
   validate,
-  appointmentController.cancelAppointment
+  appointmentController.cancelMyAppointment
 );
 
 module.exports = router;
-
