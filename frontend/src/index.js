@@ -14,6 +14,7 @@ import BookingPage from "./pages/customer/BookingPage";
 import UserProfile from "./pages/customer/UserProfile";
 import HomePage from "./pages/home/HomePage";
 import StaffLayout from "./pages/staff/StaffLayout";
+import ManagerLayout from "./pages/manager/ManagerLayout";
 
 const staticRoute = window.__MOTOCARE_STATIC_ROUTE__;
 const Router = staticRoute ? MemoryRouter : BrowserRouter;
@@ -65,6 +66,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/manager/*"
+          element={
+            <ProtectedRoute allowedRoles={["MANAGER", "ADMIN"]}>
+              <ManagerLayout />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/manager-preview" element={<ManagerLayout />} />
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </Router>
