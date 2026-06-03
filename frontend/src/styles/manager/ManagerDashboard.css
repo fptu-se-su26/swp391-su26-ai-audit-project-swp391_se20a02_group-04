@@ -1,0 +1,375 @@
+/* ManagerDashboard.css */
+
+/* KPI ROW */
+.manager-layout .kpis-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.manager-layout .kpi-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.manager-layout .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04);
+}
+
+.manager-layout .kpi-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.manager-layout .kpi-label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.manager-layout .kpi-value {
+    font-size: 1.85rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+.manager-layout .kpi-meta {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #10b981; /* Green positive default */
+    margin-top: 2px;
+}
+
+.manager-layout .kpi-meta.orange {
+    color: #ff6b00;
+}
+
+.manager-layout .kpi-meta.blue {
+    color: #3b82f6;
+}
+
+.manager-layout .kpi-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background-color: #f8fafc;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.manager-layout .kpi-card:nth-child(1) .kpi-icon-wrapper { background-color: #eff6ff; color: #3b82f6; }
+.manager-layout .kpi-card:nth-child(2) .kpi-icon-wrapper { background-color: #fff7ed; color: #ff6b00; }
+.manager-layout .kpi-card:nth-child(3) .kpi-icon-wrapper { background-color: #ecfdf5; color: #10b981; }
+.manager-layout .kpi-card:nth-child(4) .kpi-icon-wrapper { background-color: #faf5ff; color: #a855f7; }
+
+/* INTERACTIVE WORKSHOP BAYS live map */
+.manager-layout .bays-section {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+.manager-layout .section-title-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.manager-layout .section-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0f172a;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.manager-layout .bay-indicators {
+    display: flex;
+    gap: 16px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.manager-layout .indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.manager-layout .indicator-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.manager-layout .indicator-dot.empty { background-color: #10b981; }
+.manager-layout .indicator-dot.occupied { background-color: #f59e0b; }
+
+.manager-layout .bays-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+}
+
+.manager-layout .bay-card {
+    background-color: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 120px;
+    position: relative;
+    overflow: hidden;
+}
+
+.manager-layout .bay-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background-color: #cbd5e1;
+}
+
+.manager-layout .bay-card.empty::before { background-color: #10b981; }
+.manager-layout .bay-card.occupied::before { background-color: #f59e0b; }
+
+.manager-layout .bay-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.05);
+    border-color: #cbd5e1;
+}
+
+.manager-layout .bay-card.empty:hover { border-color: #10b981; }
+.manager-layout .bay-card.occupied:hover { border-color: #f59e0b; }
+
+.manager-layout .bay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.manager-layout .bay-name {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.manager-layout .bay-status-badge {
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.manager-layout .bay-status-badge.empty { background-color: #ecfdf5; color: #10b981; }
+.manager-layout .bay-status-badge.occupied { background-color: #fffbeb; color: #d97706; }
+
+.manager-layout .bay-details {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.manager-layout .bay-bike {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.manager-layout .bay-service {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.manager-layout .bay-tech {
+    margin-top: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #ff6b00;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.manager-layout .bay-empty-desc {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-style: italic;
+    margin-top: 12px;
+}
+
+/* DOUBLE BLOCK GRID FOR DASHBOARD EXTRAS */
+.manager-layout .dashboard-grid-bottom {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 24px;
+}
+
+.manager-layout .recent-activity-card, 
+.manager-layout .roster-mini-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+.manager-layout .activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.manager-layout .activity-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.manager-layout .activity-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #f1f5f9;
+    flex-shrink: 0;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23f1f5f9"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23cbd5e1"/></svg>');
+    background-size: cover;
+}
+
+.manager-layout .activity-desc-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.manager-layout .activity-text {
+    font-size: 0.85rem;
+    color: #334155;
+    line-height: 1.4;
+}
+
+.manager-layout .activity-text strong {
+    color: #0f172a;
+}
+
+.manager-layout .activity-time {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.manager-layout .tech-mini-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.manager-layout .tech-mini-row:last-child {
+    border-bottom: none;
+}
+
+.manager-layout .tech-mini-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.manager-layout .tech-mini-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.manager-layout .tech-mini-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #334155;
+    margin: 0;
+}
+
+.manager-layout .tech-mini-role {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-weight: 500;
+    margin: 0;
+}
+
+.manager-layout .status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.manager-layout .status-badge.active {
+    background-color: #E6F9F0;
+    color: #10B981;
+}
+
+.manager-layout .status-badge.locked {
+    background-color: #FDF2F2;
+    color: #EF4444;
+}
+
+/* RESPONSIVE SCALING */
+@media (max-width: 1280px) {
+    .manager-layout .kpis-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .manager-layout .bays-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 1024px) {
+    .manager-layout .dashboard-grid-bottom {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .manager-layout .bays-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

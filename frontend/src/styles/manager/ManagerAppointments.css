@@ -1,0 +1,195 @@
+/* ManagerAppointments.css */
+
+/* VIEW 2: APPOINTMENT MANAGEMENT TABLE CARD */
+.manager-layout .appointments-card {
+    background-color: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* TAB SELECTORS INSIDE APPOINTMENT PAGE */
+.manager-layout .appointments-header-tabs {
+    display: flex;
+    border-bottom: 1px solid #f1f5f9;
+    background-color: #fcfdfd;
+    padding: 0 16px;
+}
+
+.manager-layout .app-tab-btn {
+    border: none;
+    background: transparent;
+    padding: 16px 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #64748b;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.15s;
+}
+
+.manager-layout .app-tab-btn:hover {
+    color: #0f172a;
+}
+
+.manager-layout .app-tab-btn.active {
+    color: #ff6b00;
+}
+
+.manager-layout .app-tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background-color: #ff6b00;
+}
+
+/* SEARCH & ACTION ROW */
+.manager-layout .search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.manager-layout .search-bar-icon {
+    position: absolute;
+    color: #94a3b8;
+}
+
+.manager-layout .search-bar-input {
+    width: 100%;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    outline: none;
+    transition: all 0.2s ease-in-out;
+}
+
+.manager-layout .search-bar-input:focus {
+    border-color: #ff6b00;
+    box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.1);
+}
+
+.manager-layout .btn-secondary {
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    color: #64748b;
+    font-weight: 700;
+    transition: all 0.15s ease;
+}
+
+.manager-layout .btn-secondary:hover {
+    background-color: #f8fafc;
+    color: #0f172a;
+}
+
+.manager-layout .btn-secondary.active {
+    background-color: #fff7ed;
+    border-color: #ff6b00;
+    color: #ff6b00;
+}
+
+/* ASSIGNED TECH CHIP IN TABLE */
+.manager-layout .tech-allocation-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.manager-layout .tech-allocation-chip.unassigned {
+    background-color: #fff7ed;
+    border-color: #ffedd5;
+    color: #ea580c;
+}
+
+.manager-layout .btn-table-assign {
+    border: none;
+    background-color: #ff6b00;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(255, 107, 0, 0.15);
+    transition: background-color 0.15s;
+}
+
+.manager-layout .btn-table-assign:hover {
+    background-color: #e66000;
+}
+
+/* TABLE STYLING */
+.manager-layout .accounts-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.manager-layout .accounts-table th {
+    padding: 18px 24px;
+    background-color: #fcfdfd;
+    border-bottom: 1px solid #f3f5f8;
+    color: #8c97a9;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.manager-layout .accounts-table td {
+    padding: 18px 24px;
+    border-bottom: 1px solid #f8fafc;
+    vertical-align: middle;
+}
+
+.manager-layout .accounts-table tr:last-child td {
+    border-bottom: none;
+}
+
+.manager-layout .accounts-table tr:hover td {
+    background-color: #fafbfc;
+}
+
+.manager-layout .user-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.manager-layout .status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.manager-layout .status-badge.active {
+    background-color: #E6F9F0;
+    color: #10B981;
+}
+
+.manager-layout .status-badge.locked {
+    background-color: #FDF2F2;
+    color: #EF4444;
+}
+
+@media (max-width: 1024px) {
+    .manager-layout .accounts-table th, 
+    .manager-layout .accounts-table td {
+        padding: 16px 14px;
+    }
+}

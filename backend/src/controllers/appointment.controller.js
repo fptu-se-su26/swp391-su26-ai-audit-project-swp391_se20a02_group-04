@@ -1,155 +1,87 @@
 const Appointment = require('../models/Appointment.model');
+
+const Service = require('../models/Service.model');
 const User = require('../models/User.model');
+const UserAudit = require('../models/UserAudit.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
-const {
-  ACTIVE_APPOINTMENT_STATUSES,
-  CUSTOMER_CANCELLABLE_STATUSES,
-  DEFAULT_TIMEZONE_OFFSET,
-  getServicePackage
-} = require('../constants/appointment.constants');
-
-const buildAppointmentStartAt = (date, timeSlot) => {
-  return new Date(`${date}T${timeSlot}:00${DEFAULT_TIMEZONE_OFFSET}`);
-};
-
-const normalizePhone = (phone) => {
-  if (!phone) {
-    return phone;
-  }
-
-  return phone.startsWith('+84') ? `0${phone.slice(3)}` : phone;
-};
-
-const buildDateRangeQuery = (fromDate, toDate) => {
-  const range = {};
-
-  if (fromDate) {
-    range.$gte = buildAppointmentStartAt(fromDate, '00:00');
-  }
-
-  if (toDate) {
-    range.$lte = buildAppointmentStartAt(toDate, '23:59');
-  }
-
-  return Object.keys(range).length ? range : null;
-};
 
 /**
- * Create customer appointment
+ * Create new appointment (Customer)
+
  * POST /api/appointments
  */
 const createAppointment = async (req, res) => {
   try {
-    const userId = req.user.userId;
+
     const {
-      service_type,
-      service_package,
-      repair_issue,
-      issue_description,
-      vehicle_brand,
-      vehicle_model,
-      license_plate,
-      odometer,
+      service_id,
       appointment_date,
-      time_slot,
-      contact_phone,
-      note
+      start_time,
+      customer_notes,
+      vehicle_info
     } = req.body;
 
-    const serviceType = service_type.toUpperCase();
-    const normalizedLicensePlate = license_plate.toUpperCase().replace(/\s+/g, '');
-    const appointmentStartAt = buildAppointmentStartAt(appointment_date, time_slot);
-
-    if (appointmentStartAt <= new Date()) {
-      return errorResponse(res, 400, 'Appointment time must be in the future');
+    // Verify service exists
+    const service = await Service.findById(service_id);
+    if (!service || !service.is_active) {
+      return errorResponse(res, 404, 'Service not found or inactive');
     }
 
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return errorResponse(res, 404, 'Customer not found');
+    // Check if appointment date is in the future
+    const appointmentDateTime = new Date(`${appointment_date}T${start_time}`);
+    if (appointmentDateTime <= new Date()) {
+      return errorResponse(res, 400, 'Appointment must be scheduled for a future date and time');
     }
 
-    const customerPhone = normalizePhone(contact_phone || user.phone);
-
-    if (!customerPhone) {
-      return errorResponse(res, 400, 'Contact phone is required for booking');
-    }
-
-    let servicePayload;
-
-    if (serviceType === 'REPAIR') {
-      servicePayload = {
-        type: serviceType,
-        name: repair_issue.trim(),
-        repair_issue: repair_issue.trim(),
-        issue_description,
-        description: 'Repair inspection appointment',
-        estimated_price: null,
-        estimated_duration_minutes: 90
-      };
-    } else {
-      const selectedPackage = getServicePackage(serviceType, service_package);
-
-      if (!selectedPackage) {
-        return errorResponse(res, 400, 'Invalid service package for selected service type');
-      }
-
-      servicePayload = {
-        type: serviceType,
-        package_id: service_package,
-        ...selectedPackage
-      };
-    }
-
-    const duplicateCustomerAppointment = await Appointment.findOne({
-      customer_id: userId,
-      appointment_start_at: appointmentStartAt,
-      status: { $in: ACTIVE_APPOINTMENT_STATUSES }
+    // Check for conflicting appointments (same date/time)
+    const conflictingAppointment = await Appointment.findOne({
+      appointment_date: new Date(appointment_date),
+      start_time,
+      status: { $in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] }
     });
 
-    if (duplicateCustomerAppointment) {
-      return errorResponse(res, 409, 'You already have an active appointment at this time slot');
+    if (conflictingAppointment) {
+      return errorResponse(res, 409, 'This time slot is already booked');
     }
 
-    const duplicateVehicleAppointment = await Appointment.findOne({
-      'vehicle.license_plate': normalizedLicensePlate,
-      appointment_start_at: appointmentStartAt,
-      status: { $in: ACTIVE_APPOINTMENT_STATUSES }
-    });
-
-    if (duplicateVehicleAppointment) {
-      return errorResponse(res, 409, 'This vehicle already has an active appointment at this time slot');
-    }
-
+    // Create appointment
     const appointment = await Appointment.create({
-      customer_id: userId,
-      customer_snapshot: {
-        full_name: user.full_name,
-        email: user.email,
-        phone: customerPhone
-      },
-      service: servicePayload,
-      vehicle: {
-        brand: vehicle_brand,
-        model: vehicle_model,
-        license_plate: normalizedLicensePlate,
-        odometer: odometer !== undefined ? Number(odometer) : undefined
-      },
-      appointment_date,
-      time_slot,
-      appointment_start_at: appointmentStartAt,
-      customer_note: note
+      customer_id: req.user.userId,
+      service_id,
+      appointment_date: new Date(appointment_date),
+      start_time,
+      estimated_duration: service.estimated_duration,
+      customer_notes,
+      vehicle_info,
+      status: 'PENDING'
     });
+
+    // Increment service booking count
+    await service.incrementBookings();
+
+    // Log audit
+    await UserAudit.create({
+      user_id: req.user.userId,
+      action: 'APPOINTMENT_CREATED',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        appointment_id: appointment._id,
+        service_id,
+        appointment_date,
+        start_time
+      }
+    });
+
+    const populatedAppointment = await Appointment.findById(appointment._id)
+      .populate('service_id', 'service_name description base_price estimated_duration category');
 
     return successResponse(res, 201, 'Appointment created successfully', {
-      appointment: appointment.toSafeObject()
+      appointment: populatedAppointment
     });
 
   } catch (error) {
-    if (error.code === 11000) {
-      return errorResponse(res, 409, 'Appointment code already exists. Please try again.');
-    }
 
     console.error('Create appointment error:', error);
     return errorResponse(res, 500, 'Failed to create appointment');
@@ -157,42 +89,61 @@ const createAppointment = async (req, res) => {
 };
 
 /**
- * Get current customer's appointments
- * GET /api/appointments/my
+
+ * Get customer's appointments
+ * GET /api/appointments
  */
 const getMyAppointments = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
+    const {
+      page = 1,
+      limit = 20,
+      status = '',
+      date_from = '',
+      date_to = '',
+      sort_by = 'appointment_date',
+      sort_order = 'desc'
+    } = req.query;
+
+    const query = { customer_id: req.user.userId };
+
+    if (status) {
+      query.status = status.toUpperCase();
+    }
+
+    // Date range filter
+    if (date_from || date_to) {
+      query.appointment_date = {};
+      if (date_from) {
+        query.appointment_date.$gte = new Date(date_from);
+      }
+      if (date_to) {
+        query.appointment_date.$lte = new Date(date_to);
+      }
+    }
+
     const skip = (page - 1) * limit;
-
-    const query = { customer_id: userId };
-
-    if (req.query.status) {
-      query.status = req.query.status.toUpperCase();
-    }
-
-    const dateRange = buildDateRangeQuery(req.query.from_date, req.query.to_date);
-
-    if (dateRange) {
-      query.appointment_start_at = dateRange;
-    }
+    const sortOrder = sort_order === 'asc' ? 1 : -1;
 
     const [appointments, total] = await Promise.all([
       Appointment.find(query)
-        .sort({ appointment_start_at: -1, created_at: -1 })
-        .limit(limit)
-        .skip(skip)
-        .select('-__v'),
+        .populate('staff_id', 'full_name email phone')
+        .populate('service_id', 'service_name description base_price estimated_duration category')
+        .populate('cancelled_by', 'full_name')
+        .sort({ [sort_by]: sortOrder })
+        .limit(parseInt(limit))
+        .skip(skip),
+
       Appointment.countDocuments(query)
     ]);
 
     return successResponse(res, 200, 'Appointments retrieved successfully', {
       appointments,
       pagination: {
-        page,
-        limit,
+
+        page: parseInt(page),
+        limit: parseInt(limit),
+
         total,
         pages: Math.ceil(total / limit)
       }
@@ -205,15 +156,22 @@ const getMyAppointments = async (req, res) => {
 };
 
 /**
- * Get current customer's appointment detail
+
+ * Get appointment by ID (Customer can only see their own)
  * GET /api/appointments/:id
  */
-const getMyAppointmentById = async (req, res) => {
+const getAppointmentById = async (req, res) => {
   try {
+    const { id } = req.params;
+
     const appointment = await Appointment.findOne({
-      _id: req.params.id,
+      _id: id,
       customer_id: req.user.userId
-    }).select('-__v');
+    })
+      .populate('staff_id', 'full_name email phone')
+      .populate('service_id', 'service_name description base_price estimated_duration category')
+      .populate('cancelled_by', 'full_name');
+
 
     if (!appointment) {
       return errorResponse(res, 404, 'Appointment not found');
@@ -224,19 +182,32 @@ const getMyAppointmentById = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get appointment detail error:', error);
+
+    console.error('Get appointment by ID error:', error);
+
     return errorResponse(res, 500, 'Failed to retrieve appointment');
   }
 };
 
 /**
- * Cancel current customer's appointment
- * PATCH /api/appointments/:id/cancel
+
+ * Update appointment (Customer can only update their own pending appointments)
+ * PUT /api/appointments/:id
  */
-const cancelMyAppointment = async (req, res) => {
+const updateAppointment = async (req, res) => {
   try {
+    const { id } = req.params;
+    const {
+      service_id,
+      appointment_date,
+      start_time,
+      customer_notes,
+      vehicle_info
+    } = req.body;
+
     const appointment = await Appointment.findOne({
-      _id: req.params.id,
+      _id: id,
+
       customer_id: req.user.userId
     });
 
@@ -244,24 +215,140 @@ const cancelMyAppointment = async (req, res) => {
       return errorResponse(res, 404, 'Appointment not found');
     }
 
-    if (!CUSTOMER_CANCELLABLE_STATUSES.includes(appointment.status)) {
-      return errorResponse(res, 400, `Only ${CUSTOMER_CANCELLABLE_STATUSES.join(', ')} appointments can be cancelled by customer`);
+
+    if (!appointment.canBeModified()) {
+      return errorResponse(res, 400, 'Appointment cannot be modified in current status');
     }
 
-    if (appointment.appointment_start_at <= new Date()) {
-      return errorResponse(res, 400, 'Cannot cancel an appointment after its start time');
+    const oldValues = {
+      service_id: appointment.service_id,
+      appointment_date: appointment.appointment_date,
+      start_time: appointment.start_time
+    };
+
+    // Verify service if being changed
+    if (service_id && service_id !== appointment.service_id.toString()) {
+      const service = await Service.findById(service_id);
+      if (!service || !service.is_active) {
+        return errorResponse(res, 404, 'Service not found or inactive');
+      }
+      appointment.service_id = service_id;
+      appointment.estimated_duration = service.estimated_duration;
+    }
+
+    // Check appointment date/time if being changed
+    if (appointment_date || start_time) {
+      const newDate = appointment_date ? new Date(appointment_date) : appointment.appointment_date;
+      const newTime = start_time || appointment.start_time;
+      const appointmentDateTime = new Date(`${newDate.toISOString().split('T')[0]}T${newTime}`);
+
+      if (appointmentDateTime <= new Date()) {
+        return errorResponse(res, 400, 'Appointment must be scheduled for a future date and time');
+      }
+
+      // Check for conflicts (excluding current appointment)
+      const conflictingAppointment = await Appointment.findOne({
+        _id: { $ne: id },
+        appointment_date: newDate,
+        start_time: newTime,
+        status: { $in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] }
+      });
+
+      if (conflictingAppointment) {
+        return errorResponse(res, 409, 'This time slot is already booked');
+      }
+
+      if (appointment_date) appointment.appointment_date = newDate;
+      if (start_time) appointment.start_time = start_time;
+    }
+
+    // Update other fields
+    if (customer_notes !== undefined) appointment.customer_notes = customer_notes;
+    if (vehicle_info !== undefined) {
+      appointment.vehicle_info = { ...appointment.vehicle_info, ...vehicle_info };
+    }
+
+    await appointment.save();
+
+    // Log audit
+    await UserAudit.create({
+      user_id: req.user.userId,
+      action: 'APPOINTMENT_UPDATED',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        appointment_id: id,
+        old_values: oldValues,
+        new_values: {
+          service_id: appointment.service_id,
+          appointment_date: appointment.appointment_date,
+          start_time: appointment.start_time
+        }
+      }
+    });
+
+    const updatedAppointment = await Appointment.findById(id)
+      .populate('staff_id', 'full_name email phone')
+      .populate('service_id', 'service_name description base_price estimated_duration');
+
+    return successResponse(res, 200, 'Appointment updated successfully', {
+      appointment: updatedAppointment
+    });
+
+  } catch (error) {
+    console.error('Update appointment error:', error);
+    return errorResponse(res, 500, 'Failed to update appointment');
+  }
+};
+
+/**
+ * Cancel appointment (Customer can only cancel their own)
+ * DELETE /api/appointments/:id
+ */
+const cancelAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const appointment = await Appointment.findOne({
+      _id: id,
+      customer_id: req.user.userId
+    });
+
+    if (!appointment) {
+      return errorResponse(res, 404, 'Appointment not found');
+    }
+
+    if (!appointment.canBeCancelled()) {
+      return errorResponse(res, 400, 'Appointment cannot be cancelled in current status');
     }
 
     appointment.status = 'CANCELLED';
-    appointment.cancel_reason = req.body.cancel_reason;
+    appointment.cancellation_reason = reason || 'Cancelled by customer';
+    appointment.cancelled_by = req.user.userId;
+
     appointment.cancelled_at = new Date();
 
     await appointment.save();
 
-    return successResponse(res, 200, 'Appointment cancelled successfully', {
-      appointment: appointment.toSafeObject()
+
+    // Log audit
+    await UserAudit.create({
+      user_id: req.user.userId,
+      action: 'APPOINTMENT_CANCELLED',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        appointment_id: id,
+        reason
+      }
     });
 
+    return successResponse(res, 200, 'Appointment cancelled successfully');
+
+ main
   } catch (error) {
     console.error('Cancel appointment error:', error);
     return errorResponse(res, 500, 'Failed to cancel appointment');
@@ -271,6 +358,9 @@ const cancelMyAppointment = async (req, res) => {
 module.exports = {
   createAppointment,
   getMyAppointments,
-  getMyAppointmentById,
-  cancelMyAppointment
+
+  getAppointmentById,
+  updateAppointment,
+  cancelAppointment
 };
+
