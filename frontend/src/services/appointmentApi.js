@@ -47,6 +47,10 @@ export function getMyAppointments(params = {}) {
   return appointmentRequest(`/appointments/my${queryString ? `?${queryString}` : ""}`);
 }
 
+export function getMyAppointmentById(appointmentId) {
+  return appointmentRequest(`/appointments/${appointmentId}`);
+}
+
 export function cancelAppointment(appointmentId, cancelReason = "") {
   return appointmentRequest(`/appointments/${appointmentId}/cancel`, {
     method: "PATCH",

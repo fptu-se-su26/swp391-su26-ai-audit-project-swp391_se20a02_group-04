@@ -50,7 +50,7 @@ export default function AboutPage() {
         <a className="about-logo" href="/home">MOTOCORE</a>
         <nav className="about-nav" aria-label="Điều hướng chính">
           <a href="/home">Trang chủ</a>
-          <a href="/home">Dịch vụ</a>
+          <a href="/services">Dịch vụ</a>
           <a href="/booking">Lịch hẹn</a>
           <a className="active" href="/about">Về chúng tôi</a>
         </nav>
@@ -83,7 +83,7 @@ export default function AboutPage() {
             </p>
             <div className="about-hero-actions">
               <a className="primary-button" href="/booking">Đặt lịch dịch vụ</a>
-              <a className="secondary-button" href="/home">Xem dịch vụ</a>
+              <a className="secondary-button" href="/services">Xem dịch vụ</a>
             </div>
           </div>
         </section>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminCalendar from './pages/admin/AdminCalendar';
 import AdminProfile from './pages/admin/AdminProfile';
+import AdminServices from './pages/admin/AdminServices';
 import './App.css';
 
 function App() {
@@ -13,6 +14,8 @@ function App() {
         return <AdminDashboard onViewChange={setCurrentPage} />;
       case 'calendar':
         return <AdminCalendar onViewChange={setCurrentPage} />;
+      case 'services':
+        return <AdminServices onViewChange={setCurrentPage} />;
       case 'profile':
         return <AdminProfile onViewChange={setCurrentPage} />;
       default:

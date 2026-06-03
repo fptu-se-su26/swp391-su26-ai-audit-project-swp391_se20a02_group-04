@@ -114,7 +114,7 @@ export default function HomePage() {
           <a className="active" href="/home">
             Trang chủ
           </a>
-          <a href="/home">Dịch vụ</a>
+          <a href="/services">Dịch vụ</a>
           <a href="/booking">Lịch hẹn</a>
           <a href="/about">Về chúng tôi</a>
         </nav>
@@ -168,7 +168,7 @@ export default function HomePage() {
           <img
             alt="Garage xe phân khối lớn cao cấp"
             className="home-hero-image"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuCuJHMJUCLlqpELVlh63vEnytkiqNLCDzZXIHSs1TwLCBBIqbdIY40ILRBueSybpK9jQo7R1tcWjHETZzm5W9YQEnTn-wBci-qAT2Yg1xjTyDnVSEOce_dvMZ_sPrzTXuywQrwR6iacAcGXdsdFvh5hX8PFJRsgkXMex_h3DIeCmFmXtrQV9HVpJ6vPtgJ8bnnb5a3HHg5Kou-_IfT2KvH3LWKbUTzMiVlM9UZVyfYdmo2Ej8sXK0krC4yYXNkUEaDU3Ev7gQvJOA0"
+            src="https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1800&q=82"
           />
           <div className="home-hero-overlay" />
           <div className="home-hero-content">
@@ -189,8 +189,8 @@ export default function HomePage() {
               <a className="primary-button" href="/booking">
                 Đặt lịch bảo dưỡng
               </a>
-              <a className="secondary-button" href="/home">
-                Xem bảng giá
+              <a className="secondary-button" href="/services">
+                Xem dịch vụ
               </a>
             </div>
             <div className="trust-strip" aria-label="Thống kê uy tín">
@@ -332,7 +332,7 @@ export default function HomePage() {
           </div>
           <div className="footer-links">
             <a href="/home">Trang chủ</a>
-            <a href="/home">Dịch vụ</a>
+            <a href="/services">Dịch vụ</a>
             <a href="/booking">Lịch hẹn</a>
             <a href="/about">Về chúng tôi</a>
           </div>
@@ -365,7 +365,7 @@ export default function HomePage() {
           <MaterialIcon>event_available</MaterialIcon>
           Đặt lịch
         </a>
-        <a className="floating-action" href="/home">
+        <a className="floating-action" href="/services">
           <MaterialIcon>handyman</MaterialIcon>
         </a>
         <a href="/booking">

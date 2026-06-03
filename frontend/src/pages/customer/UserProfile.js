@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import {
+  cancelAppointment,
+  getMyAppointmentById,
+  getMyAppointments,
+} from "../../services/appointmentApi";
 import { clearAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
 import "../../styles/customer/UserProfile.css";
@@ -8,87 +13,235 @@ function MaterialIcon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
 }
 
+const avatarFallback =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23a04100"/></svg>';
+
+const tabs = [
+  { id: "info", icon: "person", label: "Thông tin" },
+  { id: "password", icon: "lock", label: "Bảo mật" },
+  { id: "appointments", icon: "event_available", label: "Lịch hẹn" },
+  { id: "garage", icon: "two_wheeler", label: "Nhà xe" },
+  { id: "vouchers", icon: "confirmation_number", label: "Ưu đãi" },
+  { id: "logs", icon: "history", label: "Nhật ký" },
+];
+
+const fallbackAppointments = [
+  {
+    _id: "demo-appointment-1",
+    appointment_code: "APT-20260528-01",
+    appointment_date: "2026-05-30",
+    time_slot: "09:30",
+    status: "CONFIRMED",
+    garage_branch: "MOTOCORE Mỹ Đình",
+    service: {
+      type: "MAINTENANCE",
+      name: "Bảo dưỡng định kỳ",
+      description: "Kiểm tra tổng quát, vệ sinh lọc gió, cân chỉnh phanh.",
+      estimated_price: 280000,
+      estimated_duration_minutes: 75,
+    },
+    vehicle: {
+      brand: "Honda",
+      model: "CBR650R",
+      license_plate: "29A1-999.88",
+      odometer: 12500,
+    },
+    customer_note: "Kiểm tra thêm tiếng kêu ở phanh trước.",
+    staff_notes: "Đã tiếp nhận, chờ phân công kỹ thuật viên.",
+    created_at: "2026-05-27T08:20:00.000Z",
+  },
+  {
+    _id: "demo-appointment-2",
+    appointment_code: "APT-20260521-014",
+    appointment_date: "2026-05-21",
+    time_slot: "15:00",
+    status: "COMPLETED",
+    garage_branch: "MOTOCORE Cầu Giấy",
+    service: {
+      type: "WASH",
+      name: "Rửa xe cao cấp",
+      description: "Rửa bọt tuyết, vệ sinh mâm, chăm sóc nhựa nhám.",
+      estimated_price: 80000,
+      estimated_duration_minutes: 45,
+    },
+    vehicle: {
+      brand: "Ducati",
+      model: "Monster 821",
+      license_plate: "29A1-123.45",
+      odometer: 8700,
+    },
+    customer_note: "Rửa kỹ phần mâm sau.",
+    staff_notes: "Hoàn thành và bàn giao xe sạch.",
+    completed_at: "2026-05-21T09:30:00.000Z",
+  },
+];
+
+function getStatusLabel(status) {
+  const labels = {
+    PENDING: "Chờ xác nhận",
+    CONFIRMED: "Đã xác nhận",
+    IN_PROGRESS: "Đang xử lý",
+    COMPLETED: "Hoàn thành",
+    PAID: "Đã thanh toán",
+    CANCELLED: "Đã hủy",
+    REJECTED: "Từ chối",
+    NO_SHOW: "Không đến",
+  };
+
+  return labels[status] || status || "Chưa rõ";
+}
+
+function getStatusClass(status) {
+  const classes = {
+    PENDING: "pending",
+    CONFIRMED: "confirmed",
+    IN_PROGRESS: "progress",
+    COMPLETED: "completed",
+    PAID: "paid",
+    CANCELLED: "cancelled",
+    REJECTED: "cancelled",
+    NO_SHOW: "cancelled",
+  };
+
+  return classes[status] || "pending";
+}
+
+function getAppointmentCode(appointment) {
+  return appointment?.appointment_code || appointment?.code || appointment?._id || "Chưa có mã";
+}
+
+function getAppointmentService(appointment) {
+  return appointment?.service?.name || appointment?.service || "Dịch vụ chưa xác định";
+}
+
+function formatAppointmentTime(appointment) {
+  const date = appointment?.appointment_date || "";
+  const [year, month, day] = date.split("-");
+
+  if (!year || !month || !day) {
+    return appointment?.time_slot || "Chưa có lịch";
+  }
+
+  return `${day}/${month}/${year} - ${appointment?.time_slot || appointment?.start_time || ""}`;
+}
+
+function formatCreatedDate(appointment) {
+  const rawDate = appointment?.created_at || appointment?.createdAt || appointment?.created_date;
+
+  if (!rawDate) {
+    return "Chưa có ngày tạo";
+  }
+
+  return new Date(rawDate).toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function getServiceTypeLabel(appointment) {
+  const serviceType = appointment?.service?.type || appointment?.service_type || "";
+  const labels = {
+    WASH: "Rửa xe",
+    MAINTENANCE: "Bảo dưỡng",
+    REPAIR: "Sửa xe",
+  };
+
+  return labels[serviceType.toUpperCase?.()] || serviceType || "Chưa xác định";
+}
+
+function getGarageBranch(appointment) {
+  return (
+    appointment?.garage_branch ||
+    appointment?.branch?.name ||
+    appointment?.garage?.name ||
+    appointment?.location?.name ||
+    "MOTOCORE Mỹ Đình"
+  );
+}
+
+function formatMoney(value) {
+  if (value === undefined || value === null || value === "") {
+    return "Báo giá sau kiểm tra";
+  }
+
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 export default function UserProfile() {
   const [activeTab, setActiveTab] = useState("info");
   const [isSaving, setIsSaving] = useState(false);
   const [isApiLoading, setIsApiLoading] = useState(true);
   const [isUsingMock, setIsUsingMock] = useState(false);
+  const [isAppointmentsLoading, setIsAppointmentsLoading] = useState(false);
+  const [isAppointmentDetailLoading, setIsAppointmentDetailLoading] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
   const location = useLocation();
 
-  // Đồng bộ tab từ query parameter (?tab=...)
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const tab = searchParams.get("tab");
-    if (tab && ["info", "password", "garage", "vouchers", "logs"].includes(tab)) {
-      setActiveTab(tab);
-    }
-  }, [location]);
-
-  // User Profile State
   const [user, setUser] = useState({
     fullname: "Nguyễn Hoàng Nam",
     email: "namnh.customer@gmail.com",
-    phone: "0966.888.999",
+    phone: "0966 888 999",
     address: "18 Phạm Hùng, Mỹ Đình, Hà Nội",
     dob: "12/08/1998",
-    avatar: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6d1f"/></svg>',
+    avatar: avatarFallback,
     memberTier: "Gold Member",
     memberPoints: 450,
   });
 
-  // Password State
-  const [passwords, setPasswords] = useState({
-    current: "",
-    new: "",
-    confirm: "",
-  });
-
-  const [showPassword, setShowPassword] = useState({
-    current: false,
-    new: false,
-    confirm: false,
-  });
-
-  // Customer's Garage state
-  const [bikes, setBikes] = useState([
-    { brand: "Honda", model: "CBR650R", plate: "29A1-999.88", year: "2023", color: "Đỏ Đen" },
-    { brand: "Ducati", model: "Monster 821", plate: "29A1-123.45", year: "2022", color: "Vàng Cát" },
-  ]);
-
+  const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
+  const [showPassword, setShowPassword] = useState({ current: false, new: false, confirm: false });
   const [newBike, setNewBike] = useState({ brand: "", model: "", plate: "", year: "", color: "" });
   const [showAddBike, setShowAddBike] = useState(false);
 
-  // Vouchers
+  const [bikes, setBikes] = useState([
+    { brand: "Honda", model: "CBR650R", plate: "29A1-999.88", year: "2023", color: "Đỏ đen" },
+    { brand: "Ducati", model: "Monster 821", plate: "29A1-123.45", year: "2022", color: "Vàng cát" },
+  ]);
+
   const [vouchers] = useState([
-    { code: "MOTOCORE15", desc: "Giảm 15% gói Rửa xe cao cấp", expiry: "30/06/2026", status: "Còn hiệu lực" },
+    { code: "MOTOCORE15", desc: "Giảm 15% gói rửa xe cao cấp", expiry: "30/06/2026", status: "Còn hiệu lực" },
     { code: "LUBEMOTUL", desc: "Tặng lon nhớt Motul 300V khi bảo dưỡng toàn diện", expiry: "15/07/2026", status: "Còn hiệu lực" },
   ]);
 
-  // Activity logs
   const [logs, setLogs] = useState([
-    { action: "Cập nhật thông tin tài khoản", status: "SUCCESS", time: "16:05 Hôm nay" },
+    { action: "Cập nhật thông tin tài khoản", status: "SUCCESS", time: "16:05 hôm nay" },
     { action: "Đặt lịch hẹn #APT-20260521-014", status: "SUCCESS", time: "21/05/2026" },
     { action: "Thay đổi mật khẩu tài khoản", status: "SUCCESS", time: "10/05/2026" },
   ]);
+  const [appointments, setAppointments] = useState(fallbackAppointments);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [appointmentView, setAppointmentView] = useState("list");
 
-  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const activeTabLabel = useMemo(
+    () => tabs.find((tab) => tab.id === activeTab)?.label || "Thông tin",
+    [activeTab]
+  );
 
-  const showToast = (message, type = "success") => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
-  };
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get("tab");
+    if (tabs.some((item) => item.id === tab)) {
+      setActiveTab(tab);
+      if (tab === "appointments") {
+        setAppointmentView("list");
+      }
+    }
+  }, [location]);
 
-  /**
-   * Fetch Profile details from Backend API
-   */
   useEffect(() => {
     const fetchProfileData = async () => {
       setIsApiLoading(true);
       try {
         const res = await profileService.getMe();
-        if (res && res.success && res.data) {
+        if (res?.success && res.data) {
           const apiUser = res.data.user || res.data;
           setUser((prev) => ({
             ...prev,
@@ -97,7 +250,6 @@ export default function UserProfile() {
             phone: apiUser.phone || prev.phone,
           }));
           setIsUsingMock(false);
-          showToast("Đã tải dữ liệu hồ sơ từ máy chủ!", "success");
         }
       } catch (err) {
         console.log("Could not load API profile, falling back to mock data:", err.message);
@@ -110,48 +262,83 @@ export default function UserProfile() {
     fetchProfileData();
   }, []);
 
-  // Đóng dropdown khi click ra ngoài
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (showUserMenu && !event.target.closest(".booking-actions")) {
         setShowUserMenu(false);
       }
     };
+
     document.addEventListener("mousedown", handleOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [showUserMenu]);
+
+  useEffect(() => {
+    if (activeTab !== "logs" || isUsingMock) {
+      return;
+    }
+
+    const fetchLogs = async () => {
+      try {
+        const res = await profileService.getActivityLogs(1, 10);
+        if (res?.success && res.data?.logs) {
+          setLogs(
+            res.data.logs.map((item) => ({
+              action:
+                item.action === "PROFILE_UPDATE"
+                  ? "Cập nhật thông tin tài khoản"
+                  : item.action === "PASSWORD_CHANGE"
+                    ? "Thay đổi mật khẩu tài khoản"
+                    : item.action,
+              status: item.status,
+              time: new Date(item.created_at || item.timestamp).toLocaleString("vi-VN"),
+            }))
+          );
+        }
+      } catch (err) {
+        console.warn("Failed to fetch logs, keeping fallback logs:", err.message);
+      }
+    };
+
+    fetchLogs();
+  }, [activeTab, isUsingMock]);
+
+  useEffect(() => {
+    if (activeTab !== "appointments") {
+      return;
+    }
+
+    const fetchAppointments = async () => {
+      setIsAppointmentsLoading(true);
+      try {
+        const res = await getMyAppointments({ page: 1, limit: 10 });
+        const nextAppointments = res.data?.appointments || [];
+
+        if (nextAppointments.length) {
+          setAppointments(nextAppointments);
+          setSelectedAppointment((prev) =>
+            prev && nextAppointments.some((item) => item._id === prev._id) ? prev : null
+          );
+        }
+      } catch (err) {
+        console.warn("Failed to fetch appointments, keeping fallback appointments:", err.message);
+      } finally {
+        setIsAppointmentsLoading(false);
+      }
+    };
+
+    fetchAppointments();
+  }, [activeTab]);
+
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "success" }), 2800);
+  };
 
   const handleLogout = () => {
     clearAuthSession();
     setShowUserMenu(false);
   };
-
-  /**
-   * Fetch Activity logs from Backend API if tab active
-   */
-  useEffect(() => {
-    if (activeTab === "logs" && !isUsingMock) {
-      const fetchLogs = async () => {
-        try {
-          const res = await profileService.getActivityLogs(1, 10);
-          if (res && res.success && res.data && res.data.logs) {
-            const formattedLogs = res.data.logs.map((item) => ({
-              action: item.action === "PROFILE_UPDATE" ? "Cập nhật thông tin tài khoản" : 
-                      item.action === "PASSWORD_CHANGE" ? "Thay đổi mật khẩu tài khoản" : item.action,
-              status: item.status,
-              time: new Date(item.created_at || item.timestamp).toLocaleString("vi-VN"),
-            }));
-            setLogs(formattedLogs);
-          }
-        } catch (err) {
-          console.warn("Failed to fetch logs, keeping fallback logs:", err.message);
-        }
-      };
-      fetchLogs();
-    }
-  }, [activeTab, isUsingMock]);
 
   const handleInfoChange = (e) => {
     const { name, value } = e.target;
@@ -173,134 +360,163 @@ export default function UserProfile() {
     input.accept = "image/*";
     input.onchange = (e) => {
       const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (readerEvent) => {
-          setUser((prev) => ({ ...prev, avatar: readerEvent.target.result }));
-          showToast("Đã tải ảnh đại diện lên thành công!", "success");
-        };
-        reader.readAsDataURL(file);
+      if (!file) {
+        return;
       }
+
+      const reader = new FileReader();
+      reader.onload = (readerEvent) => {
+        setUser((prev) => ({ ...prev, avatar: readerEvent.target.result }));
+        showToast("Đã cập nhật ảnh đại diện.");
+      };
+      reader.readAsDataURL(file);
     };
     input.click();
   };
 
-  /**
-   * Save User Profile Info (Connects to backend or falls back)
-   */
   const handleSaveInfo = async (e) => {
     e.preventDefault();
     if (!user.fullname.trim() || !user.phone.trim()) {
-      showToast("Vui lòng nhập đầy đủ họ tên và số điện thoại!", "error");
+      showToast("Vui lòng nhập đầy đủ họ tên và số điện thoại.", "error");
       return;
     }
 
     setIsSaving(true);
     try {
       if (!isUsingMock) {
-        // Send request to Express API
-        await profileService.updateProfile({
-          fullname: user.fullname,
-          phone: user.phone
-        });
+        await profileService.updateProfile({ fullname: user.fullname, phone: user.phone });
       }
-      
-      // Simulate/Trigger saving feedback
-      setTimeout(() => {
-        setIsSaving(false);
-        showToast("Đã lưu thông tin tài khoản thành công!");
-      }, 800);
+      showToast("Đã lưu thông tin hồ sơ.");
     } catch (err) {
+      showToast(err.message || "Không thể cập nhật hồ sơ trên máy chủ.", "error");
+    } finally {
       setIsSaving(false);
-      showToast(err.message || "Không thể cập nhật hồ sơ trên máy chủ!", "error");
     }
   };
 
-  /**
-   * Change password (Connects to backend or falls back)
-   */
   const handleSavePassword = async (e) => {
     e.preventDefault();
     if (!passwords.current || !passwords.new || !passwords.confirm) {
-      showToast("Vui lòng nhập đầy đủ các ô mật khẩu!", "error");
+      showToast("Vui lòng nhập đầy đủ các ô mật khẩu.", "error");
       return;
     }
 
     if (passwords.new.length < 6) {
-      showToast("Mật khẩu mới phải từ 6 ký tự trở lên!", "error");
+      showToast("Mật khẩu mới phải từ 6 ký tự trở lên.", "error");
       return;
     }
 
     if (passwords.new !== passwords.confirm) {
-      showToast("Mật khẩu xác nhận không khớp!", "error");
+      showToast("Mật khẩu xác nhận không khớp.", "error");
       return;
     }
 
     setIsSaving(true);
     try {
       if (!isUsingMock) {
-        await profileService.changePassword({
-          current: passwords.current,
-          new: passwords.new
-        });
+        await profileService.changePassword({ current: passwords.current, new: passwords.new });
       }
-
-      setTimeout(() => {
-        setIsSaving(false);
-        showToast("Thay đổi mật khẩu thành công!");
-        setPasswords({ current: "", new: "", confirm: "" });
-      }, 800);
+      showToast("Đã đổi mật khẩu tài khoản.");
+      setPasswords({ current: "", new: "", confirm: "" });
     } catch (err) {
+      showToast(err.message || "Sai mật khẩu hiện tại hoặc lỗi kết nối.", "error");
+    } finally {
       setIsSaving(false);
-      showToast(err.message || "Sai mật khẩu hiện tại hoặc lỗi kết nối!", "error");
     }
   };
 
-  /**
-   * Add new bike to personal garage
-   */
   const handleAddBike = (e) => {
     e.preventDefault();
     if (!newBike.brand || !newBike.model || !newBike.plate) {
-      showToast("Vui lòng điền Hãng xe, Dòng xe và Biển số!", "error");
+      showToast("Vui lòng điền hãng xe, dòng xe và biển số.", "error");
       return;
     }
 
     setBikes((prev) => [...prev, newBike]);
     setNewBike({ brand: "", model: "", plate: "", year: "", color: "" });
     setShowAddBike(false);
-    showToast("Đã đăng ký xe vào garage của bạn thành công!");
+    showToast("Đã thêm xe vào nhà xe cá nhân.");
+  };
+
+  const handleSelectAppointment = async (appointment) => {
+    setSelectedAppointment(appointment);
+    setAppointmentView("detail");
+
+    if (!appointment?._id || appointment._id.startsWith("demo-")) {
+      return;
+    }
+
+    setIsAppointmentDetailLoading(true);
+    try {
+      const res = await getMyAppointmentById(appointment._id);
+      if (res.data?.appointment) {
+        setSelectedAppointment(res.data.appointment);
+      }
+    } catch (err) {
+      showToast(err.message || "Không thể tải chi tiết lịch hẹn.", "error");
+    } finally {
+      setIsAppointmentDetailLoading(false);
+    }
+  };
+
+  const handleCancelAppointment = async (appointmentId) => {
+    if (!appointmentId || appointmentId.startsWith("demo-")) {
+      showToast("Lịch hẹn demo không thể hủy trên máy chủ.", "error");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const res = await cancelAppointment(appointmentId, "Khách hàng hủy từ trang hồ sơ");
+      const cancelledAppointment = res.data?.appointment;
+      setAppointments((prev) =>
+        prev.map((item) =>
+          item._id === appointmentId ? { ...item, status: "CANCELLED", ...cancelledAppointment } : item
+        )
+      );
+      setSelectedAppointment((prev) =>
+        prev?._id === appointmentId ? { ...prev, status: "CANCELLED", ...cancelledAppointment } : prev
+      );
+      showToast("Đã hủy lịch hẹn.");
+    } catch (err) {
+      showToast(err.message || "Không thể hủy lịch hẹn.", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBackToAppointmentList = () => {
+    setAppointmentView("list");
+    setSelectedAppointment(null);
   };
 
   return (
     <div className="user-profile-page">
-      {/* Toast alert */}
       {toast.show && (
         <div className={`custom-toast ${toast.type}`}>
           <div className="toast-content">
-            <MaterialIcon className="toast-icon-large">check_circle</MaterialIcon>
+            <MaterialIcon>{toast.type === "error" ? "error" : "task_alt"}</MaterialIcon>
             <p>{toast.message}</p>
           </div>
         </div>
       )}
 
-      {/* Header (Cohesive with BookingPage) */}
       <header className="booking-header">
         <a className="booking-logo" href="/home">
           MOTOCORE
         </a>
         <nav className="booking-nav" aria-label="Điều hướng tài khoản">
           <a href="/home">Trang chủ</a>
-          <a href="/home">Dịch vụ</a>
+          <a href="/services">Dịch vụ</a>
           <a href="/booking">Lịch hẹn</a>
           <a href="/about">Về chúng tôi</a>
         </nav>
-        <div className="booking-actions" style={{ position: "relative" }}>
-          <button className="icon-button" type="button" aria-label="Tìm kiếm" disabled>
+        <div className="booking-actions">
+          <button className="icon-button" type="button" aria-label="Tìm kiếm">
             <MaterialIcon>search</MaterialIcon>
           </button>
-          <a className="booking-contact-button" href="/home">
-            Liên hệ ngay
+          <a className="booking-contact-button" href="/booking">
+            Đặt lịch ngay
           </a>
           <button className="user-menu-trigger" type="button" aria-label="Menu" onClick={() => setShowUserMenu(!showUserMenu)}>
             <MaterialIcon>menu</MaterialIcon>
@@ -310,7 +526,7 @@ export default function UserProfile() {
             <div className="user-dropdown-menu">
               <a href="/profile?tab=info" className="dropdown-user-info" onClick={() => setShowUserMenu(false)}>
                 <div className="dropdown-avatar">
-                  <img src={user.avatar} alt="User Avatar" />
+                  <img src={user.avatar} alt="Ảnh đại diện" />
                 </div>
                 <div className="dropdown-user-details">
                   <strong>{user.fullname}</strong>
@@ -319,20 +535,20 @@ export default function UserProfile() {
               </a>
               <div className="dropdown-divider" />
               <a href="/profile?tab=info" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
-                <span className="material-symbols-outlined">person</span>
+                <MaterialIcon>person</MaterialIcon>
                 <span>Hồ sơ cá nhân</span>
               </a>
               <a href="/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
-                <span className="material-symbols-outlined">two_wheeler</span>
+                <MaterialIcon>two_wheeler</MaterialIcon>
                 <span>Nhà xe của tôi</span>
               </a>
-              <a href="/booking" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
-                <span className="material-symbols-outlined">event_available</span>
+              <a href="/profile?tab=appointments" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                <MaterialIcon>event_available</MaterialIcon>
                 <span>Lịch hẹn của tôi</span>
               </a>
               <div className="dropdown-divider" />
               <a href="/home" className="dropdown-item text-danger" onClick={handleLogout}>
-                <span className="material-symbols-outlined">logout</span>
+                <MaterialIcon>logout</MaterialIcon>
                 <span>Đăng xuất</span>
               </a>
             </div>
@@ -340,170 +556,122 @@ export default function UserProfile() {
         </div>
       </header>
 
-      {/* Main Container */}
       <main className="profile-main">
-        {/* Connection status indicator for debug/SWP scoring */}
-        <div className="connection-pill-row">
-          {isApiLoading ? (
-            <span className="api-badge loading">
-              <MaterialIcon className="spin">progress_activity</MaterialIcon> Đang tải thông tin...
-            </span>
-          ) : isUsingMock ? (
-            <span className="api-badge offline" title="Không tìm thấy token đăng nhập của bạn, đang dùng trạng thái giả lập mượt mà">
-              <MaterialIcon>cloud_off</MaterialIcon> Demo Mode (Giả lập mượt mà)
-            </span>
-          ) : (
-            <span className="api-badge online" title="Đã kết nối thành công tới Express Backend & MongoDB database">
-              <MaterialIcon>cloud_done</MaterialIcon> Đã kết nối API thực tế
-            </span>
-          )}
-        </div>
-
         <section className="profile-content-grid">
-          {/* Left Column: General Info Member Card */}
-          <div className="user-overview-card">
+          <aside className="user-overview-card">
             <div className="user-avatar-section">
               <div className="user-avatar-container">
-                <img src={user.avatar} alt="User Avatar" className="user-avatar-img" />
-                <button className="user-avatar-overlay" onClick={handleAvatarClick} title="Thay đổi ảnh đại diện">
+                <img src={user.avatar} alt="Ảnh đại diện" className="user-avatar-img" />
+                <button className="user-avatar-overlay" onClick={handleAvatarClick} type="button" title="Thay đổi ảnh đại diện">
                   <MaterialIcon>photo_camera</MaterialIcon>
                 </button>
               </div>
-              <h3>{user.fullname}</h3>
+              <h2>{user.fullname}</h2>
               <span className="member-badge">
-                <MaterialIcon className="mr-1">stars</MaterialIcon> {user.memberTier}
+                <MaterialIcon>stars</MaterialIcon>
+                {user.memberTier}
               </span>
               <p className="user-points">Điểm tích lũy: <strong>{user.memberPoints} pts</strong></p>
             </div>
 
-            <div className="overview-divider" />
-
             <div className="user-mini-stats">
-              <div className="user-stat-mini">
-                <span className="label">Chiến mã</span>
-                <span className="value">{bikes.length} xe</span>
+              <div>
+                <span>Xe</span>
+                <strong>{bikes.length}</strong>
               </div>
-              <div className="user-stat-mini">
-                <span className="label">Ưu đãi</span>
-                <span className="value text-orange">{vouchers.length} mã</span>
+              <div>
+                <span>Ưu đãi</span>
+                <strong>{vouchers.length}</strong>
               </div>
-              <div className="user-stat-mini">
-                <span className="label">Đơn xong</span>
-                <span className="value text-green">12 lần</span>
+              <div>
+                <span>Đơn xong</span>
+                <strong>{appointments.filter((item) => item.status === "COMPLETED" || item.status === "PAID").length}</strong>
+              </div>
+            </div>
+
+            <div className="profile-contact-card">
+              <div>
+                <MaterialIcon>mail</MaterialIcon>
+                <span>{user.email}</span>
+              </div>
+              <div>
+                <MaterialIcon>call</MaterialIcon>
+                <span>{user.phone}</span>
+              </div>
+              <div>
+                <MaterialIcon>location_on</MaterialIcon>
+                <span>{user.address}</span>
               </div>
             </div>
 
             <div className="membership-perks">
-              <h4>Đặc quyền Hạng Vàng</h4>
+              <h3>Đặc quyền hạng vàng</h3>
               <ul>
-                <li>Giảm giá 10% các dịch vụ rửa xe</li>
+                <li>Giảm 10% dịch vụ rửa xe</li>
                 <li>Ưu tiên đặt ca giờ cao điểm</li>
-                <li>Miễn phí kiểm tra điện & ốc định kỳ</li>
+                <li>Miễn phí kiểm tra điện và ốc định kỳ</li>
               </ul>
             </div>
-          </div>
+          </aside>
 
-          {/* Right Column: Profile Navigation & Tabs */}
-          <div className="user-tabs-card">
-            {/* Tab bar header */}
-            <div className="user-tabs-menu">
-              <button
-                className={`user-tab-btn ${activeTab === "info" ? "active" : ""}`}
-                onClick={() => setActiveTab("info")}
-              >
-                <MaterialIcon>person</MaterialIcon>
-                <span>Thông tin cá nhân</span>
-              </button>
-              <button
-                className={`user-tab-btn ${activeTab === "password" ? "active" : ""}`}
-                onClick={() => setActiveTab("password")}
-              >
-                <MaterialIcon>lock</MaterialIcon>
-                <span>Mật khẩu & Bảo mật</span>
-              </button>
-              <button
-                className={`user-tab-btn ${activeTab === "garage" ? "active" : ""}`}
-                onClick={() => setActiveTab("garage")}
-              >
-                <MaterialIcon>two_wheeler</MaterialIcon>
-                <span>Nhà xe cá nhân</span>
-              </button>
-              <button
-                className={`user-tab-btn ${activeTab === "vouchers" ? "active" : ""}`}
-                onClick={() => setActiveTab("vouchers")}
-              >
-                <MaterialIcon>confirmation_number</MaterialIcon>
-                <span>Ưu đãi áp dụng</span>
-              </button>
-              <button
-                className={`user-tab-btn ${activeTab === "logs" ? "active" : ""}`}
-                onClick={() => setActiveTab("logs")}
-              >
-                <MaterialIcon>history</MaterialIcon>
-                <span>Nhật ký tài khoản</span>
-              </button>
+          <section className="user-tabs-card">
+            <div className="user-tabs-menu" aria-label="Nhóm thông tin hồ sơ">
+              {tabs.map((tab) => (
+                <button
+                  className={`user-tab-btn ${activeTab === tab.id ? "active" : ""}`}
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    if (tab.id === "appointments") {
+                      setAppointmentView("list");
+                    }
+                  }}
+                  type="button"
+                >
+                  <MaterialIcon>{tab.icon}</MaterialIcon>
+                  <span>{tab.label}</span>
+                </button>
+              ))}
             </div>
 
-            {/* Tab content panels */}
             <div className="user-tabs-content">
-              {/* Tab 1: Personal Info Form */}
+              <div className="profile-section-heading">
+                <span>{activeTabLabel}</span>
+                <h2>
+                  {activeTab === "info" && "Thông tin cá nhân"}
+                  {activeTab === "password" && "Mật khẩu và bảo mật"}
+                  {activeTab === "appointments" && "Lịch hẹn của tôi"}
+                  {activeTab === "garage" && "Nhà xe cá nhân"}
+                  {activeTab === "vouchers" && "Ưu đãi thành viên"}
+                  {activeTab === "logs" && "Nhật ký tài khoản"}
+                </h2>
+              </div>
+
               {activeTab === "info" && (
                 <form onSubmit={handleSaveInfo} className="pane-fade-animation">
-                  <div className="pane-header-title">
-                    <h3>Thông tin cá nhân</h3>
-                    <p>Cập nhật số điện thoại và địa chỉ chính xác để nhận cuộc gọi xác nhận từ garage.</p>
-                  </div>
-
+                  <p className="profile-panel-note">Thông tin này được dùng khi garage gọi xác nhận lịch hẹn và bàn giao xe.</p>
                   <div className="user-form-grid">
                     <label className="user-input-label">
                       Họ và tên *
-                      <input
-                        name="fullname"
-                        type="text"
-                        value={user.fullname}
-                        onChange={handleInfoChange}
-                      />
+                      <input name="fullname" type="text" value={user.fullname} onChange={handleInfoChange} />
                     </label>
                     <label className="user-input-label">
-                      Địa chỉ Email (Cố định)
-                      <input
-                        name="email"
-                        type="email"
-                        value={user.email}
-                        disabled
-                        className="input-disabled"
-                      />
+                      Email
+                      <input name="email" type="email" value={user.email} disabled className="input-disabled" />
                     </label>
                     <label className="user-input-label">
                       Số điện thoại *
-                      <input
-                        name="phone"
-                        type="text"
-                        value={user.phone}
-                        onChange={handleInfoChange}
-                      />
+                      <input name="phone" type="tel" value={user.phone} onChange={handleInfoChange} />
                     </label>
                     <label className="user-input-label">
                       Ngày sinh
-                      <input
-                        name="dob"
-                        type="text"
-                        value={user.dob}
-                        onChange={handleInfoChange}
-                        placeholder="DD/MM/YYYY"
-                      />
+                      <input name="dob" type="text" value={user.dob} onChange={handleInfoChange} placeholder="DD/MM/YYYY" />
                     </label>
                     <label className="user-input-label span-2">
                       Địa chỉ thường trú
-                      <input
-                        name="address"
-                        type="text"
-                        value={user.address}
-                        onChange={handleInfoChange}
-                      />
+                      <input name="address" type="text" value={user.address} onChange={handleInfoChange} />
                     </label>
                   </div>
-
                   <div className="user-form-actions">
                     <button className="user-btn-save" type="submit" disabled={isSaving}>
                       <MaterialIcon>save</MaterialIcon>
@@ -513,234 +681,304 @@ export default function UserProfile() {
                 </form>
               )}
 
-              {/* Tab 2: Change Password Form */}
               {activeTab === "password" && (
                 <form onSubmit={handleSavePassword} className="pane-fade-animation">
-                  <div className="pane-header-title">
-                    <h3>Đổi mật khẩu tài khoản</h3>
-                    <p>Nhập mật khẩu cũ của bạn để xác nhận và cài đặt mật khẩu mới.</p>
-                  </div>
-
+                  <p className="profile-panel-note">Đặt mật khẩu riêng, dễ nhớ với bạn nhưng khó đoán với người khác.</p>
                   <div className="user-form-column">
-                    <label className="user-input-label">
-                      Mật khẩu hiện tại *
-                      <div className="user-pass-wrapper">
-                        <input
-                          name="current"
-                          type={showPassword.current ? "text" : "password"}
-                          value={passwords.current}
-                          onChange={handlePasswordChange}
-                        />
-                        <button
-                          type="button"
-                          className="btn-eye-toggle"
-                          onClick={() => togglePasswordVisibility("current")}
-                        >
-                          <MaterialIcon>{showPassword.current ? "visibility_off" : "visibility"}</MaterialIcon>
-                        </button>
-                      </div>
-                    </label>
-
-                    <label className="user-input-label">
-                      Mật khẩu mới *
-                      <div className="user-pass-wrapper">
-                        <input
-                          name="new"
-                          type={showPassword.new ? "text" : "password"}
-                          value={passwords.new}
-                          onChange={handlePasswordChange}
-                          placeholder="Tối thiểu 6 ký tự"
-                        />
-                        <button
-                          type="button"
-                          className="btn-eye-toggle"
-                          onClick={() => togglePasswordVisibility("new")}
-                        >
-                          <MaterialIcon>{showPassword.new ? "visibility_off" : "visibility"}</MaterialIcon>
-                        </button>
-                      </div>
-                    </label>
-
-                    <label className="user-input-label">
-                      Nhập lại mật khẩu mới *
-                      <div className="user-pass-wrapper">
-                        <input
-                          name="confirm"
-                          type={showPassword.confirm ? "text" : "password"}
-                          value={passwords.confirm}
-                          onChange={handlePasswordChange}
-                        />
-                        <button
-                          type="button"
-                          className="btn-eye-toggle"
-                          onClick={() => togglePasswordVisibility("confirm")}
-                        >
-                          <MaterialIcon>{showPassword.confirm ? "visibility_off" : "visibility"}</MaterialIcon>
-                        </button>
-                      </div>
-                    </label>
+                    {[
+                      ["current", "Mật khẩu hiện tại *"],
+                      ["new", "Mật khẩu mới *"],
+                      ["confirm", "Nhập lại mật khẩu mới *"],
+                    ].map(([field, label]) => (
+                      <label className="user-input-label" key={field}>
+                        {label}
+                        <div className="user-pass-wrapper">
+                          <input
+                            name={field}
+                            type={showPassword[field] ? "text" : "password"}
+                            value={passwords[field]}
+                            onChange={handlePasswordChange}
+                            placeholder={field === "new" ? "Tối thiểu 6 ký tự" : ""}
+                          />
+                          <button type="button" className="btn-eye-toggle" onClick={() => togglePasswordVisibility(field)}>
+                            <MaterialIcon>{showPassword[field] ? "visibility_off" : "visibility"}</MaterialIcon>
+                          </button>
+                        </div>
+                      </label>
+                    ))}
                   </div>
-
                   <div className="user-form-actions">
                     <button className="user-btn-save" type="submit" disabled={isSaving}>
-                      <MaterialIcon>save</MaterialIcon>
+                      <MaterialIcon>lock_reset</MaterialIcon>
                       <span>{isSaving ? "Đang cập nhật..." : "Đổi mật khẩu"}</span>
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* Tab 3: My Garage (Bikes List) */}
+              {activeTab === "appointments" && (
+                <div className="pane-fade-animation">
+                  <div className="profile-panel-toolbar">
+                    <p className="profile-panel-note">Theo dõi trạng thái lịch hẹn, xe đã đặt, dịch vụ đã chọn và ghi chú xử lý từ garage.</p>
+                    <a className="user-btn-add-bike" href="/booking">
+                      <MaterialIcon>add</MaterialIcon>
+                      <span>Đặt lịch mới</span>
+                    </a>
+                  </div>
+
+                  <div className={`appointments-workspace ${appointmentView === "detail" ? "show-detail" : "show-list"}`}>
+                    <div className="appointments-list-panel">
+                      <div className="appointments-list-heading">
+                        <h3>Danh sách lịch hẹn</h3>
+                        {isAppointmentsLoading && <span>Đang tải...</span>}
+                      </div>
+
+                      {appointments.length === 0 ? (
+                        <div className="appointment-empty-state">
+                          <MaterialIcon>event_busy</MaterialIcon>
+                          <strong>Chưa có lịch hẹn</strong>
+                          <span>Bạn có thể đặt lịch mới để garage chuẩn bị dịch vụ trước.</span>
+                        </div>
+                      ) : (
+                        appointments.map((appointment) => (
+                          <button
+                            className={`appointment-row ${selectedAppointment?._id === appointment._id ? "active" : ""}`}
+                            key={appointment._id || appointment.appointment_code}
+                            onClick={() => handleSelectAppointment(appointment)}
+                            type="button"
+                          >
+                            <span className={`appointment-status-dot ${getStatusClass(appointment.status)}`} />
+                            <span className="appointment-row-content">
+                              <span className="appointment-code-line">
+                                <span>
+                                  <small>Mã đơn</small>
+                                  <strong>{getAppointmentCode(appointment)}</strong>
+                                </span>
+                                <span className={`appointment-status status-${getStatusClass(appointment.status)}`}>
+                                  {getStatusLabel(appointment.status)}
+                                </span>
+                              </span>
+                              <span className="appointment-meta-grid">
+                                <span>
+                                  <small>Ngày tạo đơn</small>
+                                  <strong>{formatCreatedDate(appointment)}</strong>
+                                </span>
+                                <span>
+                                  <small>Loại dịch vụ</small>
+                                  <strong>{getServiceTypeLabel(appointment)}</strong>
+                                </span>
+                                <span>
+                                  <small>Thời gian hẹn</small>
+                                  <strong>{formatAppointmentTime(appointment)}</strong>
+                                </span>
+                             
+                              </span>
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="appointment-detail-panel">
+                      {selectedAppointment ? (
+                        <>
+                          <div className="appointment-detail-top">
+                            <div>
+                              <button className="appointment-back-button" onClick={handleBackToAppointmentList} type="button">
+                                <MaterialIcon>arrow_back</MaterialIcon>
+                                <span>Quay lại danh sách</span>
+                              </button>
+                              <span className="profile-eyebrow">Chi tiết đơn đặt lịch</span>
+                              <h3>{getAppointmentCode(selectedAppointment)}</h3>
+                              <p>{formatAppointmentTime(selectedAppointment)}</p>
+                            </div>
+                            <span className={`appointment-status status-${getStatusClass(selectedAppointment.status)}`}>
+                              {getStatusLabel(selectedAppointment.status)}
+                            </span>
+                          </div>
+
+                          {isAppointmentDetailLoading && (
+                            <div className="appointment-detail-loading">
+                              <MaterialIcon className="spin">progress_activity</MaterialIcon>
+                              <span>Đang tải chi tiết...</span>
+                            </div>
+                          )}
+
+                          <div className="appointment-detail-grid">
+                            <div className="appointment-detail-block">
+                              <span>Dịch vụ</span>
+                              <strong>{getAppointmentService(selectedAppointment)}</strong>
+                              <p>{selectedAppointment.service?.description || selectedAppointment.service?.repair_issue || "Chưa có mô tả dịch vụ."}</p>
+                            </div>
+                            <div className="appointment-detail-block">
+                              <span>Chi phí dự kiến</span>
+                              <strong>{formatMoney(selectedAppointment.service?.estimated_price)}</strong>
+                              <p>{selectedAppointment.service?.estimated_duration_minutes || selectedAppointment.estimated_duration || 60} phút xử lý dự kiến</p>
+                            </div>
+                            <div className="appointment-detail-block">
+                              <span>Thông tin xe</span>
+                              <strong>
+                                {selectedAppointment.vehicle?.brand || selectedAppointment.vehicle_info?.brand || "Chưa rõ hãng"}{" "}
+                                {selectedAppointment.vehicle?.model || selectedAppointment.vehicle_info?.model || ""}
+                              </strong>
+                              <p>
+                                Biển số: {selectedAppointment.vehicle?.license_plate || selectedAppointment.vehicle_info?.license_plate || "Chưa có"}
+                                {selectedAppointment.vehicle?.odometer ? ` · ${selectedAppointment.vehicle.odometer} km` : ""}
+                              </p>
+                            </div>
+                            <div className="appointment-detail-block">
+                              <span>Liên hệ</span>
+                              <strong>{selectedAppointment.customer_snapshot?.full_name || user.fullname}</strong>
+                              <p>{selectedAppointment.customer_snapshot?.phone || user.phone}</p>
+                            </div>
+                          </div>
+
+                          <div className="appointment-note-grid">
+                            <div>
+                              <span>Ghi chú khách hàng</span>
+                              <p>{selectedAppointment.customer_note || selectedAppointment.customer_notes || "Không có ghi chú thêm."}</p>
+                            </div>
+                            <div>
+                              <span>Ghi chú garage</span>
+                              <p>{selectedAppointment.staff_notes || "Garage chưa cập nhật ghi chú xử lý."}</p>
+                            </div>
+                          </div>
+
+                          {["PENDING", "CONFIRMED"].includes(selectedAppointment.status) && (
+                            <div className="appointment-detail-actions">
+                              <button
+                                className="appointment-cancel-button"
+                                disabled={isSaving}
+                                onClick={() => handleCancelAppointment(selectedAppointment._id)}
+                                type="button"
+                              >
+                                <MaterialIcon>event_busy</MaterialIcon>
+                                <span>{isSaving ? "Đang hủy..." : "Hủy lịch hẹn"}</span>
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="appointment-empty-state">
+                          <MaterialIcon>event_note</MaterialIcon>
+                          <strong>Chọn một lịch hẹn</strong>
+                          <span>Chi tiết đơn đặt lịch sẽ hiển thị tại đây.</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {activeTab === "garage" && (
                 <div className="pane-fade-animation">
-                  <div className="pane-header-title-flex">
-                    <div>
-                      <h3>Nhà xe cá nhân</h3>
-                      <p>Danh sách các dòng xe mô tô bạn đang sở hữu. Khi đặt lịch, bạn chỉ việc chọn xe thay vì nhập lại.</p>
-                    </div>
-                    <button
-                      className="user-btn-add-bike"
-                      onClick={() => setShowAddBike(!showAddBike)}
-                    >
+                  <div className="profile-panel-toolbar">
+                    <p className="profile-panel-note">Lưu sẵn xe của bạn để đặt lịch nhanh hơn ở những lần tiếp theo.</p>
+                    <button className="user-btn-add-bike" onClick={() => setShowAddBike(!showAddBike)} type="button">
                       <MaterialIcon>{showAddBike ? "close" : "add"}</MaterialIcon>
-                      <span>{showAddBike ? "Đóng lại" : "Thêm xe mới"}</span>
+                      <span>{showAddBike ? "Đóng" : "Thêm xe"}</span>
                     </button>
                   </div>
 
                   {showAddBike && (
                     <form onSubmit={handleAddBike} className="add-bike-inline-form">
-                      <h4>Đăng ký xe mới</h4>
                       <div className="user-form-grid">
                         <label className="user-input-label">
                           Hãng xe *
-                          <input
-                            type="text"
-                            placeholder="Honda, Ducati, BMW..."
-                            value={newBike.brand}
-                            onChange={(e) => setNewBike({ ...newBike, brand: e.target.value })}
-                          />
+                          <input type="text" placeholder="Honda, Yamaha, Ducati..." value={newBike.brand} onChange={(e) => setNewBike({ ...newBike, brand: e.target.value })} />
                         </label>
                         <label className="user-input-label">
-                          Dòng xe (Model) *
-                          <input
-                            type="text"
-                            placeholder="CBR650R, Monster..."
-                            value={newBike.model}
-                            onChange={(e) => setNewBike({ ...newBike, model: e.target.value })}
-                          />
+                          Dòng xe *
+                          <input type="text" placeholder="CBR650R, Exciter..." value={newBike.model} onChange={(e) => setNewBike({ ...newBike, model: e.target.value })} />
                         </label>
                         <label className="user-input-label">
-                          Biển số kiểm soát *
-                          <input
-                            type="text"
-                            placeholder="29A1-999.99"
-                            value={newBike.plate}
-                            onChange={(e) => setNewBike({ ...newBike, plate: e.target.value })}
-                          />
+                          Biển số *
+                          <input type="text" placeholder="29A1-999.99" value={newBike.plate} onChange={(e) => setNewBike({ ...newBike, plate: e.target.value })} />
                         </label>
                         <label className="user-input-label">
-                          Màu sắc xe
-                          <input
-                            type="text"
-                            placeholder="Đỏ, Đen, Xanh..."
-                            value={newBike.color}
-                            onChange={(e) => setNewBike({ ...newBike, color: e.target.value })}
-                          />
+                          Màu sắc
+                          <input type="text" placeholder="Đỏ, đen, xanh..." value={newBike.color} onChange={(e) => setNewBike({ ...newBike, color: e.target.value })} />
                         </label>
                         <label className="user-input-label">
                           Năm sản xuất
-                          <input
-                            type="text"
-                            placeholder="2023"
-                            value={newBike.year}
-                            onChange={(e) => setNewBike({ ...newBike, year: e.target.value })}
-                          />
+                          <input type="text" placeholder="2023" value={newBike.year} onChange={(e) => setNewBike({ ...newBike, year: e.target.value })} />
                         </label>
                       </div>
                       <button className="user-submit-bike-btn" type="submit">
-                        <MaterialIcon>check_circle</MaterialIcon> XÁC NHẬN ĐĂNG KÝ XE
+                        <MaterialIcon>check_circle</MaterialIcon>
+                        Lưu xe
                       </button>
                     </form>
                   )}
 
                   <div className="bikes-grid-layout">
                     {bikes.map((bike) => (
-                      <div className="bike-card-item" key={bike.plate}>
+                      <article className="bike-card-item" key={bike.plate}>
                         <div className="bike-icon-box">
                           <MaterialIcon>two_wheeler</MaterialIcon>
                         </div>
                         <div className="bike-details-info">
-                          <h4>{bike.brand} {bike.model}</h4>
-                          <p className="bike-plate">{bike.plate}</p>
-                          <div className="bike-footer-row">
-                            <span>Màu: {bike.color || "Chưa chọn"}</span>
-                            <span>Đời xe: {bike.year || "Chưa rõ"}</span>
+                          <h3>{bike.brand} {bike.model}</h3>
+                          <p>{bike.plate}</p>
+                          <div>
+                            <span>{bike.color || "Chưa chọn màu"}</span>
+                            <span>{bike.year || "Chưa rõ đời xe"}</span>
                           </div>
                         </div>
-                      </div>
+                      </article>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Tab 4: Discount Vouchers */}
               {activeTab === "vouchers" && (
                 <div className="pane-fade-animation">
-                  <div className="pane-header-title">
-                    <h3>Mã giảm giá & Ưu đãi thành viên</h3>
-                    <p>Các chương trình ưu đãi được áp dụng riêng cho tài khoản của bạn. Nhập mã tại ô tóm tắt đặt lịch.</p>
-                  </div>
-
+                  <p className="profile-panel-note">Các ưu đãi đang có thể dùng khi đặt lịch tại MOTOCORE.</p>
                   <div className="vouchers-grid-layout">
-                    {vouchers.map((v) => (
-                      <div className="voucher-card-item" key={v.code}>
+                    {vouchers.map((voucher) => (
+                      <article className="voucher-card-item" key={voucher.code}>
                         <div className="voucher-logo-area">
                           <MaterialIcon>confirmation_number</MaterialIcon>
                         </div>
                         <div className="voucher-details-area">
                           <div className="voucher-header-line">
-                            <span className="voucher-badge-code">{v.code}</span>
-                            <span className="voucher-status-text">{v.status}</span>
+                            <span className="voucher-badge-code">{voucher.code}</span>
+                            <span className="voucher-status-text">{voucher.status}</span>
                           </div>
-                          <h4>{v.desc}</h4>
-                          <p className="voucher-expiry">Hạn dùng: {v.expiry}</p>
+                          <h3>{voucher.desc}</h3>
+                          <p>Hạn dùng: {voucher.expiry}</p>
                         </div>
-                      </div>
+                      </article>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Tab 5: Account Activity Logs */}
               {activeTab === "logs" && (
                 <div className="pane-fade-animation">
-                  <div className="pane-header-title">
-                    <h3>Nhật ký bảo mật & Hoạt động tài khoản</h3>
-                    <p>Thống kê thời gian và kết quả các hành động bảo mật do tài khoản của bạn thực hiện.</p>
-                  </div>
-
+                  <p className="profile-panel-note">Theo dõi những thay đổi quan trọng liên quan tới tài khoản của bạn.</p>
                   <div className="user-timeline-list">
                     {logs.map((log, idx) => (
-                      <div className="user-timeline-item" key={idx}>
-                        <span className="material-symbols-outlined user-timeline-icon">
-                          {log.action.includes("mật khẩu") ? "lock" : "settings"}
+                      <article className="user-timeline-item" key={`${log.action}-${idx}`}>
+                        <span className="user-timeline-icon">
+                          <MaterialIcon>{log.action.toLowerCase().includes("mật khẩu") ? "lock" : "settings"}</MaterialIcon>
                         </span>
                         <div className="user-timeline-card">
                           <div className="user-timeline-header">
-                            <h4>{log.action}</h4>
-                            <span className="log-timestamp">{log.time}</span>
+                            <h3>{log.action}</h3>
+                            <span>{log.time}</span>
                           </div>
                           <span className={`log-status-badge ${log.status.toLowerCase()}`}>
                             {log.status === "SUCCESS" ? "Thành công" : "Thất bại"}
                           </span>
                         </div>
-                      </div>
+                      </article>
                     ))}
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         </section>
       </main>
     </div>

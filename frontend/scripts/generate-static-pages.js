@@ -24,6 +24,7 @@ const staffJobId = "APT-20260519-015";
 const pages = [
   { file: "index.html", route: "/home", title: "MotoCare - Trang chủ" },
   { file: "home.html", route: "/home", title: "MotoCare - Trang chủ" },
+  { file: "services.html", route: "/services", title: "MotoCare - Dịch vụ" },
   { file: "about.html", route: "/about", title: "MotoCare - Về chúng tôi" },
   { file: "login.html", route: "/login", title: "MotoCare - Đăng nhập" },
   { file: "register.html", route: "/register", title: "MotoCare - Đăng ký" },
