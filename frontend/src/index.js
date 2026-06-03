@@ -10,11 +10,13 @@ import RegisterPage from "./pages/auth/RegisterPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import VerifyOtpPage from "./pages/auth/VerifyOtpPage";
 import AboutPage from "./pages/home/AboutPage";
+import ServicesPage from "./pages/home/ServicesPage";
 import BookingPage from "./pages/customer/BookingPage";
 import UserProfile from "./pages/customer/UserProfile";
 import HomePage from "./pages/home/HomePage";
 import StaffLayout from "./pages/staff/StaffLayout";
 import ManagerLayout from "./pages/manager/ManagerLayout";
+import "./styles/design-system.css";
 
 const staticRoute = window.__MOTOCARE_STATIC_ROUTE__;
 const Router = staticRoute ? MemoryRouter : BrowserRouter;
@@ -28,6 +30,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/home" element={<HomePage />} />
+        <Route path="/services" element={<ServicesPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Calendar,
@@ -7,275 +7,347 @@ import {
   BarChart2,
   Plus,
   HelpCircle,
-  Search,
-  Bell,
-  Settings,
   ClipboardList,
   Banknote,
-  PenTool,
-  Bike,
-  Zap,
+  Package,
+  Activity,
+  AlertTriangle,
   User,
 } from "lucide-react";
 import "../../styles/admin/AdminDashboard.css";
 
-const appointments = [
+const overviewCards = [
   {
-    icon: Bike,
-    name: "NGUYỄN MINH QUÂN",
-    vehicle: "BMW R1250GS",
-    service: "Bảo dưỡng định kỳ 20.000km",
-    time: "14:30 Hôm nay",
+    title: "Tổng người dùng",
+    value: 1284,
+    display: "1,284",
+    meta: "+36 tài khoản trong tháng",
+    icon: Users,
+    tone: "neutral",
   },
   {
-    icon: Wrench,
-    name: "TRẦN THỊ HỒNG",
-    vehicle: "DUCATI V4S",
-    service: "Thay lốp & vệ sinh sên dĩa",
-    time: "16:00 Hôm nay",
+    title: "Tổng đơn đặt lịch",
+    value: 428,
+    display: "428",
+    meta: "78 đơn trong 7 ngày gần nhất",
+    icon: ClipboardList,
+    tone: "primary",
   },
   {
-    icon: Zap,
-    name: "LÊ HOÀNG NAM",
-    vehicle: "HONDA CB650R",
-    service: "Kiểm tra hệ thống điện",
-    time: "08:00 Ngày mai",
+    title: "Doanh thu",
+    value: 186.5,
+    display: "186.5M",
+    suffix: "M",
+    decimals: 1,
+    meta: "VND · tăng 12% so với tháng trước",
+    icon: Banknote,
+    tone: "success",
+  },
+  {
+    title: "Đơn chờ xử lý",
+    value: 18,
+    display: "18",
+    meta: "Cần xác nhận hoặc phân công",
+    icon: AlertTriangle,
+    tone: "warning",
   },
 ];
 
-const staff = [
-  ["Minh", "Trưởng nhóm", "3 việc", "status-dot-green"],
-  ["Thắng", "Kỹ thuật", "2 việc", "status-dot-green"],
-  ["Quốc", "Học việc", "Đang hỗ trợ", "status-dot-yellow"],
+const lowStockItems = [
+  { name: "Nhớt Motul 300V 10W40", amount: "Còn 5L", percent: 20, tone: "danger" },
+  { name: "Má phanh Brembo Carbon", amount: "Còn 2 bộ", percent: 14, tone: "danger" },
+  { name: "Lọc gió K&N CB650R", amount: "Còn 3 cái", percent: 28, tone: "warning" },
 ];
+
+const recentActivities = [
+  { time: "09:42", text: "Quản lý xác nhận lịch #APT-20260528-P1ZOUV", type: "confirm" },
+  { time: "09:18", text: "Nhân viên Minh nhận xe BMW R1250GS", type: "assign" },
+  { time: "08:55", text: "Cập nhật tồn kho má phanh Brembo", type: "stock" },
+  { time: "08:20", text: "Khách hàng Le Thi C tạo lịch rửa xe cao cấp", type: "booking" },
+];
+
+const revenueBars = [
+  ["T2", 46],
+  ["T3", 58],
+  ["T4", 52],
+  ["T5", 74],
+  ["T6", 88],
+  ["T7", 65],
+  ["CN", 72],
+];
+
+const revenueSummary = [
+  ["Tổng doanh thu", "186.5M"],
+  ["Đơn đã thanh toán", "312"],
+  ["Giá trị trung bình", "598K"],
+  ["Tăng trưởng", "+12%"],
+];
+
+const latestAppointments = [
+  {
+    code: "APT-20260528-P1ZOUV",
+    customer: "Le Thi C",
+    service: "Rửa xe cao cấp",
+    time: "29/05/2026 - 13:30",
+    branch: "MOTOCORE Mỹ Đình",
+    status: "Chờ xác nhận",
+    statusClass: "pending",
+  },
+  {
+    code: "APT-20260528-ZFU9LI",
+    customer: "Nguyễn Minh Quân",
+    service: "Bảo dưỡng định kỳ",
+    time: "29/05/2026 - 09:30",
+    branch: "MOTOCORE Cầu Giấy",
+    status: "Đã xác nhận",
+    statusClass: "confirmed",
+  },
+  {
+    code: "APT-20260527-K82MA",
+    customer: "Trần Thị Hồng",
+    service: "Thay lốp",
+    time: "28/05/2026 - 16:00",
+    branch: "MOTOCORE Mỹ Đình",
+    status: "Đang xử lý",
+    statusClass: "progress",
+  },
+  {
+    code: "APT-20260527-N4P21",
+    customer: "Lê Hoàng Nam",
+    service: "Kiểm tra điện",
+    time: "28/05/2026 - 08:00",
+    branch: "MOTOCORE Hà Đông",
+    status: "Hoàn thành",
+    statusClass: "completed",
+  },
+];
+
+function CountUp({ value, suffix = "", decimals = 0 }) {
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    let frameId;
+    const duration = 900;
+    const start = performance.now();
+
+    const tick = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCurrent(value * eased);
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [value]);
+
+  const formatted = current.toLocaleString("en-US", {
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: decimals,
+  });
+
+  return `${formatted}${suffix}`;
+}
+
+function ManagerSidebar({ activeView, onViewChange }) {
+  const navItems = [
+    ["dashboard", LayoutDashboard, "Tổng quan"],
+    ["calendar", Calendar, "Lịch hẹn"],
+    ["services", Wrench, "Dịch vụ"],
+    ["customers", Users, "Khách hàng"],
+    ["reports", BarChart2, "Báo cáo"],
+    ["profile", User, "Hồ sơ"],
+  ];
+
+  return (
+    <aside className="sidebar">
+      <div>
+        <div className="sidebar-brand">
+          <h1>MOTOCORE</h1>
+          <p>Quản lý garage</p>
+        </div>
+
+        <nav className="sidebar-nav" aria-label="Quản lý garage">
+          {navItems.map(([view, Icon, label]) => (
+            <a
+              className={`nav-item ${activeView === view ? "active" : ""}`}
+              href="#"
+              key={view}
+              onClick={(event) => {
+                event.preventDefault();
+                if (["dashboard", "calendar", "services", "profile"].includes(view) && onViewChange) {
+                  onViewChange(view);
+                }
+              }}
+            >
+              <Icon className="nav-icon" />
+              <span>{label}</span>
+            </a>
+          ))}
+        </nav>
+      </div>
+
+      <div className="sidebar-footer">
+        <button className="btn-primary" type="button">
+          <Plus className="btn-icon" />
+          Đặt lịch mới
+        </button>
+        <a href="#" className="support-link" onClick={(event) => event.preventDefault()}>
+          <HelpCircle className="support-icon" />
+          <span>Hỗ trợ</span>
+        </a>
+      </div>
+    </aside>
+  );
+}
 
 const AdminDashboard = ({ onViewChange }) => {
   return (
     <div className="dashboard-layout">
-      <aside className="sidebar">
-        <div>
-          <div className="sidebar-brand">
-            <h1>QUẢN LÝ GARAGE</h1>
-            <p>Hệ thống quản lý</p>
-          </div>
-
-          <nav className="sidebar-nav">
-            <a
-              href="#"
-              className="nav-item active"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("dashboard");
-              }}
-            >
-              <LayoutDashboard className="nav-icon" />
-              <span>Tổng quan</span>
-            </a>
-            <a
-              href="#"
-              className="nav-item"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("calendar");
-              }}
-            >
-              <Calendar className="nav-icon" />
-              <span>Lịch hẹn</span>
-            </a>
-            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
-              <Wrench className="nav-icon" />
-              <span>Dịch vụ</span>
-            </a>
-            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
-              <Users className="nav-icon" />
-              <span>Khách hàng</span>
-            </a>
-            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
-              <BarChart2 className="nav-icon" />
-              <span>Báo cáo</span>
-            </a>
-            <a
-              href="#"
-              className="nav-item"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("profile");
-              }}
-            >
-              <User className="nav-icon" />
-              <span>Hồ sơ</span>
-            </a>
-          </nav>
-        </div>
-
-        <div className="sidebar-footer">
-          <button className="btn-primary">
-            <Plus className="btn-icon" />
-            ĐẶT LỊCH MỚI
-          </button>
-          <a href="#" className="support-link">
-            <HelpCircle className="support-icon" />
-            <span>Hỗ trợ</span>
-          </a>
-        </div>
-      </aside>
+      <ManagerSidebar activeView="dashboard" onViewChange={onViewChange} />
 
       <main className="main-content">
-        <header className="header">
-          <h2>MOTOCORE</h2>
+        <div className="content-body dashboard-overview">
+          <section className="overview-kpi-grid fade-section">
+            {overviewCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <article className={`overview-card ${card.tone}`} key={card.title}>
+                  <div className="overview-card-top">
+                    <span>{card.title}</span>
+                    <Icon />
+                  </div>
+                  <strong>
+                    <CountUp value={card.value} suffix={card.suffix} decimals={card.decimals || 0} />
+                  </strong>
+                  <p>{card.meta}</p>
+                </article>
+              );
+            })}
+          </section>
 
-          <div className="header-actions">
-            <div className="search-container">
-              <Search className="search-icon" />
-              <input
-                type="text"
-                placeholder="Tìm kiếm mã đơn, biển số..."
-                className="search-input"
-              />
-            </div>
-            <div className="header-icons">
-              <div className="icon-wrapper">
-                <Bell className="header-icon" />
-                <span className="badge" />
-              </div>
-              <Settings className="header-icon" onClick={() => { if (onViewChange) onViewChange("profile"); }} style={{ cursor: "pointer" }} />
-              <div className="avatar" onClick={() => { if (onViewChange) onViewChange("profile"); }}>
-                <img src='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6b00"/></svg>' alt="Ảnh đại diện" />
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="content-body">
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-header">
-                <p className="stat-title">Lịch hẹn hôm nay</p>
-                <ClipboardList className="stat-icon" />
-              </div>
-              <div>
-                <h3 className="stat-value-orange">24</h3>
-                <p className="stat-meta-green">
-                  <BarChart2 style={{ width: "12px", height: "12px", marginRight: "4px" }} />
-                  +12% so với hôm qua
-                </p>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-header">
-                <p className="stat-title">Doanh thu ngày</p>
-                <Banknote className="stat-icon" />
-              </div>
-              <div>
-                <h3 className="stat-value-white">18.5M</h3>
-                <p className="stat-meta-gray">VNĐ • Tăng trưởng ổn định</p>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-header">
-                <p className="stat-title">Đang xử lý</p>
-                <PenTool className="stat-icon" />
-              </div>
-              <div>
-                <h3 className="stat-value-white">08</h3>
-                <div className="progress-bar-container">
-                  <div className="progress-bar-fill" />
+          <section className="overview-grid fade-section section-delay-1">
+            <article className="manager-panel revenue-panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Doanh thu</span>
+                  <h3>Biểu đồ doanh thu</h3>
                 </div>
-                <p className="stat-meta-gray">8/12 kệ sửa chữa đang bận</p>
+                <div className="revenue-filters" aria-label="Lọc thời gian doanh thu">
+                  <button className="active" type="button">1 tuần</button>
+                  <button type="button">1 tháng</button>
+                  <button type="button">1 quý</button>
+                  <button type="button">1 năm</button>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <div className="main-grid">
-            <div className="appointments-section">
-              <div className="section-header">
-                <h3 className="section-title">Lịch hẹn cần xác nhận</h3>
-                <a href="#" className="section-link">
-                  Xem tất cả
-                </a>
-              </div>
-
-              <div className="appointments-list">
-                {appointments.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <div className="appointment-card" key={item.name}>
-                      <div className="appointment-info">
-                        <div className="icon-box">
-                          <Icon className="info-icon" />
-                        </div>
-                        <div className="customer-details">
-                          <div className="customer-name-row">
-                            <h4 className="customer-name">{item.name}</h4>
-                            <span className="bike-badge">{item.vehicle}</span>
-                          </div>
-                          <p className="service-desc">
-                            {item.service} • <span className="highlight-text">{item.time}</span>
-                          </p>
-                        </div>
-                      </div>
-                      <div className="appointment-actions">
-                        <button className="btn-secondary">CHI TIẾT</button>
-                        <button className="btn-assign">
-                          <Users style={{ width: "16px", height: "16px" }} /> PHÂN CÔNG
-                        </button>
-                      </div>
+              <div className="revenue-content">
+                <div className="revenue-chart" aria-label="Biểu đồ doanh thu theo ngày">
+                  {revenueBars.map(([label, value], index) => (
+                    <div className="revenue-bar" key={label}>
+                      <div style={{ "--bar-height": `${value}%`, "--bar-delay": `${index * 80}ms` }} />
+                      <span>{label}</span>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="right-sidebar">
-              <div className="sidebar-block">
-                <h3 className="sidebar-block-title">Nhân sự trực ca</h3>
-                <div className="staff-card">
-                  {staff.map(([name, role, count, statusClass]) => (
-                    <div className="staff-row" key={name}>
-                      <div className="staff-name-container">
-                        <span className={statusClass} />
-                        <span className="staff-name">
-                          {name} <span className="staff-role">({role})</span>
-                        </span>
-                      </div>
-                      <span className="staff-count">{count}</span>
+                  ))}
+                </div>
+                <div className="revenue-table">
+                  <div className="revenue-table-head">
+                    <span>Chỉ số</span>
+                    <span>Giá trị</span>
+                  </div>
+                  {revenueSummary.map(([label, value]) => (
+                    <div className="revenue-table-row" key={label}>
+                      <span>{label}</span>
+                      <strong>{value}</strong>
                     </div>
                   ))}
                 </div>
               </div>
+            </article>
+          </section>
 
-              <div className="sidebar-block">
-                <h3 className="sidebar-block-title">Phụ tùng sắp hết</h3>
-                <div className="parts-card">
-                  <div className="parts-list">
-                    <div className="parts-row border-bottom">
-                      <span className="part-name">Nhớt Motul 300V 10W40</span>
-                      <span className="stock-badge">CÒN 5L</span>
+          <section className="overview-support-grid fade-section section-delay-2">
+            <article className="manager-panel low-stock-panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Kho vật tư</span>
+                  <h3>Vật tư sắp hết</h3>
+                </div>
+                <Package />
+              </div>
+              <div className="compact-list">
+                {lowStockItems.map((item) => (
+                  <div className={`stock-row ${item.tone}`} key={item.name}>
+                    <div className="stock-row-main">
+                      <Package />
+                      <div>
+                        <span>{item.name}</span>
+                        <small>{item.percent}% tồn kho khuyến nghị</small>
+                      </div>
                     </div>
-                    <div className="parts-row">
-                      <span className="part-name">Má phanh Brembo Carbon</span>
-                      <span className="stock-badge">CÒN 2 BỘ</span>
+                    <div className="stock-row-bottom">
+                      <div className="stock-progress">
+                        <span style={{ width: `${item.percent}%` }} />
+                      </div>
+                      <strong>{item.amount}</strong>
                     </div>
                   </div>
-                  <button className="btn-outline">Nhập thêm hàng</button>
-                </div>
+                ))}
               </div>
-            </div>
-          </div>
+            </article>
+          </section>
 
-          <footer className="footer">
-            <h4>MOTOCORE GARAGE</h4>
-            <div className="footer-links">
-              <a href="#">Chính sách bảo mật</a>
-              <a href="#">Điều khoản dịch vụ</a>
-              <a href="#">Liên hệ</a>
+          <section className="manager-panel latest-appointments-panel fade-section section-delay-3">
+            <div className="panel-heading">
+              <div>
+                <span>Lịch hẹn</span>
+                <h3>Bảng lịch hẹn mới nhất</h3>
+              </div>
+              <button className="btn-secondary" type="button">Xem tất cả</button>
             </div>
-            <p className="footer-copyright">
-              © 2024 MOTOCORE INDUSTRIAL GARAGE. Bảo lưu mọi quyền.
-            </p>
-          </footer>
+
+            <div className="latest-table">
+              <div className="latest-table-head">
+                <span>Mã đơn</span>
+                <span>Khách hàng</span>
+                <span>Dịch vụ</span>
+                <span>Thời gian hẹn</span>
+                <span>Chi nhánh</span>
+                <span>Trạng thái</span>
+              </div>
+              {latestAppointments.map((appointment) => (
+                <div className="latest-table-row" key={appointment.code}>
+                  <strong>{appointment.code}</strong>
+                  <span>{appointment.customer}</span>
+                  <span>{appointment.service}</span>
+                  <span>{appointment.time}</span>
+                  <span>{appointment.branch}</span>
+                  <em className={`manager-status ${appointment.statusClass}`}>{appointment.status}</em>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="manager-panel activity-panel fade-section section-delay-4">
+            <div className="panel-heading">
+              <div>
+                <span>Nhật ký</span>
+                <h3>Hoạt động gần đây</h3>
+              </div>
+              <Activity />
+            </div>
+            <div className="activity-timeline">
+              {recentActivities.map((item) => (
+                <div className={`activity-row ${item.type}`} key={`${item.time}-${item.text}`}>
+                  <time>{item.time}</time>
+                  <span className="activity-dot" />
+                  <p>{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </main>
     </div>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Calendar,
@@ -9,181 +9,247 @@ import {
   HelpCircle,
   Search,
   Bell,
-  Settings,
   ChevronRight,
   Filter,
   Clock,
   User,
+  ClipboardList,
+  CheckCircle2,
+  Timer,
+  Bike,
 } from "lucide-react";
+import "../../styles/admin/AdminDashboard.css";
 import "../../styles/admin/AdminCalendar.css";
+
+const appointmentKpis = [
+  ["Tổng lịch", "128", ClipboardList, "neutral", "+12 lịch tuần này"],
+  ["Chờ xác nhận", "18", Timer, "warning", "Cần xử lý trước 16:00"],
+  ["Đang xử lý", "24", Wrench, "progress", "8 kệ sửa đang bận"],
+  ["Hoàn tất hôm nay", "31", CheckCircle2, "success", "Tỷ lệ đúng hẹn 94%"],
+];
+
+const workflowSteps = [
+  ["pending", "Chờ xác nhận", "18"],
+  ["confirmed", "Đã xác nhận", "42"],
+  ["progress", "Đang xử lý", "24"],
+  ["completed", "Hoàn tất", "31"],
+];
 
 const appointments = [
   {
     id: "#MC-99281",
-    service: "BẢO DƯỠNG ĐỊNH KỲ 10.000KM",
-    vehicle: "Honda CBR1000RR-R • 29A1-12345",
-    time: "24/10/2024",
-    hour: "09:00 AM",
+    service: "Bảo dưỡng định kỳ 10.000km",
+    customer: "Nguyễn Minh Quân",
+    vehicle: "Honda CBR1000RR-R - 29A1-12345",
+    time: "24/10/2026",
+    hour: "09:00",
+    bay: "Kệ sửa 02",
+    urgency: "Ưu tiên cao",
     status: "IN_PROGRESS",
-    statusText: "ĐANG XỬ LÝ",
+    statusText: "Đang xử lý",
   },
   {
     id: "#MC-99275",
-    service: "THAY LỐP & CÂN VÀNH",
-    vehicle: "Ducati Panigale V4 • 59F1-88888",
-    time: "24/10/2024",
-    hour: "02:30 PM",
+    service: "Thay lốp và cân vành",
+    customer: "Trần Thị Hồng",
+    vehicle: "Ducati Panigale V4 - 59F1-88888",
+    time: "24/10/2026",
+    hour: "14:30",
+    bay: "Chờ tiếp nhận",
+    urgency: "Sắp đến giờ",
     status: "CONFIRMED",
-    statusText: "ĐÃ XÁC NHẬN",
+    statusText: "Đã xác nhận",
   },
   {
     id: "#MC-99260",
-    service: "VỆ SINH BUỒNG ĐỐT",
-    vehicle: "Yamaha R1M • 30H1-6789",
-    time: "15/10/2024",
-    hour: "10:00 AM",
+    service: "Vệ sinh buồng đốt",
+    customer: "Lê Hoàng Nam",
+    vehicle: "Yamaha R1M - 30H1-6789",
+    time: "15/10/2026",
+    hour: "10:00",
+    bay: "Chưa phân kệ",
+    urgency: "Lịch mới",
     status: "PENDING",
-    statusText: "CHỜ XÁC NHẬN",
+    statusText: "Chờ xác nhận",
+  },
+  {
+    id: "#MC-99244",
+    service: "Rửa xe cao cấp",
+    customer: "Le Thi C",
+    vehicle: "BMW R1250GS - 30K1-45678",
+    time: "15/10/2026",
+    hour: "16:00",
+    bay: "Kệ chăm sóc 01",
+    urgency: "Ổn định",
+    status: "COMPLETED",
+    statusText: "Hoàn tất",
   },
 ];
 
-const AdminCalendar = ({ onViewChange }) => {
+const filterOptions = [
+  ["all", "Tất cả"],
+  ["PENDING", "Chờ xác nhận"],
+  ["CONFIRMED", "Đã xác nhận"],
+  ["IN_PROGRESS", "Đang xử lý"],
+  ["COMPLETED", "Hoàn tất"],
+];
+
+function ManagerSidebar({ activeView, onViewChange }) {
+  const navItems = [
+    ["dashboard", LayoutDashboard, "Tổng quan"],
+    ["calendar", Calendar, "Lịch hẹn"],
+    ["services", Wrench, "Dịch vụ"],
+    ["customers", Users, "Khách hàng"],
+    ["reports", BarChart2, "Báo cáo"],
+    ["profile", User, "Hồ sơ"],
+  ];
+
   return (
-    <div className="calendar-layout">
-      <aside className="sidebar">
-        <div>
-          <div className="sidebar-brand">
-            <h1>QUẢN LÝ GARAGE</h1>
-            <p>Hệ thống quản lý</p>
-          </div>
-
-          <nav className="sidebar-nav">
-            <a
-              href="#"
-              className="nav-item"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("dashboard");
-              }}
-            >
-              <LayoutDashboard className="nav-icon" />
-              <span>Tổng quan</span>
-            </a>
-            <a
-              href="#"
-              className="nav-item active"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("calendar");
-              }}
-            >
-              <Calendar className="nav-icon" />
-              <span>Lịch hẹn</span>
-            </a>
-            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
-              <Wrench className="nav-icon" />
-              <span>Dịch vụ</span>
-            </a>
-            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
-              <Users className="nav-icon" />
-              <span>Khách hàng</span>
-            </a>
-            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
-              <BarChart2 className="nav-icon" />
-              <span>Báo cáo</span>
-            </a>
-            <a
-              href="#"
-              className="nav-item"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("profile");
-              }}
-            >
-              <User className="nav-icon" />
-              <span>Hồ sơ</span>
-            </a>
-          </nav>
+    <aside className="sidebar">
+      <div>
+        <div className="sidebar-brand">
+          <h1>MOTOCORE</h1>
+        <p>Quản lý garage</p>
         </div>
 
-        <div className="sidebar-footer">
-          <button className="btn-primary">
-            <Plus className="btn-icon" />
-            ĐẶT LỊCH MỚI
-          </button>
-          <a href="#" className="support-link">
-            <HelpCircle className="support-icon" />
-            <span>Hỗ trợ</span>
-          </a>
-        </div>
-      </aside>
+        <nav className="sidebar-nav" aria-label="Quản lý garage">
+          {navItems.map(([view, Icon, label]) => (
+            <a
+              className={`nav-item ${activeView === view ? "active" : ""}`}
+              href="#"
+              key={view}
+              onClick={(event) => {
+                event.preventDefault();
+                if (["dashboard", "calendar", "services", "profile"].includes(view) && onViewChange) {
+                  onViewChange(view);
+                }
+              }}
+            >
+              <Icon className="nav-icon" />
+              <span>{label}</span>
+            </a>
+          ))}
+        </nav>
+      </div>
+
+      <div className="sidebar-footer">
+        <button className="btn-primary" type="button">
+          <Plus className="btn-icon" />
+          Đặt lịch mới
+        </button>
+        <a href="#" className="support-link" onClick={(event) => event.preventDefault()}>
+          <HelpCircle className="support-icon" />
+          <span>Hỗ trợ</span>
+        </a>
+      </div>
+    </aside>
+  );
+}
+
+const AdminCalendar = ({ onViewChange }) => {
+  const [activeFilter, setActiveFilter] = useState("all");
+
+  const filteredAppointments = useMemo(() => {
+    if (activeFilter === "all") return appointments;
+    return appointments.filter((item) => item.status === activeFilter);
+  }, [activeFilter]);
+
+  return (
+    <div className="calendar-layout dashboard-layout">
+      <ManagerSidebar activeView="calendar" onViewChange={onViewChange} />
 
       <main className="main-content">
-        <header className="header">
-          <div className="header-left">
-            <h2>MOTOCORE</h2>
-            <span className="breadcrumb">Quản trị garage</span>
+        <header className="calendar-topbar">
+          <div>
+            <span className="calendar-eyebrow">Điều phối garage</span>
+            <h2>Lịch hẹn</h2>
           </div>
 
-          <div className="header-actions">
-            <div className="search-container">
-              <Search className="search-icon" />
-              <input type="text" placeholder="Tìm mã lịch..." className="search-input" />
-            </div>
-            <div className="header-icons">
-              <Bell className="header-icon" />
-              <Settings className="header-icon" onClick={() => { if (onViewChange) onViewChange("profile"); }} style={{ cursor: "pointer" }} />
-              <div className="avatar" onClick={() => { if (onViewChange) onViewChange("profile"); }}>
-                <img src='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6b00"/></svg>' alt="Quản trị viên" />
-              </div>
-            </div>
+          <div className="calendar-topbar-actions">
+            <label className="calendar-search">
+              <Search />
+              <input type="text" placeholder="Tìm mã lịch, khách hàng, biển số..." />
+            </label>
+            <button className="topbar-icon" type="button" aria-label="Thông báo">
+              <Bell />
+            </button>
           </div>
         </header>
 
         <div className="calendar-body">
-          <h2 className="page-title">Lịch hẹn của tôi</h2>
+          <section className="calendar-kpi-grid" aria-label="Tổng hợp lịch hẹn">
+            {appointmentKpis.map(([label, value, Icon, tone, note]) => (
+              <article className={`calendar-kpi-card ${tone}`} key={label}>
+                <div>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                  <p>{note}</p>
+                </div>
+                <Icon />
+              </article>
+            ))}
+          </section>
 
-          <div className="filter-bar">
+          <section className="workflow-card" aria-label="Trạng thái quy trình">
+            {workflowSteps.map(([tone, label, count], index) => (
+              <div className={`workflow-step ${tone}`} key={label}>
+                <span>{count}</span>
+                <strong>{label}</strong>
+                {index < workflowSteps.length - 1 && <em />}
+              </div>
+            ))}
+          </section>
+
+          <section className="appointment-toolbar">
             <div className="filter-buttons">
-              <button className="btn-filter-icon">
-                <Filter size={16} /> BỘ LỌC:
-              </button>
-              <button className="filter-btn active">TẤT CẢ</button>
-              <button className="filter-btn">CHỜ XÁC NHẬN</button>
-              <button className="filter-btn">ĐÃ XÁC NHẬN</button>
-              <button className="filter-btn">ĐANG XỬ LÝ</button>
-              <button className="filter-btn">HOÀN TẤT</button>
+              <span className="btn-filter-icon">
+                <Filter size={16} /> Bộ lọc
+              </span>
+              {filterOptions.map(([value, label]) => (
+                <button
+                  className={`filter-btn ${activeFilter === value ? "active" : ""}`}
+                  key={value}
+                  onClick={() => setActiveFilter(value)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-            <div className="total-box">
-              <p>TỔNG LỊCH HẸN</p>
-              <h3>12</h3>
-            </div>
-          </div>
+          </section>
 
-          <div className="appointment-table">
+          <section className="appointment-table">
             <div className="table-header">
-              <div className="col-id">MÃ LỊCH</div>
-              <div className="col-info">DỊCH VỤ & PHƯƠNG TIỆN</div>
-              <div className="col-time">THỜI GIAN</div>
-              <div className="col-status">TRẠNG THÁI</div>
-              <div className="col-action">THAO TÁC</div>
+              <div className="col-id">Mã lịch</div>
+              <div className="col-info">Khách hàng và dịch vụ</div>
+              <div className="col-time">Thời gian</div>
+              <div className="col-bay">Kệ / ưu tiên</div>
+              <div className="col-status">Trạng thái</div>
+              <div className="col-action">Thao tác</div>
             </div>
 
             <div className="table-body">
-              {appointments.map((item) => (
-                <div className="table-row" key={item.id}>
-                  <div className="col-id font-bold text-gray-400">{item.id}</div>
+              {filteredAppointments.map((item) => (
+                <article className="table-row" key={item.id}>
+                  <div className="col-id font-bold">{item.id}</div>
                   <div className="col-info">
-                    <p className="service-name">{item.service}</p>
-                    <p className="vehicle-name">{item.vehicle}</p>
+                    <div className="service-name-row">
+                      <Bike size={18} />
+                      <p className="service-name">{item.service}</p>
+                    </div>
+                    <p className="vehicle-name">{item.customer} - {item.vehicle}</p>
                   </div>
                   <div className="col-time">
-                    <p className="time-date flex items-center">
+                    <p className="time-date">
                       <Calendar size={14} className="mr-2" /> {item.time}
                     </p>
-                    <p className="time-hour flex items-center">
+                    <p className="time-hour">
                       <Clock size={14} className="mr-2" /> {item.hour}
                     </p>
+                  </div>
+                  <div className="col-bay">
+                    <strong>{item.bay}</strong>
+                    <span>{item.urgency}</span>
                   </div>
                   <div className="col-status">
                     <span className={`status-badge ${item.status.toLowerCase()}`}>
@@ -192,26 +258,14 @@ const AdminCalendar = ({ onViewChange }) => {
                     </span>
                   </div>
                   <div className="col-action">
-                    <button className="detail-link">
+                    <button className="detail-link" type="button">
                       Chi tiết <ChevronRight size={16} />
                     </button>
                   </div>
-                </div>
+                </article>
               ))}
             </div>
-          </div>
-
-          <footer className="footer">
-            <h4>MOTOCORE GARAGE</h4>
-            <div className="footer-links">
-              <a href="#">Chính sách bảo mật</a>
-              <a href="#">Điều khoản dịch vụ</a>
-              <a href="#">Liên hệ</a>
-            </div>
-            <p className="footer-copyright">
-              © 2024 MOTOCORE INDUSTRIAL GARAGE. Bảo lưu mọi quyền.
-            </p>
-          </footer>
+          </section>
         </div>
       </main>
     </div>

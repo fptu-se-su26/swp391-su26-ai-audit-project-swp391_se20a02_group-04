@@ -292,7 +292,14 @@ const AdminProfile = ({ onViewChange }) => {
               <Calendar className="nav-icon" />
               <span>Lịch hẹn</span>
             </a>
-            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
+            <a
+              href="#"
+              className="nav-item"
+              onClick={(event) => {
+                event.preventDefault();
+                if (onViewChange) onViewChange("services");
+              }}
+            >
               <Wrench className="nav-icon" />
               <span>Dịch vụ</span>
             </a>
