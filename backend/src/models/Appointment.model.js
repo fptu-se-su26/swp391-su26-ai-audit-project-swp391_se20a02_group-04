@@ -21,6 +21,16 @@ const appointmentSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+  repair_bay_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'RepairBay',
+    default: null
+  },
+  assignment_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AppointmentAssignment',
+    default: null
+  },
   service_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Service',
@@ -172,11 +182,46 @@ const appointmentSchema = new mongoose.Schema({
   cancelled_at: {
     type: Date
   },
+  assigned_at: {
+    type: Date
+  },
   confirmed_at: {
+    type: Date
+  },
+  actual_start_time: {
+    type: Date
+  },
+  actual_end_time: {
+    type: Date
+  },
+  estimated_end_time: {
     type: Date
   },
   completed_at: {
     type: Date
+  },
+  final_cost: {
+    type: Number,
+    min: [0, 'Final cost cannot be negative']
+  },
+  completion_notes: {
+    type: String,
+    trim: true,
+    maxlength: [1000, 'Completion notes cannot exceed 1000 characters']
+  },
+  total_service_duration_minutes: {
+    type: Number,
+    min: [1, 'Total service duration must be greater than 0']
+  },
+  is_rush: {
+    type: Boolean,
+    default: false
+  },
+  priority: {
+    type: String,
+    enum: ['LOW', 'MEDIUM', 'HIGH'],
+    default: 'MEDIUM',
+    uppercase: true
   },
   estimated_duration: {
     type: Number,
@@ -197,6 +242,9 @@ appointmentSchema.index({ appointment_date: 1 });
 appointmentSchema.index({ status: 1 });
 appointmentSchema.index({ appointment_date: 1, status: 1 });
 appointmentSchema.index({ 'vehicle.license_plate': 1, appointment_start_at: 1 });
+appointmentSchema.index({ repair_bay_id: 1, appointment_start_at: 1 });
+appointmentSchema.index({ assignment_id: 1 });
+appointmentSchema.index({ estimated_end_time: 1 });
 
 appointmentSchema.pre('validate', function(next) {
   if (!this.appointment_code) {

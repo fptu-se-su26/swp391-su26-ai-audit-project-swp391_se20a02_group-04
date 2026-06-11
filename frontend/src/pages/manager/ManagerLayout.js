@@ -19,12 +19,13 @@ import { getAuthSession, clearAuthSession } from "../../services/authApi";
 // Sub-components imports
 import ManagerDashboard from "./ManagerDashboard";
 import ManagerAppointments from "./ManagerAppointments";
+import AppointmentDetailPage from "./AppointmentDetailPage";
 import ManagerStaff from "./ManagerStaff";
 import ManagerWarehouse from "./ManagerWarehouse";
 import ManagerProfile from "./ManagerProfile";
 import ManagerRevenue from "./ManagerRevenue";
 
-const MANAGER_TABS = new Set(["dashboard", "appointments", "staff", "warehouse", "revenue", "profile"]);
+const MANAGER_TABS = new Set(["dashboard", "appointments", "appointment-detail", "staff", "warehouse", "revenue", "profile"]);
 
 // Technicians Mock Data
 const initialTechnicians = [
@@ -144,6 +145,7 @@ const ManagerLayout = () => {
   const location = useLocation();
   const currentTab = location.pathname.split("/")[2] || "dashboard";
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
 
   // Get active manager information
   const session = getAuthSession();
@@ -188,8 +190,25 @@ const ManagerLayout = () => {
   // Switch tabs
   const handleTabChange = (tabName) => {
     setSearchQuery("");
+    if (tabName !== "appointment-detail") {
+      setSelectedAppointmentId("");
+    }
     navigate(`/manager/${tabName}`);
   };
+
+  const openAppointmentDetail = (appointmentId) => {
+    setSelectedAppointmentId(appointmentId);
+    setSearchQuery("");
+    navigate("/manager/appointment-detail");
+  };
+
+  const updateAppointmentStatus = (appointmentId, status, statusText) => {
+    setAppointments(prev => prev.map(app => (
+      app.id === appointmentId ? { ...app, status, statusText } : app
+    )));
+  };
+
+  const selectedAppointment = appointments.find(app => app.id === selectedAppointmentId) || appointments[0];
 
   // Open allocate technician modal
   const openAllocationModal = (appId) => {
@@ -256,6 +275,31 @@ const ManagerLayout = () => {
             appointmentFilter={appointmentFilter}
             setAppointmentFilter={setAppointmentFilter}
             openAllocationModal={openAllocationModal}
+            onViewAppointment={openAppointmentDetail}
+          />
+        );
+      case "appointment-detail":
+        return (
+          <AppointmentDetailPage
+            appointment={selectedAppointment}
+            onBack={() => handleTabChange("appointments")}
+            onConfirm={() => {
+              updateAppointmentStatus(selectedAppointment.id, "CONFIRMED", "Đã xác nhận");
+              triggerToast("Đã xác nhận lịch hẹn.", "success");
+            }}
+            onStart={() => {
+              updateAppointmentStatus(selectedAppointment.id, "IN_PROGRESS", "Đang xử lý");
+              triggerToast("Đã bắt đầu xử lý lịch hẹn.", "success");
+            }}
+            onComplete={() => {
+              updateAppointmentStatus(selectedAppointment.id, "COMPLETED", "Hoàn tất");
+              triggerToast("Đã hoàn tất lịch hẹn.", "success");
+            }}
+            onAppointmentChange={(updatedAppointment) => {
+              setAppointments((prev) =>
+                prev.map((item) => (item.id === updatedAppointment.id ? { ...item, ...updatedAppointment } : item))
+              );
+            }}
           />
         );
       case "staff":
@@ -393,7 +437,7 @@ const ManagerLayout = () => {
             </a>
             <a
               href="#"
-              className={`nav-item ${currentTab === "appointments" ? "active" : ""}`}
+              className={`nav-item ${currentTab === "appointments" || currentTab === "appointment-detail" ? "active" : ""}`}
               onClick={(e) => { e.preventDefault(); handleTabChange("appointments"); }}
             >
               <Calendar className="nav-icon" />

@@ -2,7 +2,20 @@ const Appointment = require('../models/Appointment.model');
 const Service = require('../models/Service.model');
 const User = require('../models/User.model');
 const UserAudit = require('../models/UserAudit.model');
+const RepairBay = require('../models/RepairBay.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
+const {
+  assignAppointment,
+  buildDateTime,
+  calculateServiceDuration,
+  checkRepairBayAvailability,
+  checkTechnicianAvailability,
+  completeAppointment,
+  listTechnicians,
+  startAppointment
+} = require('../services/appointment-scheduling.service');
+
+const getDocumentId = (value) => value?._id || value;
 
 /**
  * Get all appointments with filters
@@ -65,6 +78,8 @@ const getAllAppointments = async (req, res) => {
         .populate('customer_id', 'full_name email phone')
         .populate('staff_id', 'full_name email')
         .populate('service_id', 'service_name base_price estimated_duration')
+        .populate('repair_bay_id', 'name code location')
+        .populate('assignment_id')
         .populate('cancelled_by', 'full_name')
         .sort({ [sort_by]: sortOrder })
         .limit(parseInt(limit))
@@ -100,6 +115,8 @@ const getAppointmentById = async (req, res) => {
       .populate('customer_id', 'full_name email phone avatar_url')
       .populate('staff_id', 'full_name email phone')
       .populate('service_id', 'service_name description base_price estimated_duration category')
+      .populate('repair_bay_id', 'name code location equipment status')
+      .populate('assignment_id')
       .populate('cancelled_by', 'full_name email');
 
     if (!appointment) {
@@ -187,7 +204,9 @@ const updateAppointment = async (req, res) => {
     const updatedAppointment = await Appointment.findById(id)
       .populate('customer_id', 'full_name email phone')
       .populate('staff_id', 'full_name email')
-      .populate('service_id', 'service_name base_price');
+      .populate('service_id', 'service_name base_price')
+      .populate('repair_bay_id', 'name code location')
+      .populate('assignment_id');
 
     return successResponse(res, 200, 'Appointment updated successfully', {
       appointment: updatedAppointment
@@ -374,6 +393,258 @@ const assignStaff = async (req, res) => {
   } catch (error) {
     console.error('Assign staff error:', error);
     return errorResponse(res, 500, 'Failed to assign staff');
+  }
+};
+
+/**
+ * Assign technician and repair bay to appointment
+ * PUT /api/admin/appointments/:id/assign
+ */
+const assignAppointmentHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { technician_id, repair_bay_id, notes } = req.body;
+
+    const appointment = await assignAppointment({
+      appointmentId: id,
+      technicianId: technician_id,
+      repairBayId: repair_bay_id,
+      assignedBy: req.user.userId,
+      notes
+    });
+
+    await UserAudit.create({
+      user_id: getDocumentId(appointment.customer_id),
+      action: 'APPOINTMENT_ASSIGNED',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        assigned_by: req.user.userId,
+        appointment_id: id,
+        technician_id,
+        repair_bay_id
+      }
+    });
+
+    return successResponse(res, 200, 'Appointment assigned successfully', {
+      appointment
+    });
+  } catch (error) {
+    console.error('Assign appointment error:', error);
+    return errorResponse(res, error.statusCode || 500, error.message || 'Failed to assign appointment', error.details);
+  }
+};
+
+/**
+ * Start appointment work
+ * PUT /api/admin/appointments/:id/start
+ */
+const startAppointmentHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const appointment = await startAppointment(id, req.user.userId);
+
+    await UserAudit.create({
+      user_id: getDocumentId(appointment.customer_id),
+      action: 'APPOINTMENT_STARTED',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        updated_by: req.user.userId,
+        appointment_id: id
+      }
+    });
+
+    return successResponse(res, 200, 'Appointment started successfully', {
+      appointment
+    });
+  } catch (error) {
+    console.error('Start appointment error:', error);
+    return errorResponse(res, error.statusCode || 500, error.message || 'Failed to start appointment');
+  }
+};
+
+/**
+ * Complete appointment work
+ * PUT /api/admin/appointments/:id/complete
+ */
+const completeAppointmentHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { final_cost, completion_notes } = req.body;
+    const appointment = await completeAppointment(id, {
+      finalCost: final_cost,
+      completionNotes: completion_notes
+    });
+
+    await UserAudit.create({
+      user_id: getDocumentId(appointment.customer_id),
+      action: 'APPOINTMENT_COMPLETED',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        updated_by: req.user.userId,
+        appointment_id: id,
+        final_cost
+      }
+    });
+
+    return successResponse(res, 200, 'Appointment completed successfully', {
+      appointment
+    });
+  } catch (error) {
+    console.error('Complete appointment error:', error);
+    return errorResponse(res, error.statusCode || 500, error.message || 'Failed to complete appointment');
+  }
+};
+
+const getTechnicians = async (req, res) => {
+  try {
+    const technicians = await listTechnicians();
+    return successResponse(res, 200, 'Technicians retrieved successfully', {
+      technicians
+    });
+  } catch (error) {
+    console.error('Get technicians error:', error);
+    return errorResponse(res, 500, 'Failed to retrieve technicians');
+  }
+};
+
+const getTechnicianAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { appointment_id, start_time, end_time, date, duration_minutes } = req.query;
+
+    let startDateTime;
+    let endDateTime;
+
+    if (appointment_id) {
+      const appointment = await Appointment.findById(appointment_id);
+      if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+      startDateTime = appointment.appointment_start_at || buildDateTime(appointment.appointment_date, appointment.start_time || appointment.time_slot);
+      const duration = await calculateServiceDuration(appointment);
+      endDateTime = appointment.estimated_end_time || new Date(startDateTime.getTime() + duration * 60000);
+    } else {
+      startDateTime = buildDateTime(date, start_time);
+      if (startDateTime) {
+        endDateTime = end_time
+          ? buildDateTime(date, end_time)
+          : new Date(startDateTime.getTime() + Number(duration_minutes || 60) * 60000);
+      }
+    }
+
+    if (!startDateTime || !endDateTime) {
+      return errorResponse(res, 400, 'Valid appointment_id or date/start_time is required');
+    }
+
+    const availability = await checkTechnicianAvailability(id, startDateTime, endDateTime, appointment_id);
+
+    return successResponse(res, 200, 'Technician availability retrieved successfully', {
+      availability
+    });
+  } catch (error) {
+    console.error('Get technician availability error:', error);
+    return errorResponse(res, 500, 'Failed to check technician availability');
+  }
+};
+
+const getRepairBays = async (req, res) => {
+  try {
+    const { include_inactive = 'false' } = req.query;
+    const query = include_inactive === 'true' ? {} : { is_active: true };
+    const repairBays = await RepairBay.find(query).sort({ code: 1 });
+
+    return successResponse(res, 200, 'Repair bays retrieved successfully', {
+      repair_bays: repairBays
+    });
+  } catch (error) {
+    console.error('Get repair bays error:', error);
+    return errorResponse(res, 500, 'Failed to retrieve repair bays');
+  }
+};
+
+const createRepairBay = async (req, res) => {
+  try {
+    const repairBay = await RepairBay.create(req.body);
+    return successResponse(res, 201, 'Repair bay created successfully', {
+      repair_bay: repairBay
+    });
+  } catch (error) {
+    console.error('Create repair bay error:', error);
+    return errorResponse(res, 500, error.message || 'Failed to create repair bay');
+  }
+};
+
+const updateRepairBay = async (req, res) => {
+  try {
+    const repairBay = await RepairBay.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    });
+
+    if (!repairBay) return errorResponse(res, 404, 'Repair bay not found');
+
+    return successResponse(res, 200, 'Repair bay updated successfully', {
+      repair_bay: repairBay
+    });
+  } catch (error) {
+    console.error('Update repair bay error:', error);
+    return errorResponse(res, 500, error.message || 'Failed to update repair bay');
+  }
+};
+
+const deleteRepairBay = async (req, res) => {
+  try {
+    const repairBay = await RepairBay.findByIdAndUpdate(req.params.id, { is_active: false }, { new: true });
+    if (!repairBay) return errorResponse(res, 404, 'Repair bay not found');
+
+    return successResponse(res, 200, 'Repair bay deactivated successfully', {
+      repair_bay: repairBay
+    });
+  } catch (error) {
+    console.error('Delete repair bay error:', error);
+    return errorResponse(res, 500, 'Failed to deactivate repair bay');
+  }
+};
+
+const getRepairBayAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { appointment_id, start_time, end_time, date, duration_minutes } = req.query;
+
+    let startDateTime;
+    let endDateTime;
+
+    if (appointment_id) {
+      const appointment = await Appointment.findById(appointment_id);
+      if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+      startDateTime = appointment.appointment_start_at || buildDateTime(appointment.appointment_date, appointment.start_time || appointment.time_slot);
+      const duration = await calculateServiceDuration(appointment);
+      endDateTime = appointment.estimated_end_time || new Date(startDateTime.getTime() + duration * 60000);
+    } else {
+      startDateTime = buildDateTime(date, start_time);
+      if (startDateTime) {
+        endDateTime = end_time
+          ? buildDateTime(date, end_time)
+          : new Date(startDateTime.getTime() + Number(duration_minutes || 60) * 60000);
+      }
+    }
+
+    if (!startDateTime || !endDateTime) {
+      return errorResponse(res, 400, 'Valid appointment_id or date/start_time is required');
+    }
+
+    const availability = await checkRepairBayAvailability(id, startDateTime, endDateTime, appointment_id);
+
+    return successResponse(res, 200, 'Repair bay availability retrieved successfully', {
+      availability
+    });
+  } catch (error) {
+    console.error('Get repair bay availability error:', error);
+    return errorResponse(res, 500, 'Failed to check repair bay availability');
   }
 };
 
@@ -584,6 +855,16 @@ module.exports = {
   updateAppointmentStatus,
   cancelAppointment,
   assignStaff,
+  assignAppointmentHandler,
+  startAppointmentHandler,
+  completeAppointmentHandler,
+  getTechnicians,
+  getTechnicianAvailability,
+  getRepairBays,
+  createRepairBay,
+  updateRepairBay,
+  deleteRepairBay,
+  getRepairBayAvailability,
   getAppointmentStatistics,
   getAppointmentCalendar
 };
