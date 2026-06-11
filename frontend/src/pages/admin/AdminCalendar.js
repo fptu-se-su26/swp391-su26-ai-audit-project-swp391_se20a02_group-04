@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import "../../styles/admin/AdminDashboard.css";
 import "../../styles/admin/AdminCalendar.css";
+import AppointmentDetailPage from "../manager/AppointmentDetailPage";
 
 const appointmentKpis = [
   ["Tổng lịch", "128", ClipboardList, "neutral", "+12 lịch tuần này"],
@@ -148,6 +149,7 @@ function ManagerSidebar({ activeView, onViewChange }) {
 
 const AdminCalendar = ({ onViewChange }) => {
   const [activeFilter, setActiveFilter] = useState("all");
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   const filteredAppointments = useMemo(() => {
     if (activeFilter === "all") return appointments;
@@ -159,6 +161,18 @@ const AdminCalendar = ({ onViewChange }) => {
       <ManagerSidebar activeView="calendar" onViewChange={onViewChange} />
 
       <main className="main-content">
+        {selectedAppointment ? (
+          <div className="calendar-detail-body appointment-detail-scope">
+            <AppointmentDetailPage
+              appointment={selectedAppointment}
+              onBack={() => setSelectedAppointment(null)}
+              onConfirm={() => setSelectedAppointment((current) => current ? { ...current, status: "CONFIRMED", statusText: "Đã xác nhận" } : current)}
+              onStart={() => setSelectedAppointment((current) => current ? { ...current, status: "IN_PROGRESS", statusText: "Đang xử lý" } : current)}
+              onComplete={() => setSelectedAppointment((current) => current ? { ...current, status: "COMPLETED", statusText: "Hoàn tất" } : current)}
+            />
+          </div>
+        ) : (
+          <>
         <header className="calendar-topbar">
           <div>
             <span className="calendar-eyebrow">Điều phối garage</span>
@@ -258,7 +272,11 @@ const AdminCalendar = ({ onViewChange }) => {
                     </span>
                   </div>
                   <div className="col-action">
-                    <button className="detail-link" type="button">
+                    <button
+                      className="detail-link"
+                      type="button"
+                      onClick={() => setSelectedAppointment(item)}
+                    >
                       Chi tiết <ChevronRight size={16} />
                     </button>
                   </div>
@@ -267,6 +285,8 @@ const AdminCalendar = ({ onViewChange }) => {
             </div>
           </section>
         </div>
+          </>
+        )}
       </main>
     </div>
   );

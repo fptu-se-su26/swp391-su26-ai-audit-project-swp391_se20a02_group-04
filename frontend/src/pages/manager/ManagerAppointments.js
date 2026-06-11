@@ -8,7 +8,8 @@ const ManagerAppointments = ({
   setSearchQuery,
   appointmentFilter,
   setAppointmentFilter,
-  openAllocationModal
+  openAllocationModal,
+  onViewAppointment
 }) => {
   return (
     <>
@@ -128,6 +129,12 @@ const ManagerAppointments = ({
                     </span>
                   </td>
                   <td>
+                    <button
+                      className="btn-table-detail"
+                      onClick={() => onViewAppointment(app.id)}
+                    >
+                      CHI TIáº¾T
+                    </button>
                     <button
                       className="btn-table-assign"
                       onClick={() => openAllocationModal(app.id)}

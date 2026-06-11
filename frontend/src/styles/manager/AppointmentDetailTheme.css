@@ -1,0 +1,42 @@
+:where(.manager-layout, .appointment-detail-scope) .appointment-detail-page {
+  --appointment-radius: 0.875rem;
+  --appointment-radius-sm: calc(var(--appointment-radius) - 4px);
+  --appointment-radius-md: calc(var(--appointment-radius) - 2px);
+  --appointment-radius-lg: var(--appointment-radius);
+  --appointment-radius-xl: calc(var(--appointment-radius) + 4px);
+  --appointment-radius-2xl: calc(var(--appointment-radius) + 8px);
+
+  --appointment-background: oklch(0.985 0.005 80);
+  --appointment-foreground: oklch(0.22 0.02 270);
+  --appointment-card: oklch(1 0 0);
+  --appointment-card-foreground: oklch(0.22 0.02 270);
+  --appointment-secondary: oklch(0.96 0.01 80);
+  --appointment-muted: oklch(0.96 0.008 80);
+  --appointment-muted-foreground: oklch(0.52 0.02 270);
+  --appointment-border: oklch(0.92 0.008 80);
+  --appointment-input: oklch(0.92 0.008 80);
+  --appointment-ring: oklch(0.63 0.22 27);
+
+  --appointment-brand-red: oklch(0.63 0.22 27);
+  --appointment-brand-red-soft: oklch(0.96 0.04 27);
+  --appointment-brand-orange: oklch(0.72 0.18 50);
+  --appointment-brand-orange-soft: oklch(0.96 0.05 60);
+  --appointment-success: oklch(0.62 0.16 150);
+  --appointment-success-soft: oklch(0.95 0.05 150);
+  --appointment-info: oklch(0.62 0.16 240);
+  --appointment-info-soft: oklch(0.95 0.04 240);
+  --appointment-warning: oklch(0.72 0.18 70);
+  --appointment-warning-soft: oklch(0.96 0.06 75);
+  --appointment-purple: oklch(0.58 0.2 295);
+  --appointment-purple-soft: oklch(0.96 0.04 295);
+
+  --appointment-shadow-card: 0 1px 2px oklch(0 0 0 / 0.04), 0 4px 16px -4px oklch(0 0 0 / 0.06);
+  --appointment-shadow-elevated: 0 10px 24px rgba(15, 23, 42, 0.055);
+
+  color: var(--appointment-foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-detail-page * {
+  border-color: var(--appointment-border);
+}
