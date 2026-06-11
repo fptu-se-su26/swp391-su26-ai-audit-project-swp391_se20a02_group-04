@@ -249,7 +249,12 @@ function formatMinutes(minutes = 0) {
 }
 
 export function ShiftSummary({ attendanceSummary, todayAttendance }) {
-  const activeShift = todayAttendance || attendanceSummary?.active_shift || null;
+  const activeShift =
+    todayAttendance?.status && todayAttendance.status !== "NOT_CHECKED_IN"
+      ? todayAttendance
+      : attendanceSummary?.active_shift || null;
+  const isCheckedIn = activeShift?.status === "CHECKED_IN";
+  const totalMinutes = activeShift?.total_minutes ?? Math.round((activeShift?.total_hours || 0) * 60);
 
   return (
     <section className="shift-panel">
@@ -259,7 +264,7 @@ export function ShiftSummary({ attendanceSummary, todayAttendance }) {
           <div className="mini-stats">
             <div>
               <span>Thời gian hôm nay</span>
-              <strong>{activeShift.status === "IN_SHIFT" ? "Đang tính" : formatMinutes(activeShift.total_minutes)}</strong>
+              <strong>{isCheckedIn ? "Đang tính" : formatMinutes(totalMinutes)}</strong>
             </div>
             <div>
               <span>Tổng giờ kỳ này</span>
@@ -269,7 +274,7 @@ export function ShiftSummary({ attendanceSummary, todayAttendance }) {
           <div className="checkin-card">
             <div>
               <span>Vào ca lúc</span>
-              <strong>{formatTime(activeShift.check_in_at)}</strong>
+              <strong>{formatTime(activeShift.check_in_time || activeShift.check_in_at)}</strong>
             </div>
             <Icon name="schedule" />
           </div>

@@ -133,7 +133,7 @@ router.put('/appointments/:id',
  */
 router.put('/appointments/:id/status',
   authenticate,
-  authorize('ADMIN', 'MANAGER', 'STAFF'),
+  authorize('ADMIN', 'MANAGER'),
   param('id').isMongoId().withMessage('Invalid appointment ID'),
   updateStatusValidation,
   validate,

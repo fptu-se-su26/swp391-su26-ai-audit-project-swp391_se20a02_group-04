@@ -1,42 +1,59 @@
-import React, { useState } from 'react';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminCalendar from './pages/admin/AdminCalendar';
-import AdminProfile from './pages/admin/AdminProfile';
-import AdminServices from './pages/admin/AdminServices';
-import AdminCustomers from './pages/admin/AdminCustomers';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminReports from './pages/admin/AdminReports';
-import './App.css';
+import React from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminCalendar from "./pages/admin/AdminCalendar";
+import AdminProfile from "./pages/admin/AdminProfile";
+import AdminServices from "./pages/admin/AdminServices";
+import AdminCustomers from "./pages/admin/AdminCustomers";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminReports from "./pages/admin/AdminReports";
+import "./App.css";
+
+const ADMIN_PAGES = new Set([
+  "dashboard",
+  "calendar",
+  "services",
+  "customers",
+  "users",
+  "reports",
+  "profile",
+]);
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const currentPage = location.pathname.split("/")[2] || "dashboard";
+
+  const handleViewChange = (page) => {
+    navigate(`/admin/${page}`);
+  };
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'dashboard':
-        return <AdminDashboard onViewChange={setCurrentPage} />;
-      case 'calendar':
-        return <AdminCalendar onViewChange={setCurrentPage} />;
-      case 'services':
-        return <AdminServices onViewChange={setCurrentPage} />;
-      case 'customers':
-        return <AdminCustomers onViewChange={setCurrentPage} />;
-      case 'users':
-        return <AdminUsers onViewChange={setCurrentPage} />;
-      case 'reports':
-        return <AdminReports onViewChange={setCurrentPage} />;
-      case 'profile':
-        return <AdminProfile onViewChange={setCurrentPage} />;
+      case "dashboard":
+        return <AdminDashboard onViewChange={handleViewChange} />;
+      case "calendar":
+        return <AdminCalendar onViewChange={handleViewChange} />;
+      case "services":
+        return <AdminServices onViewChange={handleViewChange} />;
+      case "customers":
+        return <AdminCustomers onViewChange={handleViewChange} />;
+      case "users":
+        return <AdminUsers onViewChange={handleViewChange} />;
+      case "reports":
+        return <AdminReports onViewChange={handleViewChange} />;
+      case "profile":
+        return <AdminProfile onViewChange={handleViewChange} />;
       default:
-        return <AdminDashboard onViewChange={setCurrentPage} />;
+        return <AdminDashboard onViewChange={handleViewChange} />;
     }
   };
 
-  return (
-    <div className="App">
-      {renderPage()}
-    </div>
-  );
+  if (!ADMIN_PAGES.has(currentPage)) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  return <div className="App">{renderPage()}</div>;
 }
 
 export default App;

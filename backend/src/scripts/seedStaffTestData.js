@@ -353,19 +353,16 @@ async function seedStaffTestData() {
       ensureAttendance(staff._id, today, {
         staff_id: staff._id,
         work_date: today,
-        check_in_at: checkInAt,
-        status: 'IN_SHIFT',
-        check_in_note: 'Seed check-in for staff dashboard test'
+        check_in_time: checkInAt,
+        status: 'CHECKED_IN'
       }),
       ensureAttendance(staff._id, yesterday, {
         staff_id: staff._id,
         work_date: yesterday,
-        check_in_at: yesterdayCheckIn,
-        check_out_at: checkOutAt,
-        total_minutes: Math.round((checkOutAt.getTime() - yesterdayCheckIn.getTime()) / 60000),
-        status: 'COMPLETED',
-        check_in_note: 'Seed completed shift',
-        check_out_note: 'Completed shift from seed'
+        check_in_time: yesterdayCheckIn,
+        check_out_time: checkOutAt,
+        total_hours: Number(((checkOutAt.getTime() - yesterdayCheckIn.getTime()) / 3600000).toFixed(2)),
+        status: 'CHECKED_OUT'
       })
     ]);
 

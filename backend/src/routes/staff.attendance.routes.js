@@ -23,13 +23,13 @@ const noteValidation = [
 
 router.get('/attendance/today',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   staffAttendanceController.getTodayAttendance
 );
 
 router.post('/attendance/check-in',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   noteValidation,
   validate,
   staffAttendanceController.checkIn
@@ -37,7 +37,7 @@ router.post('/attendance/check-in',
 
 router.post('/attendance/check-out',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   noteValidation,
   validate,
   staffAttendanceController.checkOut
@@ -45,7 +45,7 @@ router.post('/attendance/check-out',
 
 router.get('/attendance/history',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('date_from').optional().matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('date_from must use YYYY-MM-DD format'),
@@ -56,7 +56,7 @@ router.get('/attendance/history',
 
 router.get('/attendance/summary',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   query('period').optional().isInt({ min: 1, max: 365 }),
   validate,
   staffAttendanceController.getAttendanceSummary

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Calendar,
@@ -22,6 +22,9 @@ import ManagerAppointments from "./ManagerAppointments";
 import ManagerStaff from "./ManagerStaff";
 import ManagerWarehouse from "./ManagerWarehouse";
 import ManagerProfile from "./ManagerProfile";
+import ManagerRevenue from "./ManagerRevenue";
+
+const MANAGER_TABS = new Set(["dashboard", "appointments", "staff", "warehouse", "revenue", "profile"]);
 
 // Technicians Mock Data
 const initialTechnicians = [
@@ -138,7 +141,8 @@ const initialBays = [
 
 const ManagerLayout = () => {
   const navigate = useNavigate();
-  const [currentTab, setCurrentTab] = useState("dashboard"); // dashboard, appointments, staff, revenue
+  const location = useLocation();
+  const currentTab = location.pathname.split("/")[2] || "dashboard";
   const [searchQuery, setSearchQuery] = useState("");
 
   // Get active manager information
@@ -183,8 +187,8 @@ const ManagerLayout = () => {
 
   // Switch tabs
   const handleTabChange = (tabName) => {
-    setCurrentTab(tabName);
     setSearchQuery("");
+    navigate(`/manager/${tabName}`);
   };
 
   // Open allocate technician modal
@@ -258,12 +262,18 @@ const ManagerLayout = () => {
         return <ManagerStaff technicians={technicians} />;
       case "warehouse":
         return <ManagerWarehouse bays={bays} />;
+      case "revenue":
+        return <ManagerRevenue />;
       case "profile":
         return <ManagerProfile />;
       default:
         return <ManagerDashboard bays={bays} technicians={technicians} />;
     }
   };
+
+  if (!MANAGER_TABS.has(currentTab)) {
+    return <Navigate to="/manager/dashboard" replace />;
+  }
 
   return (
     <div className="manager-layout">
@@ -404,6 +414,14 @@ const ManagerLayout = () => {
             >
               <Layers className="nav-icon" />
               <span>Kho</span>
+            </a>
+            <a
+              href="#"
+              className={`nav-item ${currentTab === "revenue" ? "active" : ""}`}
+              onClick={(e) => { e.preventDefault(); handleTabChange("revenue"); }}
+            >
+              <BarChart2 className="nav-icon" />
+              <span>Hiá»‡u suáº¥t</span>
             </a>
             <a
               href="#"

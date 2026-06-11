@@ -2,14 +2,34 @@ const StaffAttendance = require('../models/StaffAttendance.model');
 const UserAudit = require('../models/UserAudit.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 
-const toDateString = (date = new Date()) => date.toISOString().slice(0, 10);
+const toDateString = (date = new Date()) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 10);
+};
+
+const getEmptyTodayAttendance = (workDate, staffId) => ({
+  attendance_id: null,
+  staff_id: staffId,
+  work_date: workDate,
+  check_in_time: null,
+  check_out_time: null,
+  total_hours: 0,
+  status: 'NOT_CHECKED_IN'
+});
 
 const formatAttendance = (attendance) => {
   if (!attendance) return null;
+
   const plain = attendance.toObject ? attendance.toObject() : attendance;
+  const totalHours = Number((plain.total_hours || 0).toFixed(2));
+
   return {
     ...plain,
-    total_hours: Number(((plain.total_minutes || 0) / 60).toFixed(2))
+    attendance_id: plain._id || plain.attendance_id,
+    total_hours: totalHours,
+    check_in_at: plain.check_in_time,
+    check_out_at: plain.check_out_time,
+    total_minutes: Math.round(totalHours * 60)
   };
 };
 
@@ -22,7 +42,9 @@ const getTodayAttendance = async (req, res) => {
     });
 
     return successResponse(res, 200, 'Today attendance retrieved successfully', {
-      attendance: formatAttendance(attendance),
+      attendance: attendance
+        ? formatAttendance(attendance)
+        : getEmptyTodayAttendance(workDate, req.user.userId),
       work_date: workDate
     });
   } catch (error) {
@@ -34,27 +56,21 @@ const getTodayAttendance = async (req, res) => {
 const checkIn = async (req, res) => {
   try {
     const workDate = toDateString();
-    const { note = '' } = req.body;
 
     const existing = await StaffAttendance.findOne({
       staff_id: req.user.userId,
       work_date: workDate
     });
 
-    if (existing?.status === 'IN_SHIFT') {
-      return errorResponse(res, 409, 'You are already checked in');
-    }
-
-    if (existing?.status === 'COMPLETED') {
-      return errorResponse(res, 409, 'Shift has already been completed today');
+    if (existing) {
+      return errorResponse(res, 409, 'You have already checked in today');
     }
 
     const attendance = await StaffAttendance.create({
       staff_id: req.user.userId,
       work_date: workDate,
-      check_in_at: new Date(),
-      check_in_note: note,
-      status: 'IN_SHIFT'
+      check_in_time: new Date(),
+      status: 'CHECKED_IN'
     });
 
     await UserAudit.create({
@@ -70,6 +86,10 @@ const checkIn = async (req, res) => {
       attendance: formatAttendance(attendance)
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return errorResponse(res, 409, 'You have already checked in today');
+    }
+
     console.error('Check-in error:', error);
     return errorResponse(res, 500, 'Failed to check in');
   }
@@ -78,7 +98,6 @@ const checkIn = async (req, res) => {
 const checkOut = async (req, res) => {
   try {
     const workDate = toDateString();
-    const { note = '' } = req.body;
 
     const attendance = await StaffAttendance.findOne({
       staff_id: req.user.userId,
@@ -86,14 +105,18 @@ const checkOut = async (req, res) => {
     });
 
     if (!attendance) {
-      return errorResponse(res, 404, 'No active shift found for today');
+      return errorResponse(res, 400, 'You have not checked in today');
     }
 
-    if (attendance.status !== 'IN_SHIFT') {
-      return errorResponse(res, 409, 'Shift is not active');
+    if (attendance.status === 'CHECKED_OUT' || attendance.check_out_time) {
+      return errorResponse(res, 409, 'You have already checked out today');
     }
 
-    attendance.finishShift(new Date(), note);
+    if (attendance.status !== 'CHECKED_IN') {
+      return errorResponse(res, 409, 'Attendance record is not ready for check-out');
+    }
+
+    attendance.checkOut(new Date());
     await attendance.save();
 
     await UserAudit.create({
@@ -105,7 +128,7 @@ const checkOut = async (req, res) => {
       metadata: {
         attendance_id: attendance._id,
         work_date: workDate,
-        total_minutes: attendance.total_minutes
+        total_hours: attendance.total_hours
       }
     });
 
@@ -139,7 +162,7 @@ const getAttendanceHistory = async (req, res) => {
 
     const [records, total] = await Promise.all([
       StaffAttendance.find(query)
-        .sort({ work_date: -1, check_in_at: -1 })
+        .sort({ work_date: -1, check_in_time: -1 })
         .limit(Number(limit))
         .skip(skip),
       StaffAttendance.countDocuments(query)
@@ -172,17 +195,17 @@ const getAttendanceSummary = async (req, res) => {
       work_date: { $gte: startDateString }
     });
 
-    const totalMinutes = records.reduce((sum, record) => sum + (record.total_minutes || 0), 0);
-    const completedShifts = records.filter((record) => record.status === 'COMPLETED').length;
-    const activeShift = records.find((record) => record.status === 'IN_SHIFT') || null;
+    const totalHours = records.reduce((sum, record) => sum + (record.total_hours || 0), 0);
+    const checkedOutRecords = records.filter((record) => record.status === 'CHECKED_OUT').length;
+    const activeRecord = records.find((record) => record.status === 'CHECKED_IN') || null;
 
     return successResponse(res, 200, 'Attendance summary retrieved successfully', {
       overview: {
         total_shifts: records.length,
-        completed_shifts: completedShifts,
-        total_minutes: totalMinutes,
-        total_hours: Number((totalMinutes / 60).toFixed(2)),
-        active_shift: formatAttendance(activeShift)
+        completed_shifts: checkedOutRecords,
+        total_minutes: Math.round(totalHours * 60),
+        total_hours: Number(totalHours.toFixed(2)),
+        active_shift: formatAttendance(activeRecord)
       },
       period_days: Number(period)
     });

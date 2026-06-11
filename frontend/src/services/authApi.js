@@ -165,8 +165,12 @@ export function hasAnyRole(allowedRoles, userRoles = getAuthSession().roles) {
 export function getDefaultRouteByRoles(roles = getAuthSession().roles) {
   const normalizedRoles = normalizeRoles(roles);
 
-  if (normalizedRoles.includes("ADMIN") || normalizedRoles.includes("MANAGER")) {
-    return "/admin";
+  if (normalizedRoles.includes("ADMIN")) {
+    return "/admin/dashboard";
+  }
+
+  if (normalizedRoles.includes("MANAGER")) {
+    return "/manager/dashboard";
   }
 
   if (normalizedRoles.includes("STAFF")) {
