@@ -46,6 +46,58 @@ const assignStaffValidation = [
     .withMessage('Valid staff ID is required')
 ];
 
+const assignAppointmentValidation = [
+  body('technician_id').notEmpty().isMongoId()
+    .withMessage('Valid technician ID is required'),
+  body('repair_bay_id').notEmpty().isMongoId()
+    .withMessage('Valid repair bay ID is required'),
+  body('notes').optional().trim().isLength({ max: 500 })
+    .withMessage('Notes cannot exceed 500 characters')
+];
+
+const completeAppointmentValidation = [
+  body('final_cost').notEmpty().isFloat({ min: 0.01 })
+    .withMessage('Final cost must be greater than 0'),
+  body('completion_notes').optional().trim().isLength({ max: 1000 })
+    .withMessage('Completion notes cannot exceed 1000 characters')
+];
+
+const createRepairBayValidation = [
+  body('name').notEmpty().trim().isLength({ max: 120 })
+    .withMessage('Repair bay name is required'),
+  body('code').notEmpty().trim().isLength({ max: 40 })
+    .withMessage('Repair bay code is required'),
+  body('status').optional().isIn(['AVAILABLE', 'MAINTENANCE', 'BLOCKED'])
+    .withMessage('Invalid repair bay status'),
+  body('capacity').optional().isInt({ min: 1 })
+    .withMessage('Capacity must be at least 1'),
+  body('equipment').optional().isArray()
+    .withMessage('Equipment must be an array'),
+  body('location').optional().trim().isLength({ max: 160 })
+    .withMessage('Location cannot exceed 160 characters'),
+  body('hourly_rate').optional().isFloat({ min: 0 })
+    .withMessage('Hourly rate cannot be negative')
+];
+
+const updateRepairBayValidation = [
+  body('name').optional().trim().isLength({ min: 1, max: 120 })
+    .withMessage('Repair bay name cannot exceed 120 characters'),
+  body('code').optional().trim().isLength({ min: 1, max: 40 })
+    .withMessage('Repair bay code cannot exceed 40 characters'),
+  body('status').optional().isIn(['AVAILABLE', 'MAINTENANCE', 'BLOCKED'])
+    .withMessage('Invalid repair bay status'),
+  body('capacity').optional().isInt({ min: 1 })
+    .withMessage('Capacity must be at least 1'),
+  body('equipment').optional().isArray()
+    .withMessage('Equipment must be an array'),
+  body('location').optional().trim().isLength({ max: 160 })
+    .withMessage('Location cannot exceed 160 characters'),
+  body('hourly_rate').optional().isFloat({ min: 0 })
+    .withMessage('Hourly rate cannot be negative'),
+  body('is_active').optional().isBoolean()
+    .withMessage('is_active must be boolean')
+];
+
 const cancelAppointmentValidation = [
   body('reason').optional().trim().isLength({ max: 500 })
     .withMessage('Reason cannot exceed 500 characters')
@@ -77,6 +129,84 @@ router.get('/appointments/calendar',
   query('staff_id').optional().isMongoId(),
   validate,
   adminAppointmentController.getAppointmentCalendar
+);
+
+/**
+ * @route   GET /api/admin/technicians
+ * @desc    Get active technicians
+ * @access  Private/Admin
+ */
+router.get('/technicians',
+  authenticate,
+  authorize('ADMIN', 'MANAGER'),
+  adminAppointmentController.getTechnicians
+);
+
+/**
+ * @route   GET /api/admin/technicians/:id/availability
+ * @desc    Check technician availability
+ * @access  Private/Admin
+ */
+router.get('/technicians/:id/availability',
+  authenticate,
+  authorize('ADMIN', 'MANAGER'),
+  param('id').isMongoId().withMessage('Invalid technician ID'),
+  query('appointment_id').optional().isMongoId(),
+  query('date').optional().isISO8601(),
+  query('start_time').optional().matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+  query('end_time').optional().matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+  query('duration_minutes').optional().isInt({ min: 1 }),
+  validate,
+  adminAppointmentController.getTechnicianAvailability
+);
+
+/**
+ * @route   GET /api/admin/repair-bays
+ * @desc    Get repair bays
+ * @access  Private/Admin
+ */
+router.get('/repair-bays',
+  authenticate,
+  authorize('ADMIN', 'MANAGER'),
+  adminAppointmentController.getRepairBays
+);
+
+router.post('/repair-bays',
+  authenticate,
+  authorize('ADMIN', 'MANAGER'),
+  createRepairBayValidation,
+  validate,
+  adminAppointmentController.createRepairBay
+);
+
+router.get('/repair-bays/:id/availability',
+  authenticate,
+  authorize('ADMIN', 'MANAGER'),
+  param('id').isMongoId().withMessage('Invalid repair bay ID'),
+  query('appointment_id').optional().isMongoId(),
+  query('date').optional().isISO8601(),
+  query('start_time').optional().matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+  query('end_time').optional().matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+  query('duration_minutes').optional().isInt({ min: 1 }),
+  validate,
+  adminAppointmentController.getRepairBayAvailability
+);
+
+router.put('/repair-bays/:id',
+  authenticate,
+  authorize('ADMIN', 'MANAGER'),
+  param('id').isMongoId().withMessage('Invalid repair bay ID'),
+  updateRepairBayValidation,
+  validate,
+  adminAppointmentController.updateRepairBay
+);
+
+router.delete('/repair-bays/:id',
+  authenticate,
+  authorize('ADMIN', 'MANAGER'),
+  param('id').isMongoId().withMessage('Invalid repair bay ID'),
+  validate,
+  adminAppointmentController.deleteRepairBay
 );
 
 /**
@@ -138,6 +268,47 @@ router.put('/appointments/:id/status',
   updateStatusValidation,
   validate,
   adminAppointmentController.updateAppointmentStatus
+);
+
+/**
+ * @route   PUT /api/admin/appointments/:id/assign
+ * @desc    Assign technician and repair bay
+ * @access  Private/Admin
+ */
+router.put('/appointments/:id/assign',
+  authenticate,
+  authorize('ADMIN', 'MANAGER'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  assignAppointmentValidation,
+  validate,
+  adminAppointmentController.assignAppointmentHandler
+);
+
+/**
+ * @route   PUT /api/admin/appointments/:id/start
+ * @desc    Start appointment work
+ * @access  Private/Admin
+ */
+router.put('/appointments/:id/start',
+  authenticate,
+  authorize('ADMIN', 'MANAGER', 'STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  validate,
+  adminAppointmentController.startAppointmentHandler
+);
+
+/**
+ * @route   PUT /api/admin/appointments/:id/complete
+ * @desc    Complete appointment work
+ * @access  Private/Admin
+ */
+router.put('/appointments/:id/complete',
+  authenticate,
+  authorize('ADMIN', 'MANAGER', 'STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  completeAppointmentValidation,
+  validate,
+  adminAppointmentController.completeAppointmentHandler
 );
 
 /**

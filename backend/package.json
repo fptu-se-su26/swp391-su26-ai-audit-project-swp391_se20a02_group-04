@@ -10,7 +10,8 @@
     "test:watch": "jest --watch",
     "seed:roles": "node src/scripts/seedRoles.js",
     "seed:data": "node src/scripts/seedData.js",
-    "seed:staff": "node src/scripts/seedStaffTestData.js"
+    "seed:staff": "node src/scripts/seedStaffTestData.js",
+    "migrate:appointments": "node src/scripts/migrateAppointmentManagement.js"
   },
   "keywords": [
     "appointment",

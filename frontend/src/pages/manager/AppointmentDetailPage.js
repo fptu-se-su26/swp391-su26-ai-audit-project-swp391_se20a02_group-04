@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import "../../styles/manager/AppointmentDetailTheme.css";
 import "../../styles/manager/AppointmentDetailPage.css";
+import AppointmentAssignmentDialog from "./AppointmentAssignmentDialog";
 import {
   mockCancelAppointmentDetail,
   mockCompleteAppointment,
@@ -141,6 +142,12 @@ const toDateInputValue = (dateValue) => {
   return normalized;
 };
 
+const getShortAppointmentId = (appointmentId = "") => {
+  const normalized = String(appointmentId || "").replace(/^#/, "");
+  if (normalized.length <= 16) return String(appointmentId || "");
+  return `#${normalized.slice(0, 8)}...${normalized.slice(-4)}`;
+};
+
 export default function AppointmentDetailPage({
   appointment,
   onBack,
@@ -155,6 +162,7 @@ export default function AppointmentDetailPage({
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [editDraft, setEditDraft] = useState(null);
+  const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
   const detail = buildAppointmentDetail(localAppointment);
   const isApproved = !pendingStatuses.includes(detail.status);
   const totalPrice = detail.services.reduce((sum, item) => sum + item.price, 0);
@@ -245,10 +253,10 @@ export default function AppointmentDetailPage({
             <VehicleCard appointment={detail} />
           </div>
           <ServicesCard services={detail.services} totalPrice={totalPrice} />
+          <AssignmentCard assignment={detail.assignment} isApproved={isApproved} />
 
           {isApproved && (
             <>
-              <AssignmentCard assignment={detail.assignment} />
               <TimelineCard status={detail.status} />
             </>
           )}
@@ -270,6 +278,10 @@ export default function AppointmentDetailPage({
             onStart={() => runAppointmentAction((current) => runMappedOrFallbackAction(onStart, mockStartAppointmentProcessing, current))}
             onComplete={() => runAppointmentAction((current) => runMappedOrFallbackAction(onComplete, mockCompleteAppointment, current))}
             onEdit={openEditModal}
+            onAssign={() => {
+              setActionMessage("");
+              setShowAssignmentDialog(true);
+            }}
             onPrint={() => runAppointmentAction(mockPrintServiceTicket)}
             onSendSms={() => runAppointmentAction(mockSendAppointmentSms)}
             onSendEmail={() => runAppointmentAction(mockSendAppointmentEmail)}
@@ -285,6 +297,20 @@ export default function AppointmentDetailPage({
           onChange={setEditDraft}
           onClose={closeEditModal}
           onSubmit={submitScheduleEdit}
+        />
+      )}
+      {showAssignmentDialog && (
+        <AppointmentAssignmentDialog
+          appointment={localAppointment}
+          onClose={() => setShowAssignmentDialog(false)}
+          onSuccess={(updatedAppointment) => {
+            applyAppointmentUpdate(updatedAppointment);
+            setShowAssignmentDialog(false);
+            setActionMessage("Đã phân công lịch hẹn thành công.");
+          }}
+          onError={(message) => {
+            setActionMessage(message || "Không thể phân công lịch hẹn.");
+          }}
         />
       )}
     </div>
@@ -311,6 +337,7 @@ function DetailTopBar() {
 
 function PageHeader({ appointment, onBack }) {
   const displayId = String(appointment.id).startsWith("#") ? appointment.id : `#${appointment.id}`;
+  const shortDisplayId = getShortAppointmentId(displayId);
 
   return (
     <div className="appointment-detail-header">
@@ -319,7 +346,7 @@ function PageHeader({ appointment, onBack }) {
       </button>
       <div className="appointment-header-divider" />
       <div className="appointment-title-group">
-        <h2>{displayId}</h2>
+        <h2 title={displayId}>{shortDisplayId}</h2>
         <StatusBadge status={appointment.status} />
         <PriorityBadge priority={appointment.priority} />
       </div>
@@ -359,19 +386,23 @@ function InfoRow({ icon: Icon, label, value, accent }) {
   return (
     <div className="appointment-info-row">
       <span className="appointment-info-icon">{Icon && <Icon size={17} />}</span>
-      <div>
+      <div className="appointment-info-content">
         <p>{label}</p>
-        <strong className={accent ? "accent" : ""}>{value}</strong>
+        <strong className={accent ? "accent" : ""} title={typeof value === "string" ? value : undefined}>
+          {value}
+        </strong>
       </div>
     </div>
   );
 }
 
 function AppointmentInfo({ appointment }) {
+  const displayId = String(appointment.id).startsWith("#") ? appointment.id : `#${appointment.id}`;
+
   return (
     <DetailCard title="Thông tin lịch hẹn" icon={Calendar}>
       <div className="appointment-info-grid">
-        <InfoRow icon={Hash} label="Mã lịch" value={appointment.id} />
+        <InfoRow icon={Hash} label="Mã lịch" value={getShortAppointmentId(displayId)} />
         <InfoRow icon={CalendarDays} label="Ngày tạo" value={appointment.createdDate} />
         <InfoRow icon={Calendar} label="Ngày hẹn" value={appointment.appointmentDate} />
         <InfoRow icon={Clock} label="Giờ hẹn" value={appointment.appointmentHour} />
@@ -446,14 +477,23 @@ function ServicesCard({ services, totalPrice }) {
   );
 }
 
-function AssignmentCard({ assignment }) {
+function AssignmentCard({ assignment, isApproved }) {
+  const displayAssignment = isApproved
+    ? assignment
+    : {
+        ...assignment,
+        bay: "Chưa phân kệ",
+        technician: "Chưa phân công",
+        expectedDone: "--:--"
+      };
+
   return (
     <DetailCard title="Phân công xử lý" icon={Users}>
       <div className="assignment-grid">
-        <InfoRow icon={Wrench} label="Kệ sửa" value={assignment.bay} />
-        <InfoRow icon={User} label="Kỹ thuật viên" value={assignment.technician} />
-        <InfoRow icon={Clock} label="Bắt đầu" value={assignment.startTime} />
-        <InfoRow icon={CheckCircle2} label="Dự kiến xong" value={assignment.expectedDone} />
+        <InfoRow icon={Wrench} label="Kệ sửa" value={displayAssignment.bay} />
+        <InfoRow icon={User} label="Kỹ thuật viên" value={displayAssignment.technician} />
+        <InfoRow icon={Clock} label="Bắt đầu" value={displayAssignment.startTime} />
+        <InfoRow icon={CheckCircle2} label="Dự kiến xong" value={displayAssignment.expectedDone} />
       </div>
     </DetailCard>
   );
@@ -561,6 +601,7 @@ function FooterActions({
   onStart,
   onComplete,
   onEdit,
+  onAssign,
   onPrint,
   onSendSms,
   onSendEmail,
@@ -585,6 +626,11 @@ function FooterActions({
       <button className="detail-primary-btn" onClick={primaryAction.onClick} disabled={isPrimaryDisabled}>
         <CheckCircle2 size={17} /> {isLoading ? "Đang xử lý..." : primaryAction.label}
       </button>
+      {!isApproved && (
+        <button className="detail-print-btn" onClick={onAssign} disabled={isLoading}>
+          <Users size={17} /> Phân công xử lý
+        </button>
+      )}
       {isApproved && (
         <button className="detail-print-btn" onClick={onPrint} disabled={isLoading}>
           <Printer size={17} /> In phiếu dịch vụ
