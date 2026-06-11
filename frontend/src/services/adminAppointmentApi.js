@@ -112,6 +112,8 @@ export function mapAdminAppointment(appointment = {}) {
   const vehicleName = getVehicleName(vehicle);
   const vehiclePlate = getVehiclePlate(vehicle);
   const staff = appointment.staff_id || {};
+  const repairBay = appointment.repair_bay_id || {};
+  const assignment = appointment.assignment_id || {};
   const status = String(appointment.status || "PENDING").toUpperCase();
   const estimatedPrice = service.base_price || appointment.service?.estimated_price || 0;
   const estimatedDuration = service.estimated_duration || appointment.service?.estimated_duration_minutes || appointment.estimated_duration || 60;
@@ -139,9 +141,13 @@ export function mapAdminAppointment(appointment = {}) {
     time: formatDate(appointment.appointment_date),
     apiDate: appointment.appointment_date,
     hour: appointment.start_time || appointment.time_slot || "--:--",
-    bay: staff.full_name ? `KTV ${staff.full_name}` : "Chưa phân kệ",
+    bay: repairBay.name || (staff.full_name ? `KTV ${staff.full_name}` : "Chưa phân kệ"),
+    repairBayCode: repairBay.code || "",
+    repairBayLocation: repairBay.location || "",
     techAssigned: staff.full_name || "Chưa phân công",
-    expectedDone: appointment.end_time || "--:--",
+    technicianSpecialization: staff.specialization || "",
+    startTime: assignment.estimated_start_time || appointment.appointment_start_at || "",
+    expectedDone: appointment.end_time || (appointment.estimated_end_time ? new Date(appointment.estimated_end_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "--:--"),
     urgency: getUrgency(appointment),
     status,
     statusText: statusTextMap[status] || statusTextMap.PENDING,
@@ -207,3 +213,5 @@ export async function cancelAdminAppointment(appointmentId, reason = "Hủy từ
     body: JSON.stringify({ reason }),
   });
 }
+
+export { adminAppointmentRequest, withQuery };

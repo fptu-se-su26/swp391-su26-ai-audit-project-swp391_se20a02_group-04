@@ -31,6 +31,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  specialization: {
+    type: String,
+    trim: true,
+    maxlength: [120, 'Specialization cannot exceed 120 characters']
+  },
   auth_provider: {
     type: String,
     enum: ['local', 'google'],
