@@ -40,7 +40,7 @@ const addNotesValidation = [
  */
 router.get('/appointments/my-stats',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   query('period').optional().isInt({ min: 1, max: 365 }),
   validate,
   staffAppointmentController.getMyWorkloadStats
@@ -53,7 +53,7 @@ router.get('/appointments/my-stats',
  */
 router.get('/appointments/today',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   staffAppointmentController.getTodayAppointments
 );
 
@@ -64,7 +64,7 @@ router.get('/appointments/today',
  */
 router.get('/appointments/all',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('status').optional().isIn(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
@@ -82,7 +82,7 @@ router.get('/appointments/all',
  */
 router.get('/appointments',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('status').optional().isIn(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
@@ -99,7 +99,7 @@ router.get('/appointments',
  */
 router.get('/appointments/:id',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   param('id').isMongoId().withMessage('Invalid appointment ID'),
   validate,
   staffAppointmentController.getAppointmentById
@@ -112,7 +112,7 @@ router.get('/appointments/:id',
  */
 router.put('/appointments/:id/status',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   param('id').isMongoId().withMessage('Invalid appointment ID'),
   updateStatusValidation,
   validate,
@@ -126,7 +126,7 @@ router.put('/appointments/:id/status',
  */
 router.put('/appointments/:id/notes',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   param('id').isMongoId().withMessage('Invalid appointment ID'),
   addNotesValidation,
   validate,

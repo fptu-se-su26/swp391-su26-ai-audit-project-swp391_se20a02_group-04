@@ -6,12 +6,12 @@ async function staffRequest(path, options = {}) {
   const { accessToken } = getAuthSession();
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
     headers: {
       "Content-Type": "application/json",
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options.headers,
     },
-    ...options,
   });
 
   const payload = await response.json().catch(() => ({}));
@@ -25,6 +25,50 @@ async function staffRequest(path, options = {}) {
   }
 
   return payload;
+}
+
+async function attendanceRequest(primaryPath, fallbackPath, options = {}) {
+  try {
+    return normalizeAttendanceResponse(await staffRequest(primaryPath, options));
+  } catch (error) {
+    if (error.message !== "Route not found") {
+      throw error;
+    }
+
+    return normalizeAttendanceResponse(await staffRequest(fallbackPath, options));
+  }
+}
+
+function normalizeAttendanceResponse(payload) {
+  const attendance = payload?.data?.attendance;
+
+  if (!attendance) {
+    return payload;
+  }
+
+  const statusMap = {
+    IN_SHIFT: "CHECKED_IN",
+    COMPLETED: "CHECKED_OUT",
+  };
+
+  const totalHours =
+    attendance.total_hours !== undefined
+      ? Number(attendance.total_hours || 0)
+      : Number(((attendance.total_minutes || 0) / 60).toFixed(2));
+
+  return {
+    ...payload,
+    data: {
+      ...payload.data,
+      attendance: {
+        ...attendance,
+        status: statusMap[attendance.status] || attendance.status,
+        check_in_time: attendance.check_in_time || attendance.check_in_at || null,
+        check_out_time: attendance.check_out_time || attendance.check_out_at || null,
+        total_hours: totalHours,
+      },
+    },
+  };
 }
 
 function withQuery(path, params = {}) {
@@ -94,18 +138,18 @@ export function useAppointmentMaterials(appointmentId, { items, notes } = {}) {
 }
 
 export function getTodayAttendance() {
-  return staffRequest("/staff/attendance/today");
+  return attendanceRequest("/staff/attendance/today", "/attendance/today");
 }
 
 export function checkInStaff(note = "") {
-  return staffRequest("/staff/attendance/check-in", {
+  return attendanceRequest("/staff/attendance/check-in", "/attendance/check-in", {
     method: "POST",
     body: JSON.stringify({ note }),
   });
 }
 
 export function checkOutStaff(note = "") {
-  return staffRequest("/staff/attendance/check-out", {
+  return attendanceRequest("/staff/attendance/check-out", "/attendance/check-out", {
     method: "POST",
     body: JSON.stringify({ note }),
   });

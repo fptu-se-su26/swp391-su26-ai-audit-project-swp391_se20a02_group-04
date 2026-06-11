@@ -38,7 +38,7 @@ const materialUsageValidation = [
 
 router.get('/inventory',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   inventoryQueryValidation,
   validate,
   staffInventoryController.getStaffInventoryItems
@@ -46,7 +46,7 @@ router.get('/inventory',
 
 router.get('/inventory/low-stock',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   validate,
@@ -55,7 +55,7 @@ router.get('/inventory/low-stock',
 
 router.get('/appointments/:id/materials',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   param('id').isMongoId().withMessage('Invalid appointment ID'),
   validate,
   staffInventoryController.getAppointmentMaterials
@@ -63,7 +63,7 @@ router.get('/appointments/:id/materials',
 
 router.post('/appointments/:id/materials',
   authenticate,
-  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  authorize('STAFF'),
   materialUsageValidation,
   validate,
   staffInventoryController.useAppointmentMaterials

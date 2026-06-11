@@ -25,27 +25,27 @@ describe('staff model validation', () => {
     const attendance = new StaffAttendance({
       staff_id: new mongoose.Types.ObjectId(),
       work_date: '10/06/2026',
-      check_in_at: new Date()
+      check_in_time: new Date()
     });
 
     const error = attendance.validateSync();
     expect(error.errors.work_date).toBeDefined();
   });
 
-  test('finishShift calculates total minutes and status', () => {
+  test('checkOut calculates total hours and status', () => {
     const checkIn = new Date('2026-06-10T08:00:00.000Z');
     const checkOut = new Date('2026-06-10T11:30:00.000Z');
     const attendance = new StaffAttendance({
       staff_id: new mongoose.Types.ObjectId(),
       work_date: '2026-06-10',
-      check_in_at: checkIn
+      check_in_time: checkIn
     });
 
-    attendance.finishShift(checkOut, 'done');
+    attendance.checkOut(checkOut);
 
-    expect(attendance.status).toBe('COMPLETED');
-    expect(attendance.total_minutes).toBe(210);
-    expect(attendance.check_out_note).toBe('done');
+    expect(attendance.status).toBe('CHECKED_OUT');
+    expect(attendance.total_hours).toBe(3.5);
+    expect(attendance.check_out_time).toEqual(checkOut);
   });
 
   test('new staff audit actions are valid', () => {
