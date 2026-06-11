@@ -19,6 +19,9 @@ const AUTH_MESSAGE_TRANSLATIONS = [
     "Tài khoản này được tạo bằng Google. Vui lòng đăng nhập bằng Google.",
   ],
   ["Login failed", "Đăng nhập thất bại. Vui lòng thử lại."],
+  ["Google authentication failed", "Đăng nhập Google thất bại. Vui lòng thử lại."],
+  ["Google ID token is required", "Không nhận được mã xác thực Google."],
+  ["Account created successfully with Google", "Tạo tài khoản Google thành công."],
   ["Email is required", "Vui lòng nhập email."],
   ["Please provide a valid email address", "Email không hợp lệ."],
   ["Phone number is required", "Vui lòng nhập số điện thoại."],
@@ -221,6 +224,13 @@ export function login(credentials) {
   return request("/auth/login", {
     method: "POST",
     body: JSON.stringify(credentials),
+  });
+}
+
+export function googleLogin(idToken) {
+  return request("/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ id_token: idToken }),
   });
 }
 

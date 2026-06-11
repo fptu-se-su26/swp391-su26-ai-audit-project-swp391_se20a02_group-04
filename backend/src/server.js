@@ -12,6 +12,8 @@ const userRoutes = require('./routes/user.routes');
 const serviceRoutes = require('./routes/service.routes');
 const appointmentRoutes = require('./routes/appointment.routes');
 const staffAppointmentRoutes = require('./routes/staff.appointment.routes');
+const staffInventoryRoutes = require('./routes/staff.inventory.routes');
+const staffAttendanceRoutes = require('./routes/staff.attendance.routes');
 const adminUserRoutes = require('./routes/admin.user.routes');
 const adminAppointmentRoutes = require('./routes/admin.appointment.routes');
 const adminInventoryRoutes = require('./routes/admin.inventory.routes');
@@ -50,6 +52,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/staff', staffAppointmentRoutes);
+app.use('/api/staff', staffInventoryRoutes);
+app.use('/api/staff', staffAttendanceRoutes);
 app.use('/api/admin', adminUserRoutes);
 app.use('/api/admin', adminAppointmentRoutes);
 app.use('/api/admin', adminInventoryRoutes);
@@ -68,6 +72,16 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+
+process.on('uncaughtException', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use. Stop the running backend process before starting a new one.`);
+    process.exit(1);
+  }
+
+  console.error('Server failed to start:', error);
+  process.exit(1);
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);

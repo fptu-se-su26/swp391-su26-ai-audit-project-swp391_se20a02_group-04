@@ -107,8 +107,9 @@
   width: min(100%, 430px);
 }
 
-.mobile-login-brand {
-  display: none;
+.login-home-logo {
+  margin-bottom: 34px;
+  color: #191c1d;
 }
 
 .login-heading {
@@ -298,11 +299,24 @@
 
 .social-login-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
-.social-login-grid button {
+.google-login-button {
+  display: grid;
+  min-height: 48px;
+}
+
+.google-login-button > div,
+.google-login-button iframe {
+  width: 100% !important;
+}
+
+.google-login-button iframe {
+  border-radius: 10px !important;
+}
+
+.google-login-fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -317,14 +331,21 @@
   font-weight: 700;
 }
 
-.social-login-grid button:hover {
+.google-login-fallback:disabled {
+  color: rgba(90, 65, 54, 0.55);
+  cursor: not-allowed;
+}
+
+.google-login-fallback:not(:disabled):hover {
   background: #f3f4f5;
 }
 
-.social-login-grid img {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
+.google-login-status {
+  margin: 0;
+  color: #5a4136;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .signup-copy {
@@ -397,21 +418,19 @@
     padding: 38px 22px;
   }
 
-  .mobile-login-brand {
+  .login-home-logo {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    width: 100%;
+    gap: 10px;
     margin-bottom: 36px;
     color: #a04100;
-    font-size: 24px;
-    font-weight: 900;
-    letter-spacing: -0.03em;
-    text-decoration: none;
   }
 
-  .mobile-login-brand .material-symbols-outlined {
-    font-size: 52px;
+  .login-home-logo img {
+    width: 64px;
+    height: 64px;
   }
 
   .login-heading {

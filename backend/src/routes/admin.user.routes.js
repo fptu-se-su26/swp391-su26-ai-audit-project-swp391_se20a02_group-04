@@ -37,6 +37,11 @@ const assignRoleValidation = [
     .withMessage('Invalid role name')
 ];
 
+const banUserValidation = [
+  body('reason').optional().trim().isLength({ max: 500 })
+    .withMessage('Reason cannot exceed 500 characters')
+];
+
 const lockUserValidation = [
   body('duration').optional().isInt({ min: 1, max: 10080 })
     .withMessage('Duration must be between 1 and 10080 minutes (7 days)'),
@@ -141,6 +146,47 @@ router.delete('/users/:id/roles/:roleId',
   param('roleId').isMongoId().withMessage('Invalid role ID'),
   validate,
   adminUserController.removeRole
+);
+
+/**
+ * @route   PUT /api/admin/users/:id/role
+ * @desc    Replace user's primary role
+ * @access  Private/Admin
+ */
+router.put('/users/:id/role',
+  authenticate,
+  authorize('ADMIN'),
+  param('id').isMongoId().withMessage('Invalid user ID'),
+  assignRoleValidation,
+  validate,
+  adminUserController.replaceUserRole
+);
+
+/**
+ * @route   PUT /api/admin/users/:id/ban
+ * @desc    Ban user account
+ * @access  Private/Admin
+ */
+router.put('/users/:id/ban',
+  authenticate,
+  authorize('ADMIN'),
+  param('id').isMongoId().withMessage('Invalid user ID'),
+  banUserValidation,
+  validate,
+  adminUserController.banUser
+);
+
+/**
+ * @route   PUT /api/admin/users/:id/unban
+ * @desc    Unban user account
+ * @access  Private/Admin
+ */
+router.put('/users/:id/unban',
+  authenticate,
+  authorize('ADMIN'),
+  param('id').isMongoId().withMessage('Invalid user ID'),
+  validate,
+  adminUserController.unbanUser
 );
 
 /**

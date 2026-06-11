@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "../../styles/home/HomePage.css";
-import { clearAuthSession } from "../../services/authApi";
+import { clearAuthSession, getAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
 
 const services = [
@@ -59,28 +59,42 @@ function MaterialIcon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
 }
 
+const DEFAULT_AVATAR =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6d1f"/></svg>';
+
 export default function HomePage() {
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [user, setUser] = useState({
-    fullname: "Nguyễn Hoàng Nam",
-    email: "namnh.customer@gmail.com",
-    avatar: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6d1f"/></svg>'
-  });
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
+    const normalizeUser = (sourceUser) => ({
+      fullname: sourceUser.full_name || sourceUser.fullname || sourceUser.name || "",
+      email: sourceUser.email || "",
+      avatar: sourceUser.avatar || sourceUser.avatar_url || DEFAULT_AVATAR,
+    });
+
     const fetchUserData = async () => {
+      const session = getAuthSession();
+
+      if (!session.accessToken) {
+        setUser(null);
+        setShowUserMenu(false);
+        return;
+      }
+
+      if (session.user) {
+        setUser(normalizeUser(session.user));
+      }
+
       try {
         const res = await profileService.getMe();
         if (res && res.success && res.data) {
           const apiUser = res.data.user || res.data;
-          setUser({
-            fullname: apiUser.full_name || apiUser.fullname || "Nguyễn Hoàng Nam",
-            email: apiUser.email || "namnh.customer@gmail.com",
-            avatar: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6d1f"/></svg>'
-          });
+          setUser(normalizeUser(apiUser));
         }
       } catch (e) {
-        console.log("Offline or not logged in, using default profile info");
+        setUser(null);
+        setShowUserMenu(false);
       }
     };
     fetchUserData();
@@ -125,11 +139,13 @@ export default function HomePage() {
           <a className="home-contact-button" href="/booking">
             Liên hệ ngay
           </a>
-          <button className="user-menu-trigger" type="button" aria-label="Menu" onClick={() => setShowUserMenu(!showUserMenu)}>
-            <MaterialIcon>menu</MaterialIcon>
-          </button>
+          {user && (
+            <button className="user-menu-trigger" type="button" aria-label="Menu" onClick={() => setShowUserMenu(!showUserMenu)}>
+              <MaterialIcon>menu</MaterialIcon>
+            </button>
+          )}
 
-          {showUserMenu && (
+          {user && showUserMenu && (
             <div className="user-dropdown-menu">
               <a href="/profile?tab=info" className="dropdown-user-info" onClick={() => setShowUserMenu(false)}>
                 <div className="dropdown-avatar">

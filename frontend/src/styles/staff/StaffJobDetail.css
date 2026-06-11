@@ -100,6 +100,11 @@
   gap: 12px;
 }
 
+.detail-main-stack {
+  display: grid;
+  gap: 24px;
+}
+
 .action-stack {
   flex-direction: column;
 }
@@ -107,6 +112,10 @@
 .muted-copy {
   margin: 0;
   line-height: 1.6;
+}
+
+.sub-panel-title {
+  margin-top: 24px !important;
 }
 
 .confirm-panel,
@@ -139,6 +148,20 @@
 .form-actions {
   justify-content: flex-end;
   flex-wrap: wrap;
+}
+
+.disabled-link {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.complete-panel input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  outline: none;
 }
 
 .material-pick-grid {
