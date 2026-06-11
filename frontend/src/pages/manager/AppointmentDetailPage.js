@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Bell,
@@ -27,6 +27,16 @@ import {
 } from "lucide-react";
 import "../../styles/manager/AppointmentDetailTheme.css";
 import "../../styles/manager/AppointmentDetailPage.css";
+import {
+  mockCancelAppointmentDetail,
+  mockCompleteAppointment,
+  mockConfirmAppointment,
+  mockPrintServiceTicket,
+  mockSendAppointmentEmail,
+  mockSendAppointmentSms,
+  mockStartAppointmentProcessing,
+  mockUpdateAppointmentSchedule
+} from "../../services/appointmentDetailMockApi";
 
 const pendingStatuses = ["pending", "waiting_confirmation"];
 
@@ -118,11 +128,109 @@ const getPriorityText = (priority) => {
   return labels[priority] || labels.medium;
 };
 
-export default function AppointmentDetailPage({ appointment, onBack, onConfirm, onStart, onComplete }) {
-  const detail = buildAppointmentDetail(appointment);
+const toDateInputValue = (dateValue) => {
+  if (!dateValue) return "";
+  const normalized = String(dateValue).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(normalized)) {
+    const [day, month, year] = normalized.split("/");
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  return normalized;
+};
+
+export default function AppointmentDetailPage({
+  appointment,
+  onBack,
+  onConfirm,
+  onStart,
+  onComplete,
+  onUpdateSchedule,
+  onCancel,
+  onAppointmentChange
+}) {
+  const [localAppointment, setLocalAppointment] = useState(appointment || {});
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+  const [editDraft, setEditDraft] = useState(null);
+  const detail = buildAppointmentDetail(localAppointment);
   const isApproved = !pendingStatuses.includes(detail.status);
   const totalPrice = detail.services.reduce((sum, item) => sum + item.price, 0);
   const progress = detail.status === "done" ? 100 : detail.status === "processing" ? 75 : detail.status === "confirmed" ? 50 : 25;
+
+  useEffect(() => {
+    setLocalAppointment(appointment || {});
+  }, [appointment]);
+
+  const applyAppointmentUpdate = (updatedAppointment) => {
+    setLocalAppointment(updatedAppointment);
+    onAppointmentChange?.(updatedAppointment);
+  };
+
+  const runMappedOrFallbackAction = async (handler, fallback, currentAppointment, payload) => {
+    const result = handler ? await handler(currentAppointment, payload) : undefined;
+    return result === undefined ? fallback(currentAppointment, payload) : result;
+  };
+
+  const getUpdatedAppointmentFromResult = (result, fallbackAppointment) => {
+    if (!result) return fallbackAppointment;
+    if (result.data?.appointment) return result.data.appointment;
+    if (result.data && !result.data.appointment) return result.data;
+    if (result.appointment) return result.appointment;
+    return result;
+  };
+
+  const runAppointmentAction = async (request, afterSuccess) => {
+    if (isActionLoading) return;
+    setIsActionLoading(true);
+    setActionMessage("");
+
+    try {
+      const result = await request(localAppointment);
+      const updatedAppointment = getUpdatedAppointmentFromResult(result, localAppointment);
+      applyAppointmentUpdate(updatedAppointment);
+      afterSuccess?.(updatedAppointment);
+      setActionMessage(result.message || "Thao tác đã hoàn tất.");
+    } catch (error) {
+      setActionMessage(error.message || "Không thể hoàn tất thao tác. Vui lòng thử lại.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const openEditModal = () => {
+    setEditDraft({
+      appointmentDate: toDateInputValue(localAppointment.apiDate || detail.appointmentDate),
+      appointmentHour: detail.appointmentHour,
+      channel: detail.channel,
+      customerNote: detail.customerNote
+    });
+    setActionMessage("");
+  };
+
+  const closeEditModal = () => {
+    if (!isActionLoading) setEditDraft(null);
+  };
+
+  const submitScheduleEdit = async (event) => {
+    event.preventDefault();
+    if (!editDraft || isActionLoading) return;
+    setIsActionLoading(true);
+    setActionMessage("");
+
+    try {
+      const result = await runMappedOrFallbackAction(onUpdateSchedule, mockUpdateAppointmentSchedule, localAppointment, editDraft);
+      applyAppointmentUpdate(getUpdatedAppointmentFromResult(result, localAppointment));
+      setEditDraft(null);
+      setActionMessage(result.message || "Đã cập nhật lịch hẹn.");
+    } catch (error) {
+      setActionMessage(error.message || "Không thể cập nhật lịch hẹn. Vui lòng thử lại.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
 
   return (
     <div className="appointment-detail-page">
@@ -157,12 +265,28 @@ export default function AppointmentDetailPage({ appointment, onBack, onConfirm, 
           <QuickInfoCard appointment={detail} totalPrice={totalPrice} progress={progress} isApproved={isApproved} />
           <FooterActions
             status={detail.status}
-            onConfirm={onConfirm}
-            onStart={onStart}
-            onComplete={onComplete}
+            isLoading={isActionLoading}
+            onConfirm={() => runAppointmentAction((current) => runMappedOrFallbackAction(onConfirm, mockConfirmAppointment, current))}
+            onStart={() => runAppointmentAction((current) => runMappedOrFallbackAction(onStart, mockStartAppointmentProcessing, current))}
+            onComplete={() => runAppointmentAction((current) => runMappedOrFallbackAction(onComplete, mockCompleteAppointment, current))}
+            onEdit={openEditModal}
+            onPrint={() => runAppointmentAction(mockPrintServiceTicket)}
+            onSendSms={() => runAppointmentAction(mockSendAppointmentSms)}
+            onSendEmail={() => runAppointmentAction(mockSendAppointmentEmail)}
+            onCancel={() => runAppointmentAction((current) => runMappedOrFallbackAction(onCancel, mockCancelAppointmentDetail, current))}
           />
+          {actionMessage && <p className="appointment-action-message">{actionMessage}</p>}
         </aside>
       </div>
+      {editDraft && (
+        <EditScheduleModal
+          draft={editDraft}
+          isLoading={isActionLoading}
+          onChange={setEditDraft}
+          onClose={closeEditModal}
+          onSubmit={submitScheduleEdit}
+        />
+      )}
     </div>
   );
 }
@@ -430,7 +554,18 @@ function QuickInfoCard({ appointment, totalPrice, progress, isApproved }) {
   );
 }
 
-function FooterActions({ status, onConfirm, onStart, onComplete }) {
+function FooterActions({
+  status,
+  isLoading,
+  onConfirm,
+  onStart,
+  onComplete,
+  onEdit,
+  onPrint,
+  onSendSms,
+  onSendEmail,
+  onCancel
+}) {
   const isApproved = !pendingStatuses.includes(status);
   const primaryAction =
     status === "processing"
@@ -442,34 +577,100 @@ function FooterActions({ status, onConfirm, onStart, onComplete }) {
           : status === "cancelled"
             ? { label: "Lịch hẹn đã hủy", onClick: undefined }
             : { label: "Xác nhận lịch hẹn", onClick: onConfirm };
-  const isPrimaryDisabled = !primaryAction.onClick;
+  const isPrimaryDisabled = !primaryAction.onClick || isLoading;
 
   return (
     <section className="appointment-detail-card action-card">
       <p className="side-title muted">Hành động</p>
       <button className="detail-primary-btn" onClick={primaryAction.onClick} disabled={isPrimaryDisabled}>
-        <CheckCircle2 size={17} /> {primaryAction.label}
+        <CheckCircle2 size={17} /> {isLoading ? "Đang xử lý..." : primaryAction.label}
       </button>
       {isApproved && (
-        <button className="detail-print-btn">
+        <button className="detail-print-btn" onClick={onPrint} disabled={isLoading}>
           <Printer size={17} /> In phiếu dịch vụ
         </button>
       )}
       <div className="detail-secondary-grid">
-        <SecondaryButton icon={Edit3} label="Chỉnh sửa" />
-        <SecondaryButton icon={MessageSquare} label="Gửi SMS" />
-        <SecondaryButton icon={Send} label="Gửi Email" />
-        <SecondaryButton icon={XCircle} label="Hủy lịch" danger />
+        <SecondaryButton icon={Edit3} label="Chỉnh sửa" onClick={onEdit} disabled={isLoading} />
+        <SecondaryButton icon={MessageSquare} label="Gửi SMS" onClick={onSendSms} disabled={isLoading} />
+        <SecondaryButton icon={Send} label="Gửi Email" onClick={onSendEmail} disabled={isLoading} />
+        <SecondaryButton icon={XCircle} label="Hủy lịch" onClick={onCancel} disabled={isLoading} danger />
       </div>
     </section>
   );
 }
 
-function SecondaryButton({ icon: Icon, label, danger }) {
+function SecondaryButton({ icon: Icon, label, danger, disabled, onClick }) {
   return (
-    <button className={`detail-secondary-btn ${danger ? "danger" : ""}`}>
+    <button className={`detail-secondary-btn ${danger ? "danger" : ""}`} onClick={onClick} disabled={disabled}>
       <Icon size={15} /> {label}
     </button>
+  );
+}
+
+function EditScheduleModal({ draft, isLoading, onChange, onClose, onSubmit }) {
+  const updateDraft = (field, value) => {
+    onChange((current) => ({ ...current, [field]: value }));
+  };
+
+  return (
+    <div className="appointment-edit-backdrop" role="presentation">
+      <form className="appointment-edit-modal" onSubmit={onSubmit}>
+        <div className="appointment-edit-header">
+          <div>
+            <p>Sửa lịch hẹn</p>
+            <h3>Cập nhật thông tin lịch</h3>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Đóng" disabled={isLoading}>
+            <XCircle size={20} />
+          </button>
+        </div>
+
+        <div className="appointment-edit-grid">
+          <label>
+            <span>Ngày hẹn</span>
+            <input
+              type="date"
+              value={draft.appointmentDate}
+              onChange={(event) => updateDraft("appointmentDate", event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Giờ hẹn</span>
+            <input
+              value={draft.appointmentHour}
+              onChange={(event) => updateDraft("appointmentHour", event.target.value)}
+              placeholder="09:00"
+            />
+          </label>
+          <label>
+            <span>Kênh đặt lịch</span>
+            <input
+              value={draft.channel}
+              onChange={(event) => updateDraft("channel", event.target.value)}
+              placeholder="Website"
+            />
+          </label>
+          <label className="wide">
+            <span>Ghi chú khách hàng</span>
+            <textarea
+              value={draft.customerNote}
+              onChange={(event) => updateDraft("customerNote", event.target.value)}
+              rows={4}
+            />
+          </label>
+        </div>
+
+        <div className="appointment-edit-actions">
+          <button type="button" className="detail-secondary-btn" onClick={onClose} disabled={isLoading}>
+            Hủy
+          </button>
+          <button type="submit" className="detail-primary-btn" disabled={isLoading}>
+            {isLoading ? "Đang lưu..." : "Sửa lịch"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Calendar,
@@ -22,6 +22,15 @@ import {
 import "../../styles/admin/AdminDashboard.css";
 import "../../styles/admin/AdminCalendar.css";
 import AppointmentDetailPage from "../manager/AppointmentDetailPage";
+import {
+  cancelAdminAppointment,
+  getAdminAppointmentStatistics,
+  getAdminAppointments,
+  getMappedAdminAppointmentById,
+  mapAdminAppointment,
+  updateAdminAppointment,
+  updateAdminAppointmentStatus,
+} from "../../services/adminAppointmentApi";
 
 const appointmentKpis = [
   ["Tổng lịch", "128", ClipboardList, "neutral", "+12 lịch tuần này"],
@@ -37,7 +46,7 @@ const workflowSteps = [
   ["completed", "Hoàn tất", "31"],
 ];
 
-const appointments = [
+const fallbackAppointments = [
   {
     id: "#MC-99281",
     service: "Bảo dưỡng định kỳ 10.000km",
@@ -150,11 +159,136 @@ function ManagerSidebar({ activeView, onViewChange }) {
 const AdminCalendar = ({ onViewChange }) => {
   const [activeFilter, setActiveFilter] = useState("all");
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentStats, setAppointmentStats] = useState(null);
+  const [isUsingFallback, setIsUsingFallback] = useState(false);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAppointmentsFromDatabase() {
+      setIsLoadingAppointments(true);
+
+      try {
+        const [appointmentsResponse, statisticsResponse] = await Promise.all([
+          getAdminAppointments({ limit: 100, sort_by: "appointment_date", sort_order: "desc" }),
+          getAdminAppointmentStatistics({ period: 7 }),
+        ]);
+
+        if (!isMounted) return;
+
+        const nextAppointments = (appointmentsResponse.data?.appointments || []).map(mapAdminAppointment);
+        setAppointments(nextAppointments);
+        setAppointmentStats(statisticsResponse.data?.overview || null);
+        setIsUsingFallback(false);
+      } catch (error) {
+        if (!isMounted) return;
+        console.warn("Admin appointments API unavailable, using fallback data:", error.message);
+        setAppointments(fallbackAppointments);
+        setAppointmentStats(null);
+        setIsUsingFallback(true);
+      } finally {
+        if (isMounted) setIsLoadingAppointments(false);
+      }
+    }
+
+    loadAppointmentsFromDatabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const counts = useMemo(() => {
+    const localCounts = appointments.reduce(
+      (summary, item) => ({
+        ...summary,
+        [item.status]: (summary[item.status] || 0) + 1,
+      }),
+      {}
+    );
+
+    return {
+      total: appointmentStats?.total ?? appointments.length,
+      pending: appointmentStats?.pending ?? localCounts.PENDING ?? 0,
+      confirmed: appointmentStats?.confirmed ?? localCounts.CONFIRMED ?? 0,
+      inProgress: appointmentStats?.in_progress ?? localCounts.IN_PROGRESS ?? 0,
+      completed: appointmentStats?.completed ?? localCounts.COMPLETED ?? 0,
+      completionRate: appointmentStats?.completion_rate ?? 0,
+    };
+  }, [appointmentStats, appointments]);
+
+  const dashboardKpis = useMemo(() => {
+    if (isUsingFallback && !appointmentStats) return appointmentKpis;
+
+    return [
+    ["Tổng lịch", counts.total, ClipboardList, "neutral", isUsingFallback ? "Dữ liệu mẫu" : "Từ database"],
+    ["Chờ xác nhận", counts.pending, Timer, "warning", "Cần xử lý"],
+    ["Đang xử lý", counts.inProgress, Wrench, "progress", "Đang trong garage"],
+    ["Hoàn tất", counts.completed, CheckCircle2, "success", `Tỷ lệ hoàn tất ${counts.completionRate}%`],
+    ];
+  }, [appointmentStats, counts, isUsingFallback]);
+
+  const workflowStats = useMemo(() => {
+    if (isUsingFallback && !appointmentStats) return workflowSteps;
+
+    return [
+    ["pending", "Chờ xác nhận", counts.pending],
+    ["confirmed", "Đã xác nhận", counts.confirmed],
+    ["progress", "Đang xử lý", counts.inProgress],
+    ["completed", "Hoàn tất", counts.completed],
+    ];
+  }, [appointmentStats, counts, isUsingFallback]);
+
+  const updateAppointmentRow = (updatedAppointment) => {
+    setAppointments((current) =>
+      current.map((item) => (item.id === updatedAppointment.id || item.rawId === updatedAppointment.rawId ? updatedAppointment : item))
+    );
+    setSelectedAppointment(updatedAppointment);
+  };
+
+  const refreshAppointmentFromDatabase = async (appointment) => {
+    if (!appointment.rawId) return undefined;
+    const updatedAppointment = await getMappedAdminAppointmentById(appointment.rawId);
+    updateAppointmentRow(updatedAppointment);
+    return updatedAppointment;
+  };
+
+  const updateStatusFromDatabase = async (appointment, status) => {
+    if (!appointment.rawId) return undefined;
+    await updateAdminAppointmentStatus(appointment.rawId, status);
+    return refreshAppointmentFromDatabase(appointment);
+  };
+
+  const updateScheduleFromDatabase = async (appointment, payload) => {
+    if (!appointment.rawId) return undefined;
+    await updateAdminAppointment(appointment.rawId, payload);
+    return refreshAppointmentFromDatabase(appointment);
+  };
+
+  const cancelFromDatabase = async (appointment) => {
+    if (!appointment.rawId) return undefined;
+    await cancelAdminAppointment(appointment.rawId);
+    const cancelledAppointment = { ...appointment, status: "CANCELLED", statusText: "Đã hủy" };
+    updateAppointmentRow(cancelledAppointment);
+    return cancelledAppointment;
+  };
+
+  const openAppointmentDetail = async (appointment) => {
+    setSelectedAppointment(appointment);
+
+    try {
+      await refreshAppointmentFromDatabase(appointment);
+    } catch (error) {
+      console.warn("Could not load real appointment detail:", error.message);
+    }
+  };
 
   const filteredAppointments = useMemo(() => {
     if (activeFilter === "all") return appointments;
     return appointments.filter((item) => item.status === activeFilter);
-  }, [activeFilter]);
+  }, [activeFilter, appointments]);
 
   return (
     <div className="calendar-layout dashboard-layout">
@@ -166,9 +300,12 @@ const AdminCalendar = ({ onViewChange }) => {
             <AppointmentDetailPage
               appointment={selectedAppointment}
               onBack={() => setSelectedAppointment(null)}
-              onConfirm={() => setSelectedAppointment((current) => current ? { ...current, status: "CONFIRMED", statusText: "Đã xác nhận" } : current)}
-              onStart={() => setSelectedAppointment((current) => current ? { ...current, status: "IN_PROGRESS", statusText: "Đang xử lý" } : current)}
-              onComplete={() => setSelectedAppointment((current) => current ? { ...current, status: "COMPLETED", statusText: "Hoàn tất" } : current)}
+              onConfirm={(appointment) => updateStatusFromDatabase(appointment, "CONFIRMED")}
+              onStart={(appointment) => updateStatusFromDatabase(appointment, "IN_PROGRESS")}
+              onComplete={(appointment) => updateStatusFromDatabase(appointment, "COMPLETED")}
+              onUpdateSchedule={updateScheduleFromDatabase}
+              onCancel={cancelFromDatabase}
+              onAppointmentChange={updateAppointmentRow}
             />
           </div>
         ) : (
@@ -191,8 +328,14 @@ const AdminCalendar = ({ onViewChange }) => {
         </header>
 
         <div className="calendar-body">
+          {(isLoadingAppointments || isUsingFallback) && (
+            <p className={`calendar-data-note ${isUsingFallback ? "warning" : ""}`}>
+              {isLoadingAppointments ? "Đang tải dữ liệu lịch hẹn từ database..." : "API lịch hẹn chưa sẵn sàng, đang hiển thị dữ liệu mẫu."}
+            </p>
+          )}
+
           <section className="calendar-kpi-grid" aria-label="Tổng hợp lịch hẹn">
-            {appointmentKpis.map(([label, value, Icon, tone, note]) => (
+            {dashboardKpis.map(([label, value, Icon, tone, note]) => (
               <article className={`calendar-kpi-card ${tone}`} key={label}>
                 <div>
                   <span>{label}</span>
@@ -205,11 +348,11 @@ const AdminCalendar = ({ onViewChange }) => {
           </section>
 
           <section className="workflow-card" aria-label="Trạng thái quy trình">
-            {workflowSteps.map(([tone, label, count], index) => (
+            {workflowStats.map(([tone, label, count], index) => (
               <div className={`workflow-step ${tone}`} key={label}>
                 <span>{count}</span>
                 <strong>{label}</strong>
-                {index < workflowSteps.length - 1 && <em />}
+                {index < workflowStats.length - 1 && <em />}
               </div>
             ))}
           </section>
@@ -243,6 +386,10 @@ const AdminCalendar = ({ onViewChange }) => {
             </div>
 
             <div className="table-body">
+              {!isLoadingAppointments && filteredAppointments.length === 0 && (
+                <div className="calendar-empty-row">Không có lịch hẹn phù hợp.</div>
+              )}
+
               {filteredAppointments.map((item) => (
                 <article className="table-row" key={item.id}>
                   <div className="col-id font-bold">{item.id}</div>
@@ -275,7 +422,7 @@ const AdminCalendar = ({ onViewChange }) => {
                     <button
                       className="detail-link"
                       type="button"
-                      onClick={() => setSelectedAppointment(item)}
+                      onClick={() => openAppointmentDetail(item)}
                     >
                       Chi tiết <ChevronRight size={16} />
                     </button>

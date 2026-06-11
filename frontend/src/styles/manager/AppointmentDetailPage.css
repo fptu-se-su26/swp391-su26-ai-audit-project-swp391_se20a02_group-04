@@ -764,6 +764,134 @@
   background: var(--appointment-brand-red-soft);
 }
 
+:where(.manager-layout, .appointment-detail-scope) .detail-print-btn:disabled,
+:where(.manager-layout, .appointment-detail-scope) .detail-secondary-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-action-message {
+  margin: -8px 2px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--appointment-success-soft);
+  border-radius: var(--appointment-radius-md);
+  background: var(--appointment-success-soft);
+  color: var(--appointment-success);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: oklch(0 0 0 / 0.42);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-modal {
+  width: min(620px, 100%);
+  border: 1px solid var(--appointment-border);
+  border-radius: var(--appointment-radius-2xl);
+  background: var(--appointment-card);
+  box-shadow: 0 24px 70px oklch(0 0 0 / 0.18);
+  padding: 24px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-header,
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-header {
+  margin-bottom: 20px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-header p {
+  margin: 0 0 4px;
+  color: var(--appointment-brand-red);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-header h3 {
+  margin: 0;
+  color: var(--appointment-foreground);
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-header button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--appointment-border);
+  border-radius: var(--appointment-radius-md);
+  background: var(--appointment-card);
+  color: var(--appointment-muted-foreground);
+  cursor: pointer;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-grid label.wide {
+  grid-column: 1 / -1;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-grid span {
+  color: var(--appointment-muted-foreground);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-grid input,
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-grid textarea {
+  width: 100%;
+  border: 1px solid var(--appointment-border);
+  border-radius: var(--appointment-radius-md);
+  background: var(--appointment-card);
+  color: var(--appointment-foreground);
+  font: inherit;
+  font-size: 0.92rem;
+  outline: none;
+  padding: 12px 14px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-grid input:focus,
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-grid textarea:focus {
+  border-color: var(--appointment-ring);
+  box-shadow: 0 0 0 3px var(--appointment-brand-red-soft);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-actions {
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-actions .detail-secondary-btn,
+:where(.manager-layout, .appointment-detail-scope) .appointment-edit-actions .detail-primary-btn {
+  width: auto;
+  min-width: 118px;
+  padding: 12px 18px;
+}
+
 @media (max-width: 1180px) {
   :where(.manager-layout, .appointment-detail-scope) .appointment-detail-grid {
     grid-template-columns: 1fr;
@@ -801,5 +929,9 @@
   :where(.manager-layout, .appointment-detail-scope) .appointment-last-update {
     margin-left: 0;
     width: 100%;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .appointment-edit-grid {
+    grid-template-columns: 1fr;
   }
 }

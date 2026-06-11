@@ -291,6 +291,11 @@ const ManagerLayout = () => {
               updateAppointmentStatus(selectedAppointment.id, "COMPLETED", "Hoàn tất");
               triggerToast("Đã hoàn tất lịch hẹn.", "success");
             }}
+            onAppointmentChange={(updatedAppointment) => {
+              setAppointments((prev) =>
+                prev.map((item) => (item.id === updatedAppointment.id ? { ...item, ...updatedAppointment } : item))
+              );
+            }}
           />
         );
       case "staff":
