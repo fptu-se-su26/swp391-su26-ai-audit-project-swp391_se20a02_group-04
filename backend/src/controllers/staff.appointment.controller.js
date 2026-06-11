@@ -3,6 +3,17 @@ const Service = require('../models/Service.model');
 const User = require('../models/User.model');
 const UserAudit = require('../models/UserAudit.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
+const mongoose = require('mongoose');
+
+const toDateString = (date = new Date()) => {
+  return date.toISOString().slice(0, 10);
+};
+
+const getDateDaysAgo = (days) => {
+  const date = new Date();
+  date.setDate(date.getDate() - Number(days || 0));
+  return toDateString(date);
+};
 
 /**
  * Get staff's assigned appointments
@@ -30,10 +41,10 @@ const getMyAssignedAppointments = async (req, res) => {
     if (date_from || date_to) {
       query.appointment_date = {};
       if (date_from) {
-        query.appointment_date.$gte = new Date(date_from);
+        query.appointment_date.$gte = date_from;
       }
       if (date_to) {
-        query.appointment_date.$lte = new Date(date_to);
+        query.appointment_date.$lte = date_to;
       }
     }
 
@@ -101,10 +112,10 @@ const getAllAppointments = async (req, res) => {
     if (date_from || date_to) {
       query.appointment_date = {};
       if (date_from) {
-        query.appointment_date.$gte = new Date(date_from);
+        query.appointment_date.$gte = date_from;
       }
       if (date_to) {
-        query.appointment_date.$lte = new Date(date_to);
+        query.appointment_date.$lte = date_to;
       }
     }
 
@@ -305,15 +316,10 @@ const addAppointmentNotes = async (req, res) => {
  */
 const getTodayAppointments = async (req, res) => {
   try {
-    const today = new Date();
-    const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+    const today = toDateString();
 
     const query = {
-      appointment_date: {
-        $gte: startOfDay,
-        $lte: endOfDay
-      }
+      appointment_date: today
     };
 
     // If staff, show only their appointments. If admin/manager, show all
@@ -330,7 +336,7 @@ const getTodayAppointments = async (req, res) => {
     return successResponse(res, 200, "Today's appointments retrieved successfully", {
       appointments,
       total: appointments.length,
-      date: startOfDay.toISOString().split('T')[0]
+      date: today
     });
 
   } catch (error) {
@@ -346,10 +352,13 @@ const getTodayAppointments = async (req, res) => {
 const getMyWorkloadStats = async (req, res) => {
   try {
     const { period = '30' } = req.query; // days
-    const daysAgo = new Date();
-    daysAgo.setDate(daysAgo.getDate() - parseInt(period));
-
     const staffId = req.user.userId;
+    const dateFrom = getDateDaysAgo(parseInt(period));
+    const sevenDaysAgo = getDateDaysAgo(7);
+    const today = toDateString();
+    const staffObjectId = mongoose.Types.ObjectId.isValid(staffId)
+      ? new mongoose.Types.ObjectId(staffId)
+      : staffId;
 
     // Get staff's appointment statistics
     const [
@@ -361,12 +370,12 @@ const getMyWorkloadStats = async (req, res) => {
     ] = await Promise.all([
       Appointment.countDocuments({ 
         staff_id: staffId,
-        created_at: { $gte: daysAgo }
+        appointment_date: { $gte: dateFrom }
       }),
       Appointment.countDocuments({ 
         staff_id: staffId,
         status: 'COMPLETED',
-        completed_at: { $gte: daysAgo }
+        appointment_date: { $gte: dateFrom }
       }),
       Appointment.countDocuments({ 
         staff_id: staffId,
@@ -375,14 +384,11 @@ const getMyWorkloadStats = async (req, res) => {
       Appointment.countDocuments({ 
         staff_id: staffId,
         status: { $in: ['PENDING', 'CONFIRMED'] },
-        appointment_date: { $gte: new Date() }
+        appointment_date: { $gte: today }
       }),
       Appointment.countDocuments({ 
         staff_id: staffId,
-        appointment_date: {
-          $gte: new Date(new Date().setHours(0, 0, 0, 0)),
-          $lt: new Date(new Date().setHours(23, 59, 59, 999))
-        }
+        appointment_date: today
       })
     ]);
 
@@ -395,13 +401,13 @@ const getMyWorkloadStats = async (req, res) => {
     const appointmentsByDate = await Appointment.aggregate([
       {
         $match: {
-          staff_id: new require('mongoose').Types.ObjectId(staffId),
-          appointment_date: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+          staff_id: staffObjectId,
+          appointment_date: { $gte: sevenDaysAgo }
         }
       },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$appointment_date' } },
+          _id: '$appointment_date',
           count: { $sum: 1 }
         }
       },

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import AuthHomeLogo from "../../components/AuthHomeLogo";
 import { resetPassword } from "../../services/authApi";
 import "../../styles/auth/AuthActionPage.css";
 
@@ -60,7 +61,7 @@ export default function ResetPasswordPage() {
         </section>
 
         <section className="auth-action-panel">
-          <a className="auth-action-logo" href="/home">MOTOCORE</a>
+          <AuthHomeLogo className="auth-action-logo" />
           <div className="auth-action-heading">
             <MaterialIcon>lock_reset</MaterialIcon>
             <span>Khôi phục tài khoản</span>

@@ -5,6 +5,7 @@ import {
   Wrench,
   Users,
   BarChart2,
+  Shield,
   Plus,
   HelpCircle,
   ClipboardList,
@@ -158,6 +159,7 @@ function ManagerSidebar({ activeView, onViewChange }) {
     ["calendar", Calendar, "Lịch hẹn"],
     ["services", Wrench, "Dịch vụ"],
     ["customers", Users, "Khách hàng"],
+    ["users", Shield, "Người dùng"],
     ["reports", BarChart2, "Báo cáo"],
     ["profile", User, "Hồ sơ"],
   ];
@@ -178,9 +180,7 @@ function ManagerSidebar({ activeView, onViewChange }) {
               key={view}
               onClick={(event) => {
                 event.preventDefault();
-                if (["dashboard", "calendar", "services", "profile"].includes(view) && onViewChange) {
-                  onViewChange(view);
-                }
+                onViewChange?.(view);
               }}
             >
               <Icon className="nav-icon" />

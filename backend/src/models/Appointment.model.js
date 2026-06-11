@@ -205,7 +205,7 @@ appointmentSchema.pre('validate', function(next) {
     this.appointment_code = `APT-${datePart}-${randomPart}`;
   }
 
-  if (!this.time_slot && this.start_time) {
+  if (!this.time_slot && this.start_time && TIME_SLOTS.includes(this.start_time)) {
     this.time_slot = this.start_time;
   }
 

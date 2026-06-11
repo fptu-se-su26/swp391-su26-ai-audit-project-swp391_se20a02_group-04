@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import AuthHomeLogo from "../../components/AuthHomeLogo";
 import { getDefaultRouteByRoles, register, saveAuthSession } from "../../services/authApi";
 import "../../styles/auth/RegisterPage.css";
 
@@ -96,12 +97,7 @@ export default function RegisterPage() {
 
         <section className="register-panel">
           <div className="register-card">
-            <a className="register-mobile-brand" href="/home">
-              <span>
-                <MaterialIcon>build</MaterialIcon>
-              </span>
-              MOTOCORE
-            </a>
+            <AuthHomeLogo className="register-home-logo" />
 
             <div className="register-heading">
               <h2>Tạo tài khoản mới</h2>

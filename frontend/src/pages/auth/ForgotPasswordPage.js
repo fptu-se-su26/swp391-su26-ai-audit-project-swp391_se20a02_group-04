@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import AuthHomeLogo from "../../components/AuthHomeLogo";
 import { forgotPassword } from "../../services/authApi";
 import "../../styles/auth/ForgotPasswordPage.css";
 
@@ -36,9 +37,7 @@ export default function ForgotPasswordPage() {
     <div className="forgot-page">
       <header className="forgot-header">
         <div className="forgot-header-inner">
-          <a className="forgot-logo" href="/home">
-            MOTOCORE
-          </a>
+          <AuthHomeLogo className="forgot-logo" />
           <nav className="forgot-nav" aria-label="Điều hướng khôi phục mật khẩu">
             <a href="/home">Giải pháp</a>
             <a href="/home">Quy trình</a>
@@ -71,6 +70,8 @@ export default function ForgotPasswordPage() {
 
         <section className="forgot-panel">
           <div className="forgot-card">
+            <AuthHomeLogo className="forgot-card-logo" />
+
             <div className="forgot-heading">
               <MaterialIcon className="reset-icon">lock_reset</MaterialIcon>
               <h2>Quên mật khẩu?</h2>

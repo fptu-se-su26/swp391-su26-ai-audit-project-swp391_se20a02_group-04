@@ -410,6 +410,147 @@ const removeRole = async (req, res) => {
 };
 
 /**
+ * Replace user's primary role
+ * PUT /api/admin/users/:id/role
+ */
+const replaceUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role_name } = req.body;
+
+    if (!role_name) {
+      return errorResponse(res, 400, 'Role name is required');
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return errorResponse(res, 404, 'User not found');
+    }
+
+    if (id === req.user.userId.toString()) {
+      return errorResponse(res, 400, 'Cannot change your own role');
+    }
+
+    const role = await Role.findOne({ role_name: role_name.toUpperCase(), is_active: true });
+    if (!role) {
+      return errorResponse(res, 404, 'Role not found');
+    }
+
+    const existingRoles = await UserRole.find({ user_id: id }).populate('role_id', 'role_name');
+    const oldRoles = existingRoles
+      .map((userRole) => userRole.role_id?.role_name)
+      .filter(Boolean);
+
+    await UserRole.deleteMany({ user_id: id });
+    await UserRole.create({
+      user_id: id,
+      role_id: role._id,
+      assigned_by: req.user.userId
+    });
+
+    await UserAudit.create({
+      user_id: id,
+      action: 'ROLE_REPLACED',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        changed_by: req.user.userId,
+        old_roles: oldRoles,
+        new_role: role.role_name
+      }
+    });
+
+    return successResponse(res, 200, 'User role updated successfully', {
+      role: role.role_name
+    });
+
+  } catch (error) {
+    console.error('Replace user role error:', error);
+    return errorResponse(res, 500, 'Failed to update user role');
+  }
+};
+
+/**
+ * Ban user account
+ * PUT /api/admin/users/:id/ban
+ */
+const banUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = '' } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return errorResponse(res, 404, 'User not found');
+    }
+
+    if (id === req.user.userId.toString()) {
+      return errorResponse(res, 400, 'Cannot ban your own account');
+    }
+
+    user.is_active = false;
+    user.account_locked_until = undefined;
+    await user.save();
+
+    await UserAudit.create({
+      user_id: id,
+      action: 'ADMIN_BAN',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        banned_by: req.user.userId,
+        reason
+      }
+    });
+
+    return successResponse(res, 200, 'User banned successfully');
+
+  } catch (error) {
+    console.error('Ban user error:', error);
+    return errorResponse(res, 500, 'Failed to ban user');
+  }
+};
+
+/**
+ * Unban user account
+ * PUT /api/admin/users/:id/unban
+ */
+const unbanUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return errorResponse(res, 404, 'User not found');
+    }
+
+    user.is_active = true;
+    user.failed_login_attempts = 0;
+    user.account_locked_until = undefined;
+    await user.save();
+
+    await UserAudit.create({
+      user_id: id,
+      action: 'ADMIN_UNBAN',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        unbanned_by: req.user.userId
+      }
+    });
+
+    return successResponse(res, 200, 'User unbanned successfully');
+
+  } catch (error) {
+    console.error('Unban user error:', error);
+    return errorResponse(res, 500, 'Failed to unban user');
+  }
+};
+
+/**
  * Get user audit logs
  * GET /api/admin/users/:id/audit-logs
  */
@@ -655,6 +796,9 @@ module.exports = {
   deleteUser,
   assignRole,
   removeRole,
+  replaceUserRole,
+  banUser,
+  unbanUser,
   getUserAuditLogs,
   lockUser,
   unlockUser,

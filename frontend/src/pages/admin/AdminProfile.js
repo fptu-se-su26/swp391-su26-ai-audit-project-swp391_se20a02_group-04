@@ -303,11 +303,36 @@ const AdminProfile = ({ onViewChange }) => {
               <Wrench className="nav-icon" />
               <span>Dịch vụ</span>
             </a>
-            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
+            <a
+              href="#"
+              className="nav-item"
+              onClick={(event) => {
+                event.preventDefault();
+                if (onViewChange) onViewChange("customers");
+              }}
+            >
               <Users className="nav-icon" />
               <span>Khách hàng</span>
             </a>
-            <a href="#" className="nav-item" onClick={(e) => e.preventDefault()}>
+            <a
+              href="#"
+              className="nav-item"
+              onClick={(event) => {
+                event.preventDefault();
+                if (onViewChange) onViewChange("users");
+              }}
+            >
+              <Shield className="nav-icon" />
+              <span>Người dùng</span>
+            </a>
+            <a
+              href="#"
+              className="nav-item"
+              onClick={(event) => {
+                event.preventDefault();
+                if (onViewChange) onViewChange("reports");
+              }}
+            >
               <BarChart2 className="nav-icon" />
               <span>Báo cáo</span>
             </a>

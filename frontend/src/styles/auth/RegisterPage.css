@@ -118,8 +118,9 @@
   width: min(100%, 460px);
 }
 
-.register-mobile-brand {
-  display: none;
+.register-home-logo {
+  margin-bottom: 30px;
+  color: #191c1d;
 }
 
 .register-heading {
@@ -365,26 +366,17 @@
     padding: 38px 18px;
   }
 
-  .register-mobile-brand {
+  .register-home-logo {
     display: inline-flex;
     align-items: center;
     gap: 10px;
     margin-bottom: 34px;
     color: #a04100;
-    font-size: 24px;
-    font-weight: 900;
-    letter-spacing: -0.04em;
-    text-decoration: none;
   }
 
-  .register-mobile-brand span {
-    display: grid;
-    width: 42px;
-    height: 42px;
-    place-items: center;
-    border-radius: 10px;
-    background: #ff6b00;
-    color: #fff;
+  .register-home-logo img {
+    width: 58px;
+    height: 58px;
   }
 }
 

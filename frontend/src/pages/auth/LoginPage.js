@@ -1,7 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { getDefaultRouteByRoles, login, saveAuthSession } from "../../services/authApi";
+import AuthHomeLogo from "../../components/AuthHomeLogo";
+import { getDefaultRouteByRoles, googleLogin, login, saveAuthSession } from "../../services/authApi";
 import "../../styles/auth/LoginPage.css";
+
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+const GOOGLE_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
 
 function MaterialIcon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
@@ -16,8 +20,80 @@ export default function LoginPage() {
   });
   const [status, setStatus] = useState({ type: "", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+  const googleButtonRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !googleButtonRef.current) return undefined;
+
+    let isMounted = true;
+
+    const handleCredentialResponse = async (googleResponse) => {
+      if (!googleResponse?.credential) {
+        setStatus({ type: "error", message: "Không nhận được mã xác thực Google." });
+        return;
+      }
+
+      setStatus({ type: "", message: "" });
+      setIsGoogleSubmitting(true);
+
+      try {
+        const response = await googleLogin(googleResponse.credential);
+        saveAuthSession(response.data);
+        const fromPath = location.state?.from?.pathname;
+        navigate(fromPath || getDefaultRouteByRoles(response.data?.roles), { replace: true });
+      } catch (error) {
+        if (isMounted) {
+          setStatus({ type: "error", message: error.message || "Đăng nhập Google thất bại. Vui lòng thử lại." });
+        }
+      } finally {
+        if (isMounted) {
+          setIsGoogleSubmitting(false);
+        }
+      }
+    };
+
+    const renderGoogleButton = () => {
+      if (!isMounted || !window.google?.accounts?.id || !googleButtonRef.current) return;
+
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+      });
+
+      googleButtonRef.current.innerHTML = "";
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: "outline",
+        size: "large",
+        shape: "rectangular",
+        text: "continue_with",
+        logo_alignment: "left",
+        width: Math.min(400, googleButtonRef.current.offsetWidth || 400),
+      });
+    };
+
+    if (window.google?.accounts?.id) {
+      renderGoogleButton();
+    } else {
+      const existingScript = document.querySelector(`script[src="${GOOGLE_SCRIPT_SRC}"]`);
+      const script = existingScript || document.createElement("script");
+
+      script.src = GOOGLE_SCRIPT_SRC;
+      script.async = true;
+      script.defer = true;
+      script.onload = renderGoogleButton;
+
+      if (!existingScript) {
+        document.body.appendChild(script);
+      }
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [location.state, navigate]);
 
   const handleChange = (event) => {
     const { name, type, checked, value } = event.target;
@@ -68,10 +144,7 @@ export default function LoginPage() {
 
         <section className="login-panel">
           <div className="login-card">
-            <a className="mobile-login-brand" href="/home">
-              <MaterialIcon>handyman</MaterialIcon>
-              <span>MOTOCORE</span>
-            </a>
+            <AuthHomeLogo className="login-home-logo" />
 
             <div className="login-heading">
               <h1>Chào mừng quay lại</h1>
@@ -144,12 +217,14 @@ export default function LoginPage() {
             </div>
 
             <div className="social-login-grid">
-              <button type="button" disabled>
-                Google
-              </button>
-              <button type="button" disabled>
-                Facebook
-              </button>
+              <div className="google-login-button" ref={googleButtonRef}>
+                {!GOOGLE_CLIENT_ID && (
+                  <button className="google-login-fallback" type="button" disabled>
+                    Google chưa được cấu hình
+                  </button>
+                )}
+              </div>
+              {isGoogleSubmitting && <p className="google-login-status">Đang xác thực với Google...</p>}
             </div>
 
             <p className="signup-copy">

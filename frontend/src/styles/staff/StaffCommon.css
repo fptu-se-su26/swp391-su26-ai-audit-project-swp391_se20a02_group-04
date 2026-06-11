@@ -325,6 +325,11 @@ button {
   background: #dcfce7;
 }
 
+.status-red {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
 .job-card {
   padding: 20px;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
@@ -569,6 +574,58 @@ td {
 }
 
 .danger {
+  color: var(--red);
+}
+
+.state-box {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  padding: 28px;
+  color: var(--muted);
+  text-align: center;
+  background: var(--surface-muted);
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+}
+
+.state-box strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.state-box p {
+  max-width: 520px;
+  margin: 0;
+  line-height: 1.55;
+}
+
+.state-box.error {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.state-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.form-message {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.form-message.success {
+  color: var(--green);
+}
+
+.form-message.error {
   color: var(--red);
 }
 
