@@ -56,7 +56,7 @@ const lockUserValidation = [
  */
 router.get('/dashboard/statistics',
   authenticate,
-  authorize('ADMIN'),
+  authorize('ADMIN', 'MANAGER'),
   query('period').optional().isInt({ min: 1, max: 365 }),
   validate,
   adminUserController.getDashboardStatistics

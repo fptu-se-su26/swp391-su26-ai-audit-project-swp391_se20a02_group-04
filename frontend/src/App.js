@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -10,9 +11,11 @@ import AdminReports from './pages/admin/AdminReports';
 import AdminInventory from './pages/admin/AdminInventory';
 import './App.css';
 
+
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
+
   const [currentPage, setCurrentPage] = useState(location.pathname.startsWith('/admin/inventory') ? 'inventory' : 'dashboard');
 
   useEffect(() => {
@@ -28,10 +31,12 @@ function App() {
     } else if (location.pathname.startsWith('/admin/inventory')) {
       navigate('/admin');
     }
+
   };
 
   const renderPage = () => {
     switch (currentPage) {
+
       case 'dashboard':
         return <AdminDashboard onViewChange={handlePageChange} />;
       case 'calendar':
@@ -50,14 +55,15 @@ function App() {
         return <AdminInventory onViewChange={handlePageChange} />;
       default:
         return <AdminDashboard onViewChange={handlePageChange} />;
+
     }
   };
 
-  return (
-    <div className="App">
-      {renderPage()}
-    </div>
-  );
+  if (!ADMIN_PAGES.has(currentPage)) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  return <div className="App">{renderPage()}</div>;
 }
 
 export default App;

@@ -1,5 +1,7 @@
+
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+
 import {
   LayoutDashboard,
   Calendar,
@@ -23,8 +25,10 @@ import AppointmentDetailPage from "./AppointmentDetailPage";
 import ManagerStaff from "./ManagerStaff";
 import ManagerWarehouse from "./ManagerWarehouse";
 import ManagerProfile from "./ManagerProfile";
+
 import AdminCalendar from "../admin/AdminCalendar";
 import InventoryModule from "../inventory/InventoryModule";
+
 
 // Technicians Mock Data
 const initialTechnicians = [
@@ -148,7 +152,9 @@ function getManagerTabFromPath(pathname) {
 const ManagerLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
   const [currentTab, setCurrentTab] = useState(() => getManagerTabFromPath(location.pathname)); // dashboard, appointments, staff, inventory
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
 
@@ -200,11 +206,11 @@ const ManagerLayout = () => {
 
   // Switch tabs
   const handleTabChange = (tabName) => {
-    setCurrentTab(tabName);
     setSearchQuery("");
     if (tabName !== "appointment-detail") {
       setSelectedAppointmentId("");
     }
+
     if (tabName === "inventory") {
       navigate("/manager/inventory");
     } else if (tabName === "warehouse") {
@@ -212,12 +218,13 @@ const ManagerLayout = () => {
     } else if (location.pathname.startsWith("/manager/inventory") || location.pathname.startsWith("/manager/repair-bays")) {
       navigate("/manager");
     }
+
   };
 
   const openAppointmentDetail = (appointmentId) => {
     setSelectedAppointmentId(appointmentId);
-    setCurrentTab("appointment-detail");
     setSearchQuery("");
+    navigate("/manager/appointment-detail");
   };
 
   const updateAppointmentStatus = (appointmentId, status, statusText) => {
@@ -325,12 +332,18 @@ const ManagerLayout = () => {
         return <InventoryModule basePath="/manager/inventory" />;
       case "warehouse":
         return <ManagerWarehouse bays={bays} />;
+      case "revenue":
+        return <ManagerRevenue />;
       case "profile":
         return <ManagerProfile />;
       default:
         return <ManagerDashboard bays={bays} technicians={technicians} />;
     }
   };
+
+  if (!MANAGER_TABS.has(currentTab)) {
+    return <Navigate to="/manager/dashboard" replace />;
+  }
 
   return (
     <div className="manager-layout">
@@ -479,6 +492,14 @@ const ManagerLayout = () => {
             >
               <Layers className="nav-icon" />
               <span>Sơ đồ kệ</span>
+            </a>
+            <a
+              href="#"
+              className={`nav-item ${currentTab === "revenue" ? "active" : ""}`}
+              onClick={(e) => { e.preventDefault(); handleTabChange("revenue"); }}
+            >
+              <BarChart2 className="nav-icon" />
+              <span>Hiá»‡u suáº¥t</span>
             </a>
             <a
               href="#"

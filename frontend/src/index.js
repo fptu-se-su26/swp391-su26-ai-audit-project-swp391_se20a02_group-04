@@ -18,6 +18,19 @@ import StaffLayout from "./pages/staff/StaffLayout";
 import ManagerLayout from "./pages/manager/ManagerLayout";
 import "./styles/design-system.css";
 
+function UnauthorizedPage() {
+  return (
+    <main className="route-message-page">
+      <section className="route-message-card">
+        <span className="material-symbols-outlined route-message-icon">block</span>
+        <p className="route-message-eyebrow">Không đủ quyền</p>
+        <h1>Bạn không thể truy cập khu vực này</h1>
+        <p>Vui lòng quay lại dashboard phù hợp với vai trò hiện tại của tài khoản.</p>
+      </section>
+    </main>
+  );
+}
+
 const staticRoute = window.__MOTOCARE_STATIC_ROUTE__;
 const Router = staticRoute ? MemoryRouter : BrowserRouter;
 const routerProps = staticRoute
@@ -37,6 +50,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/verify-otp" element={<VerifyOtpPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
         <Route
           path="/booking"
           element={
@@ -56,7 +70,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route
           path="/admin/*"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN", "MANAGER"]}>
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
               <App />
             </ProtectedRoute>
           }
@@ -64,7 +78,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route
           path="/staff/*"
           element={
-            <ProtectedRoute allowedRoles={["STAFF", "MANAGER", "ADMIN"]}>
+            <ProtectedRoute allowedRoles={["STAFF"]}>
               <StaffLayout />
             </ProtectedRoute>
           }
@@ -72,12 +86,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route
           path="/manager/*"
           element={
-            <ProtectedRoute allowedRoles={["MANAGER", "ADMIN"]}>
+            <ProtectedRoute allowedRoles={["MANAGER"]}>
               <ManagerLayout />
             </ProtectedRoute>
           }
         />
-        <Route path="/manager-preview" element={<ManagerLayout />} />
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </Router>
