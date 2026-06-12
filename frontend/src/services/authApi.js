@@ -77,13 +77,21 @@ export function translateAuthMessage(message) {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+      ...options,
+    });
+  } catch (error) {
+    throw new Error(
+      `Không kết nối được backend tại ${API_BASE_URL}. Hãy kiểm tra server API có đang chạy không.`
+    );
+  }
 
   const payload = await response.json().catch(() => ({}));
 

@@ -8,6 +8,7 @@ import StaffJobDetail, { StaffJobComplete, StaffJobMaterials, StaffJobStart } fr
 import StaffJobs from "./StaffJobs";
 import StaffMaterials from "./StaffMaterials";
 import StaffProfile from "./StaffProfile";
+import StaffSchedule from "./StaffSchedule";
 
 export default function StaffLayout() {
   return (
@@ -18,6 +19,7 @@ export default function StaffLayout() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<StaffDashboard />} />
           <Route path="assignments" element={<Navigate to="../jobs" replace />} />
+          <Route path="schedule" element={<StaffSchedule />} />
           <Route path="jobs" element={<StaffJobs />} />
           <Route path="jobs/:jobId" element={<StaffJobDetail />} />
           <Route path="jobs/:jobId/start" element={<StaffJobStart />} />

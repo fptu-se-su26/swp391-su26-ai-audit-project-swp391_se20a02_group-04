@@ -33,6 +33,58 @@ const addNotesValidation = [
     .withMessage('Notes are required and cannot exceed 1000 characters')
 ];
 
+const completeValidation = [
+  body('completion_notes').optional().trim().isLength({ max: 1000 })
+    .withMessage('Completion notes cannot exceed 1000 characters'),
+  body('actual_duration').optional().isInt({ min: 1, max: 480 })
+    .withMessage('Actual duration must be between 1 and 480 minutes')
+];
+
+const profileValidation = [
+  body('full_name').optional().trim().isLength({ min: 2, max: 100 })
+    .withMessage('Full name must be between 2 and 100 characters'),
+  body('phone').optional().trim().matches(/^[0-9]{10,11}$/)
+    .withMessage('Phone must contain 10-11 digits'),
+  body('specialization').optional().trim().isLength({ max: 120 })
+    .withMessage('Specialization cannot exceed 120 characters')
+];
+
+router.get('/dashboard',
+  authenticate,
+  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  staffAppointmentController.getDashboard
+);
+
+router.get('/schedule/today',
+  authenticate,
+  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  staffAppointmentController.getTodaySchedule
+);
+
+router.get('/schedule',
+  authenticate,
+  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  query('week').optional().matches(/^\d{4}-W\d{2}$/).withMessage('week must use YYYY-Www format'),
+  query('date_from').optional().matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('date_from must use YYYY-MM-DD format'),
+  query('date_to').optional().matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('date_to must use YYYY-MM-DD format'),
+  validate,
+  staffAppointmentController.getMySchedule
+);
+
+router.get('/profile',
+  authenticate,
+  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  staffAppointmentController.getProfile
+);
+
+router.put('/profile',
+  authenticate,
+  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  profileValidation,
+  validate,
+  staffAppointmentController.updateProfile
+);
+
 /**
  * @route   GET /api/staff/appointments/my-stats
  * @desc    Get staff workload statistics
@@ -55,6 +107,17 @@ router.get('/appointments/today',
   authenticate,
   authorize('STAFF', 'ADMIN', 'MANAGER'),
   staffAppointmentController.getTodayAppointments
+);
+
+router.get('/appointments/history',
+  authenticate,
+  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+  query('date_from').optional().isISO8601(),
+  query('date_to').optional().isISO8601(),
+  validate,
+  staffAppointmentController.getAppointmentHistory
 );
 
 /**
@@ -117,6 +180,41 @@ router.put('/appointments/:id/status',
   updateStatusValidation,
   validate,
   staffAppointmentController.updateAppointmentStatus
+);
+
+router.post('/appointments/:id/acknowledge',
+  authenticate,
+  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  validate,
+  staffAppointmentController.acknowledgeAppointment
+);
+
+router.post('/appointments/:id/start',
+  authenticate,
+  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('notes').optional().trim().isLength({ max: 1000 }).withMessage('Notes cannot exceed 1000 characters'),
+  validate,
+  staffAppointmentController.startAppointment
+);
+
+router.post('/appointments/:id/complete',
+  authenticate,
+  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  completeValidation,
+  validate,
+  staffAppointmentController.completeAppointment
+);
+
+router.post('/appointments/:id/no-show',
+  authenticate,
+  authorize('STAFF', 'ADMIN', 'MANAGER'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('notes').optional().trim().isLength({ max: 1000 }).withMessage('Notes cannot exceed 1000 characters'),
+  validate,
+  staffAppointmentController.markNoShow
 );
 
 /**

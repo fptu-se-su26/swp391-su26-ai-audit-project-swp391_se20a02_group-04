@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Bell,
@@ -134,9 +134,15 @@ const toDateInputValue = (dateValue) => {
   const normalized = String(dateValue).trim();
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(normalized)) return normalized.slice(0, 10);
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(normalized)) {
     const [day, month, year] = normalized.split("/");
     return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const parsedDate = new Date(normalized);
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return parsedDate.toISOString().slice(0, 10);
   }
 
   return normalized;
@@ -146,6 +152,61 @@ const getShortAppointmentId = (appointmentId = "") => {
   const normalized = String(appointmentId || "").replace(/^#/, "");
   if (normalized.length <= 16) return String(appointmentId || "");
   return `#${normalized.slice(0, 8)}...${normalized.slice(-4)}`;
+};
+
+const getNumericValue = (value = "") => String(value || "").replace(/[^\d]/g, "");
+
+const isPlaceholderText = (value = "") => /^chưa\s+/i.test(String(value || "").trim());
+
+const hasAppointmentAssignment = (appointment = {}, detail = {}) => {
+  const raw = appointment.raw || {};
+  const hasRawStaff = Boolean(raw.staff_id || appointment.rawStaffId || appointment.staff_id);
+  const hasRawBay = Boolean(raw.repair_bay_id || appointment.rawRepairBayId || appointment.repair_bay_id);
+  if (hasRawStaff && hasRawBay) return true;
+
+  return Boolean(
+    detail.assignment?.technician &&
+    detail.assignment?.bay &&
+    !isPlaceholderText(detail.assignment.technician) &&
+    !isPlaceholderText(detail.assignment.bay)
+  );
+};
+
+const getServiceDurationMinutes = (service = {}) => {
+  const match = String(service.time || "").match(/\d+/);
+  return match ? Number(match[0]) : 0;
+};
+
+const validateEditDraft = (draft = {}) => {
+  const errors = {};
+
+  if (!draft.appointmentDate) errors.appointmentDate = "Vui lòng chọn ngày hẹn.";
+  if (!draft.appointmentHour) errors.appointmentHour = "Vui lòng nhập giờ hẹn.";
+  if (draft.customerPhone && !/^[0-9+\-\s().]{8,15}$/.test(draft.customerPhone)) {
+    errors.customerPhone = "Số điện thoại không hợp lệ.";
+  }
+  if (draft.customerEmail && !/^\S+@\S+\.\S+$/.test(draft.customerEmail)) {
+    errors.customerEmail = "Email không hợp lệ.";
+  }
+  if (draft.vehicleYear && !/^\d{4}$/.test(String(draft.vehicleYear))) {
+    errors.vehicleYear = "Năm sản xuất phải gồm 4 chữ số.";
+  }
+  if (draft.vehicleMileage && Number(getNumericValue(draft.vehicleMileage)) < 0) {
+    errors.vehicleMileage = "Số km hiện tại phải lớn hơn hoặc bằng 0.";
+  }
+  if (draft.assignmentTechnician && !draft.assignmentStartTime) {
+    errors.assignmentStartTime = "Cần có giờ bắt đầu khi đã chọn kỹ thuật viên.";
+  }
+  if (
+    draft.assignmentStartTime &&
+    draft.assignmentEndTime &&
+    draft.assignmentEndTime !== "--:--" &&
+    draft.assignmentEndTime < draft.assignmentStartTime
+  ) {
+    errors.assignmentEndTime = "Dự kiến xong không được nhỏ hơn giờ bắt đầu.";
+  }
+
+  return errors;
 };
 
 export default function AppointmentDetailPage({
@@ -162,15 +223,28 @@ export default function AppointmentDetailPage({
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [editDraft, setEditDraft] = useState(null);
+  const [editErrors, setEditErrors] = useState({});
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
   const detail = buildAppointmentDetail(localAppointment);
   const isApproved = !pendingStatuses.includes(detail.status);
+  const hasAssignment = hasAppointmentAssignment(localAppointment, detail);
   const totalPrice = detail.services.reduce((sum, item) => sum + item.price, 0);
   const progress = detail.status === "done" ? 100 : detail.status === "processing" ? 75 : detail.status === "confirmed" ? 50 : 25;
 
   useEffect(() => {
     setLocalAppointment(appointment || {});
   }, [appointment]);
+
+  useEffect(() => {
+    if (!editDraft) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [editDraft]);
 
   const applyAppointmentUpdate = (updatedAppointment) => {
     setLocalAppointment(updatedAppointment);
@@ -209,22 +283,54 @@ export default function AppointmentDetailPage({
   };
 
   const openEditModal = () => {
+    const appointmentCode = String(detail.id || "").replace(/^#/, "");
+    const assignmentStartTime = detail.assignment.startTime || detail.appointmentHour;
+    const services = detail.services || [];
+
     setEditDraft({
+      appointmentCode,
       appointmentDate: toDateInputValue(localAppointment.apiDate || detail.appointmentDate),
       appointmentHour: detail.appointmentHour,
       channel: detail.channel,
-      customerNote: detail.customerNote
+      priority: detail.priority,
+      status: detail.status,
+      customerName: detail.customer.name,
+      customerPhone: detail.customer.phone,
+      customerEmail: detail.customer.email,
+      customerAddress: detail.customer.address,
+      customerTier: detail.customer.tier,
+      vehicleName: detail.vehicle.name,
+      vehiclePlate: detail.vehicle.plate,
+      vehicleYear: detail.vehicle.year,
+      vehicleMileage: detail.vehicle.odometer,
+      services,
+      totalDuration: services.reduce((sum, service) => sum + getServiceDurationMinutes(service), 0),
+      totalPrice: services.reduce((sum, service) => sum + Number(service.price || 0), 0),
+      assignmentBay: detail.assignment.bay,
+      assignmentTechnician: detail.assignment.technician,
+      assignmentStartTime,
+      assignmentEndTime: detail.assignment.expectedDone,
+      customerNote: detail.customerNote,
+      garageNote: detail.garageNote
     });
+    setEditErrors({});
     setActionMessage("");
   };
 
   const closeEditModal = () => {
-    if (!isActionLoading) setEditDraft(null);
+    if (!isActionLoading) {
+      setEditDraft(null);
+      setEditErrors({});
+    }
   };
 
   const submitScheduleEdit = async (event) => {
     event.preventDefault();
     if (!editDraft || isActionLoading) return;
+    const validationErrors = validateEditDraft(editDraft);
+    setEditErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) return;
+
     setIsActionLoading(true);
     setActionMessage("");
 
@@ -253,7 +359,7 @@ export default function AppointmentDetailPage({
             <VehicleCard appointment={detail} />
           </div>
           <ServicesCard services={detail.services} totalPrice={totalPrice} />
-          <AssignmentCard assignment={detail.assignment} isApproved={isApproved} />
+          <AssignmentCard assignment={detail.assignment} hasAssignment={hasAssignment} />
 
           {isApproved && (
             <>
@@ -273,6 +379,7 @@ export default function AppointmentDetailPage({
           <QuickInfoCard appointment={detail} totalPrice={totalPrice} progress={progress} isApproved={isApproved} />
           <FooterActions
             status={detail.status}
+            hasAssignment={hasAssignment}
             isLoading={isActionLoading}
             onConfirm={() => runAppointmentAction((current) => runMappedOrFallbackAction(onConfirm, mockConfirmAppointment, current))}
             onStart={() => runAppointmentAction((current) => runMappedOrFallbackAction(onStart, mockStartAppointmentProcessing, current))}
@@ -293,6 +400,7 @@ export default function AppointmentDetailPage({
       {editDraft && (
         <EditScheduleModal
           draft={editDraft}
+          errors={editErrors}
           isLoading={isActionLoading}
           onChange={setEditDraft}
           onClose={closeEditModal}
@@ -477,8 +585,8 @@ function ServicesCard({ services, totalPrice }) {
   );
 }
 
-function AssignmentCard({ assignment, isApproved }) {
-  const displayAssignment = isApproved
+function AssignmentCard({ assignment, hasAssignment }) {
+  const displayAssignment = hasAssignment
     ? assignment
     : {
         ...assignment,
@@ -596,6 +704,7 @@ function QuickInfoCard({ appointment, totalPrice, progress, isApproved }) {
 
 function FooterActions({
   status,
+  hasAssignment,
   isLoading,
   onConfirm,
   onStart,
@@ -612,7 +721,9 @@ function FooterActions({
     status === "processing"
       ? { label: "Hoàn tất lịch hẹn", onClick: onComplete }
       : status === "confirmed"
-        ? { label: "Bắt đầu xử lý", onClick: onStart }
+        ? hasAssignment
+          ? { label: "Bắt đầu xử lý", onClick: onStart }
+          : { label: "Phân công xử lý", onClick: onAssign }
         : status === "done"
           ? { label: "Lịch hẹn đã hoàn tất", onClick: undefined }
           : status === "cancelled"
@@ -654,10 +765,125 @@ function SecondaryButton({ icon: Icon, label, danger, disabled, onClick }) {
   );
 }
 
-function EditScheduleModal({ draft, isLoading, onChange, onClose, onSubmit }) {
+function EditScheduleModal({ draft, errors = {}, isLoading, onChange, onClose, onSubmit }) {
   const updateDraft = (field, value) => {
     onChange((current) => ({ ...current, [field]: value }));
   };
+
+  return (
+    <div className="appointment-edit-layer" role="presentation">
+      <button className="appointment-edit-backdrop" type="button" aria-label="Đóng modal" onClick={onClose} disabled={isLoading} />
+      <form className="appointment-edit-modal" onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="appointment-edit-title">
+        <div className="appointment-edit-header">
+          <div>
+            <p>Sửa lịch hẹn</p>
+            <h3 id="appointment-edit-title">Cập nhật thông tin lịch</h3>
+            <span>Cập nhật thông tin khách hàng, xe, dịch vụ và lịch hẹn</span>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Đóng" disabled={isLoading}>
+            <XCircle size={20} />
+          </button>
+        </div>
+
+        <div className="appointment-edit-body">
+          <EditSection title="Thông tin lịch hẹn" description="Trạng thái và ưu tiên đang hiển thị theo dữ liệu hiện tại.">
+            <div className="appointment-edit-grid">
+              <EditField label="Mã lịch"><input value={draft.appointmentCode || ""} disabled readOnly /></EditField>
+              <EditField label="Ngày hẹn" error={errors.appointmentDate}>
+                <input type="date" value={draft.appointmentDate || ""} onChange={(event) => updateDraft("appointmentDate", event.target.value)} />
+              </EditField>
+              <EditField label="Giờ hẹn" error={errors.appointmentHour}>
+                <input type="time" value={draft.appointmentHour || ""} onChange={(event) => updateDraft("appointmentHour", event.target.value)} />
+              </EditField>
+              <EditField label="Kênh đặt lịch">
+                <input value={draft.channel || ""} onChange={(event) => updateDraft("channel", event.target.value)} placeholder="Website" />
+              </EditField>
+              <EditField label="Mức ưu tiên">
+                <select value={String(draft.priority || "medium").toLowerCase()} disabled>
+                  <option value="low">LOW</option>
+                  <option value="medium">MEDIUM</option>
+                  <option value="high">HIGH</option>
+                </select>
+              </EditField>
+              <EditField label="Trạng thái lịch hẹn">
+                <select value={draft.status || "pending"} disabled>
+                  <option value="pending">PENDING</option>
+                  <option value="waiting_confirmation">WAITING_CONFIRMATION</option>
+                  <option value="confirmed">CONFIRMED</option>
+                  <option value="processing">IN_PROGRESS</option>
+                  <option value="done">COMPLETED</option>
+                  <option value="cancelled">CANCELLED</option>
+                </select>
+              </EditField>
+            </div>
+          </EditSection>
+
+          <EditSection title="Thông tin khách hàng" description="Thông tin khách hàng được quản lý ở module Khách hàng.">
+            <div className="appointment-edit-grid">
+              <EditField label="Tên khách hàng"><input value={draft.customerName || ""} disabled readOnly /></EditField>
+              <EditField label="Số điện thoại" error={errors.customerPhone}><input value={draft.customerPhone || ""} disabled readOnly /></EditField>
+              <EditField label="Email" error={errors.customerEmail}><input value={draft.customerEmail || ""} disabled readOnly /></EditField>
+              <EditField label="Địa chỉ"><input value={draft.customerAddress || ""} disabled readOnly /></EditField>
+              <EditField label="Hạng thành viên"><input value={draft.customerTier || ""} disabled readOnly /></EditField>
+            </div>
+          </EditSection>
+
+          <EditSection title="Thông tin xe" description="Backend hiện hỗ trợ cập nhật thông tin xe cơ bản qua appointment.">
+            <div className="appointment-edit-grid">
+              <EditField label="Tên xe / dòng xe">
+                <input value={draft.vehicleName || ""} onChange={(event) => updateDraft("vehicleName", event.target.value)} />
+              </EditField>
+              <EditField label="Biển số">
+                <input value={draft.vehiclePlate || ""} onChange={(event) => updateDraft("vehiclePlate", event.target.value)} />
+              </EditField>
+              <EditField label="Năm sản xuất" error={errors.vehicleYear}>
+                <input inputMode="numeric" value={draft.vehicleYear || ""} onChange={(event) => updateDraft("vehicleYear", event.target.value)} />
+              </EditField>
+              <EditField label="Số km hiện tại" error={errors.vehicleMileage}>
+                <input inputMode="numeric" value={draft.vehicleMileage || ""} onChange={(event) => updateDraft("vehicleMileage", event.target.value)} />
+              </EditField>
+            </div>
+          </EditSection>
+
+          <EditSection title="Dịch vụ đã đặt" description="Danh sách dịch vụ hiện chỉ hiển thị readonly trong modal này.">
+            <div className="appointment-edit-services">
+              {(draft.services || []).map((service) => (
+                <div className="appointment-edit-service-row" key={`${service.name}-${service.time}`}>
+                  <div><strong>{service.name}</strong><span>{service.time}</span></div>
+                  <b>{Number(service.price || 0).toLocaleString("vi-VN")}đ</b>
+                </div>
+              ))}
+              <div className="appointment-edit-total-row"><span>Tổng thời gian</span><strong>{draft.totalDuration || 0} phút</strong></div>
+              <div className="appointment-edit-total-row"><span>Tổng chi phí</span><strong>{Number(draft.totalPrice || 0).toLocaleString("vi-VN")}đ</strong></div>
+            </div>
+          </EditSection>
+
+          <EditSection title="Phân công xử lý" description="Đổi kỹ thuật viên/kệ sửa dùng nút Phân công xử lý để có kiểm tra availability.">
+            <div className="appointment-edit-grid">
+              <EditField label="Kệ sửa"><input value={draft.assignmentBay || "Chưa phân kệ"} disabled readOnly /></EditField>
+              <EditField label="Kỹ thuật viên"><input value={draft.assignmentTechnician || "Chưa phân công"} disabled readOnly /></EditField>
+              <EditField label="Bắt đầu" error={errors.assignmentStartTime}><input value={draft.assignmentStartTime || ""} disabled readOnly /></EditField>
+              <EditField label="Dự kiến xong" error={errors.assignmentEndTime}><input value={draft.assignmentEndTime || "--:--"} disabled readOnly /></EditField>
+            </div>
+          </EditSection>
+
+          <EditSection title="Ghi chú">
+            <div className="appointment-edit-grid">
+              <EditField label="Ghi chú khách hàng" wide><textarea value={draft.customerNote || ""} rows={3} disabled readOnly /></EditField>
+              <EditField label="Ghi chú nội bộ garage" wide>
+                <textarea value={draft.garageNote || ""} onChange={(event) => updateDraft("garageNote", event.target.value)} rows={4} />
+              </EditField>
+            </div>
+          </EditSection>
+        </div>
+
+        <div className="appointment-edit-actions">
+          <button type="button" className="detail-secondary-btn" onClick={onClose} disabled={isLoading}>Hủy</button>
+          <button type="submit" className="detail-primary-btn" disabled={isLoading}>{isLoading ? "Đang lưu..." : "Lưu thay đổi"}</button>
+        </div>
+      </form>
+    </div>
+  );
 
   return (
     <div className="appointment-edit-backdrop" role="presentation">
@@ -720,6 +946,28 @@ function EditScheduleModal({ draft, isLoading, onChange, onClose, onSubmit }) {
   );
 }
 
+function EditSection({ title, description, children }) {
+  return (
+    <section className="appointment-edit-section">
+      <div className="appointment-edit-section-heading">
+        <h4>{title}</h4>
+        {description && <p>{description}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function EditField({ label, error, wide, children }) {
+  return (
+    <label className={`appointment-edit-field ${wide ? "wide" : ""}`}>
+      <span>{label}</span>
+      {children}
+      {error && <small className="appointment-edit-error">{error}</small>}
+    </label>
+  );
+}
+
 function Avatar({ initials }) {
   return <span className="detail-avatar">{initials}</span>;
 }
@@ -732,3 +980,4 @@ function Row({ label, value }) {
     </div>
   );
 }
+

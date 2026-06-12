@@ -1,6 +1,12 @@
 import React, { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { clearAuthSession, getAuthSession } from "../../services/authApi";
+import {
+  checkInStaff,
+  checkOutStaff,
+  getTodayAttendance,
+  saveStaffAppointmentNote,
+} from "../../services/staffAppointmentApi";
 
 export function Icon({ name, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -11,6 +17,7 @@ export function Sidebar() {
   const { user } = getAuthSession();
   const navItems = [
     { icon: "dashboard", label: "Tổng quan", to: "/staff/dashboard" },
+    { icon: "calendar_month", label: "Lịch làm việc", to: "/staff/schedule" },
     { icon: "assignment", label: "Công việc được giao", to: "/staff/jobs" },
     { icon: "inventory_2", label: "Sử dụng vật tư", to: "/staff/materials" },
     { icon: "schedule", label: "Chấm công", to: "/staff/attendance" },
@@ -66,28 +73,84 @@ export function Sidebar() {
 }
 
 export function PageHeader({ title, subtitle, actions = true }) {
+  const [attendance, setAttendance] = useState(null);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [attendanceMessage, setAttendanceMessage] = useState("");
+
+  React.useEffect(() => {
+    if (!actions) return undefined;
+    let mounted = true;
+    setLoadingAttendance(true);
+    getTodayAttendance()
+      .then((response) => mounted && setAttendance(response.data?.attendance || null))
+      .catch(() => mounted && setAttendance(null))
+      .finally(() => mounted && setLoadingAttendance(false));
+    return () => { mounted = false; };
+  }, [actions]);
+
+  const refreshAttendance = async () => {
+    const response = await getTodayAttendance();
+    setAttendance(response.data?.attendance || null);
+  };
+
+  const handleCheckIn = async () => {
+    setLoadingAttendance(true);
+    setAttendanceMessage("");
+    try {
+      const response = await checkInStaff("");
+      setAttendance(response.data?.attendance || null);
+      setAttendanceMessage("Da vao ca.");
+    } catch (error) {
+      if (/409|already|da/i.test(error.message || "")) await refreshAttendance().catch(() => {});
+      else setAttendanceMessage(error.message || "Khong the vao ca.");
+    } finally {
+      setLoadingAttendance(false);
+    }
+  };
+
+  const handleCheckOut = async () => {
+    if (!window.confirm("Xac nhan ket thuc ca lam?")) return;
+    setLoadingAttendance(true);
+    setAttendanceMessage("");
+    try {
+      const response = await checkOutStaff("");
+      setAttendance(response.data?.attendance || null);
+      setAttendanceMessage("Da ket thuc ca.");
+    } catch (error) {
+      setAttendanceMessage(error.message || "Khong the ket thuc ca.");
+      await refreshAttendance().catch(() => {});
+    } finally {
+      setLoadingAttendance(false);
+    }
+  };
+
+  const inShift = attendance?.status === "IN_SHIFT";
+
   return (
     <header className="topbar">
       <div>
         <h2>{title}</h2>
         <p>{subtitle}</p>
+        {attendanceMessage && <small className="staff-header-message">{attendanceMessage}</small>}
       </div>
       {actions && (
         <div className="topbar-actions">
-          <Link className="secondary-button large" to="/staff/attendance">
-            <Icon name="logout" />
-            Kết thúc ca
-          </Link>
-          <Link className="primary-button large" to="/staff/attendance">
-            <Icon name="login" />
-            Vào ca
-          </Link>
+          {inShift ? (
+            <button className="secondary-button large" disabled={loadingAttendance} onClick={handleCheckOut} type="button">
+              <Icon name="logout" />
+              Ket thuc ca
+            </button>
+          ) : (
+            <button className="primary-button large" disabled={loadingAttendance} onClick={handleCheckIn} type="button">
+              <Icon name="login" />
+              Vao ca
+            </button>
+          )}
         </div>
       )}
     </header>
   );
 }
-
 export function StatCard({ icon, label, value, helper, tone }) {
   return (
     <article className="stat-card">
@@ -286,32 +349,63 @@ export function ShiftSummary({ attendanceSummary, todayAttendance }) {
   );
 }
 
-export function QuickNote() {
-  const [note, setNote] = useState(localStorage.getItem("staffQuickNote") || "");
+export function QuickNote({ job, onSaved }) {
+  const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    localStorage.setItem("staffQuickNote", note);
-    setMessage("Đã lưu ghi chú nhanh trên trình duyệt.");
-    window.setTimeout(() => setMessage(""), 2200);
+  React.useEffect(() => {
+    setNote(job?.staffNotes || "");
+    setMessage("");
+    setError("");
+  }, [job?.id, job?.staffNotes]);
+
+  const handleSave = async () => {
+    setMessage("");
+    setError("");
+
+    if (!job) {
+      setError("Chua co cong viec de ghi chu.");
+      return;
+    }
+
+    if (!note.trim()) {
+      setError("Vui long nhap ghi chu truoc khi luu.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await saveStaffAppointmentNote(job.id, note.trim());
+      setMessage("Da luu ghi chu ky thuat.");
+      onSaved?.();
+      window.setTimeout(() => setMessage(""), 2200);
+    } catch (err) {
+      setError(err.message || "Khong the luu ghi chu.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <section className="panel">
       <h3>
         <Icon name="edit_note" />
-        Ghi chú kỹ thuật
+        Ghi chu ky thuat
       </h3>
-      <label htmlFor="technical-note">Ghi chú nhanh</label>
+      <label htmlFor="technical-note">Ghi chu nhanh</label>
       <textarea
+        disabled={!job || saving}
         id="technical-note"
         onChange={(event) => setNote(event.target.value)}
-        placeholder="Nhập tình trạng xe, khuyến nghị thay thế hoặc lưu ý cho quản lý..."
+        placeholder={job ? "Nhap tinh trang xe, khuyen nghi thay the hoac luu y cho quan ly..." : "Chua co cong viec dang lam hoac duoc giao."}
         value={note}
       />
       {message && <p className="form-message success">{message}</p>}
-      <button className="dark-button full" onClick={handleSave} type="button">
-        Lưu ghi chú
+      {error && <p className="form-message error">{error}</p>}
+      <button className="dark-button full" disabled={!job || saving} onClick={handleSave} type="button">
+        {saving ? "Dang luu..." : "Luu ghi chu"}
       </button>
     </section>
   );

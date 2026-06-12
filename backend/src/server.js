@@ -18,20 +18,42 @@ const adminUserRoutes = require('./routes/admin.user.routes');
 const adminAppointmentRoutes = require('./routes/admin.appointment.routes');
 const adminInventoryRoutes = require('./routes/admin.inventory.routes');
 const adminServiceRoutes = require('./routes/admin.service.routes');
+const managerStaffRoutes = require('./routes/manager.staff.routes');
 
 const app = express();
 
 // Connect to MongoDB
 connectDB();
 
+const configuredCorsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const devCorsPattern = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+
 // Middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (configuredCorsOrigins.includes(origin) || (process.env.NODE_ENV !== 'production' && devCorsPattern.test(origin))) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS origin not allowed: ${origin}`));
+  },
   credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
+app.use('/api', (req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
 
 // Apply rate limiting to all routes
 app.use('/api/', apiLimiter);
@@ -58,6 +80,7 @@ app.use('/api/admin', adminUserRoutes);
 app.use('/api/admin', adminAppointmentRoutes);
 app.use('/api/admin', adminInventoryRoutes);
 app.use('/api/admin', adminServiceRoutes);
+app.use('/api/manager', managerStaffRoutes);
 
 // 404 handler
 app.use((req, res) => {

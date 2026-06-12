@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Icon, PageHeader } from "./StaffComponents";
 import { profileService } from "../../services/profileService";
+import { getStaffProfile, updateStaffProfile } from "../../services/staffAppointmentApi";
 import "../../styles/staff/StaffProfile.css";
 
 function pickUser(payload) {
@@ -12,6 +13,7 @@ export default function StaffProfile() {
     full_name: "",
     email: "",
     phone: "",
+    specialization: "",
   });
   const [activityLogs, setActivityLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,7 +27,7 @@ export default function StaffProfile() {
 
     try {
       const [profileResponse, logsResponse] = await Promise.allSettled([
-        profileService.getMe(),
+        getStaffProfile(),
         profileService.getActivityLogs(1, 10),
       ]);
 
@@ -38,6 +40,7 @@ export default function StaffProfile() {
         full_name: user.full_name || user.fullname || "",
         email: user.email || "",
         phone: user.phone || "",
+        specialization: user.specialization || "",
       });
 
       if (logsResponse.status === "fulfilled") {
@@ -74,9 +77,10 @@ export default function StaffProfile() {
 
     setIsSaving(true);
     try {
-      await profileService.updateProfile({
+      await updateStaffProfile({
         full_name: profile.full_name.trim(),
         phone: profile.phone.trim(),
+        specialization: profile.specialization.trim(),
       });
       setMessage("Đã cập nhật hồ sơ nhân viên.");
     } catch (err) {
@@ -155,6 +159,10 @@ export default function StaffProfile() {
                 <label className="staff-form-label">
                   Số điện thoại *
                   <input name="phone" onChange={handleChange} value={profile.phone} />
+                </label>
+                <label className="staff-form-label">
+                  Chuyen mon
+                  <input name="specialization" onChange={handleChange} value={profile.specialization} />
                 </label>
               </div>
 

@@ -20,9 +20,7 @@ const ManagerAppointments = ({
         </div>
       </div>
 
-      {/* Appointments List card */}
       <div className="appointments-card">
-        {/* Search Bar container */}
         <div style={{ padding: "20px 24px", display: "flex", gap: "16px", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9" }}>
           <div className="search-input-wrapper" style={{ width: "320px" }}>
             <Search className="search-bar-icon" style={{ left: "12px", width: "16px", height: "16px" }} />
@@ -68,7 +66,6 @@ const ManagerAppointments = ({
           </div>
         </div>
 
-        {/* Main Table */}
         <table className="accounts-table">
           <thead>
             <tr>
@@ -82,8 +79,8 @@ const ManagerAppointments = ({
           </thead>
           <tbody>
             {appointments
-              .filter(app => {
-                const matchesSearch = app.customer.toLowerCase().includes(searchQuery.toLowerCase()) || 
+              .filter((app) => {
+                const matchesSearch = app.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                      app.vehicle.toLowerCase().includes(searchQuery.toLowerCase());
                 const matchesFilter = appointmentFilter === "ALL" || app.status === appointmentFilter;
                 return matchesSearch && matchesFilter;
@@ -120,11 +117,13 @@ const ManagerAppointments = ({
                     )}
                   </td>
                   <td>
-                    <span className={`status-badge ${app.status === "COMPLETED" ? "active" : app.status === "PENDING" ? "locked" : "active"}`} 
-                          style={{ 
-                            backgroundColor: app.status === "PENDING" ? "#fff7ed" : app.status === "IN_PROGRESS" ? "#eff6ff" : "", 
-                            color: app.status === "PENDING" ? "#ea580c" : app.status === "IN_PROGRESS" ? "#2563eb" : "" 
-                          }}>
+                    <span
+                      className={`status-badge ${app.status === "COMPLETED" ? "active" : app.status === "PENDING" ? "locked" : "active"}`}
+                      style={{
+                        backgroundColor: app.status === "PENDING" ? "#fff7ed" : app.status === "IN_PROGRESS" ? "#eff6ff" : "",
+                        color: app.status === "PENDING" ? "#ea580c" : app.status === "IN_PROGRESS" ? "#2563eb" : ""
+                      }}
+                    >
                       {app.statusText}
                     </span>
                   </td>
@@ -133,7 +132,7 @@ const ManagerAppointments = ({
                       className="btn-table-detail"
                       onClick={() => onViewAppointment(app.id)}
                     >
-                      CHI TIáº¾T
+                      CHI TIẾT
                     </button>
                     <button
                       className="btn-table-assign"

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Calendar,
@@ -10,6 +10,7 @@ import {
   Settings,
   Check,
   Layers,
+  Boxes,
   LogOut,
   User
 } from "lucide-react";
@@ -18,11 +19,12 @@ import { getAuthSession, clearAuthSession } from "../../services/authApi";
 
 // Sub-components imports
 import ManagerDashboard from "./ManagerDashboard";
-import ManagerAppointments from "./ManagerAppointments";
 import AppointmentDetailPage from "./AppointmentDetailPage";
 import ManagerStaff from "./ManagerStaff";
 import ManagerWarehouse from "./ManagerWarehouse";
 import ManagerProfile from "./ManagerProfile";
+import AdminCalendar from "../admin/AdminCalendar";
+import InventoryModule from "../inventory/InventoryModule";
 
 // Technicians Mock Data
 const initialTechnicians = [
@@ -137,9 +139,16 @@ const initialBays = [
   { id: 10, name: "Kệ 10", occupied: false, bike: "", service: "", tech: "" }
 ];
 
+function getManagerTabFromPath(pathname) {
+  if (pathname.startsWith("/manager/inventory")) return "inventory";
+  if (pathname.startsWith("/manager/repair-bays")) return "warehouse";
+  return "dashboard";
+}
+
 const ManagerLayout = () => {
   const navigate = useNavigate();
-  const [currentTab, setCurrentTab] = useState("dashboard"); // dashboard, appointments, staff, revenue
+  const location = useLocation();
+  const [currentTab, setCurrentTab] = useState(() => getManagerTabFromPath(location.pathname)); // dashboard, appointments, staff, inventory
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
 
@@ -155,6 +164,12 @@ const ManagerLayout = () => {
     clearAuthSession();
     navigate("/login");
   };
+
+  useEffect(() => {
+    if (location.pathname.startsWith("/manager/inventory") || location.pathname.startsWith("/manager/repair-bays")) {
+      setCurrentTab(getManagerTabFromPath(location.pathname));
+    }
+  }, [location.pathname]);
   const [appointmentFilter, setAppointmentFilter] = useState("ALL"); // ALL, PENDING, CONFIRMED, IN_PROGRESS, COMPLETED
 
   // Dynamic States
@@ -189,6 +204,13 @@ const ManagerLayout = () => {
     setSearchQuery("");
     if (tabName !== "appointment-detail") {
       setSelectedAppointmentId("");
+    }
+    if (tabName === "inventory") {
+      navigate("/manager/inventory");
+    } else if (tabName === "warehouse") {
+      navigate("/manager/repair-bays/diagram");
+    } else if (location.pathname.startsWith("/manager/inventory") || location.pathname.startsWith("/manager/repair-bays")) {
+      navigate("/manager");
     }
   };
 
@@ -264,14 +286,13 @@ const ManagerLayout = () => {
         return <ManagerDashboard bays={bays} technicians={technicians} />;
       case "appointments":
         return (
-          <ManagerAppointments
-            appointments={appointments}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            appointmentFilter={appointmentFilter}
-            setAppointmentFilter={setAppointmentFilter}
-            openAllocationModal={openAllocationModal}
-            onViewAppointment={openAppointmentDetail}
+          <AdminCalendar
+            embedded
+            onViewChange={(view) => {
+              if (view === "dashboard") handleTabChange("dashboard");
+              if (view === "calendar") handleTabChange("appointments");
+              if (view === "profile") handleTabChange("profile");
+            }}
           />
         );
       case "appointment-detail":
@@ -299,7 +320,9 @@ const ManagerLayout = () => {
           />
         );
       case "staff":
-        return <ManagerStaff technicians={technicians} />;
+        return <ManagerStaff />;
+      case "inventory":
+        return <InventoryModule basePath="/manager/inventory" />;
       case "warehouse":
         return <ManagerWarehouse bays={bays} />;
       case "profile":
@@ -439,7 +462,15 @@ const ManagerLayout = () => {
               onClick={(e) => { e.preventDefault(); handleTabChange("staff"); }}
             >
               <Users className="nav-icon" />
-              <span>Phân công KTV</span>
+              <span>Staff Management</span>
+            </a>
+            <a
+              href="#"
+              className={`nav-item ${currentTab === "inventory" ? "active" : ""}`}
+              onClick={(e) => { e.preventDefault(); handleTabChange("inventory"); }}
+            >
+              <Boxes className="nav-icon" />
+              <span>Kho</span>
             </a>
             <a
               href="#"
@@ -447,7 +478,7 @@ const ManagerLayout = () => {
               onClick={(e) => { e.preventDefault(); handleTabChange("warehouse"); }}
             >
               <Layers className="nav-icon" />
-              <span>Kho</span>
+              <span>Sơ đồ kệ</span>
             </a>
             <a
               href="#"

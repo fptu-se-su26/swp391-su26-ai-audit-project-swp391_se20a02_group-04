@@ -64,17 +64,38 @@ function formatDate(dateValue) {
   return date.toLocaleDateString("vi-VN");
 }
 
+function formatTime(timeValue) {
+  if (!timeValue) return "";
+  const text = String(timeValue).trim();
+  const timeMatch = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (timeMatch) return `${String(timeMatch[1]).padStart(2, "0")}:${timeMatch[2]}`;
+
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
+  return date.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
 function toApiDate(dateValue) {
   if (!dateValue) return undefined;
   const normalized = String(dateValue).trim();
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(normalized)) return normalized.slice(0, 10);
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(normalized)) {
     const [day, month, year] = normalized.split("/");
     return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   }
 
-  return normalized;
+  const parsedDate = new Date(normalized);
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return parsedDate.toISOString().slice(0, 10);
+  }
+
+  return undefined;
 }
 
 function getCustomer(appointment = {}) {
@@ -146,7 +167,7 @@ export function mapAdminAppointment(appointment = {}) {
     repairBayLocation: repairBay.location || "",
     techAssigned: staff.full_name || "Chưa phân công",
     technicianSpecialization: staff.specialization || "",
-    startTime: assignment.estimated_start_time || appointment.appointment_start_at || "",
+    startTime: formatTime(assignment.estimated_start_time || appointment.appointment_start_at || appointment.start_time || appointment.time_slot),
     expectedDone: appointment.end_time || (appointment.estimated_end_time ? new Date(appointment.estimated_end_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "--:--"),
     urgency: getUrgency(appointment),
     status,
@@ -196,13 +217,23 @@ export async function updateAdminAppointmentStatus(appointmentId, status, notes 
 }
 
 export async function updateAdminAppointment(appointmentId, payload = {}) {
+  const appointmentDate = toApiDate(payload.appointmentDate);
+
   return adminAppointmentRequest(`/admin/appointments/${appointmentId}`, {
     method: "PUT",
     body: JSON.stringify({
-      ...(payload.appointmentDate ? { appointment_date: toApiDate(payload.appointmentDate) } : {}),
+      ...(appointmentDate ? { appointment_date: appointmentDate } : {}),
       ...(payload.appointmentHour ? { start_time: payload.appointmentHour } : {}),
       ...(payload.expectedDone ? { end_time: payload.expectedDone } : {}),
-      ...(payload.customerNote ? { staff_notes: payload.customerNote } : {}),
+      ...(payload.garageNote ? { staff_notes: payload.garageNote } : payload.customerNote ? { staff_notes: payload.customerNote } : {}),
+      ...(payload.vehicleName || payload.vehiclePlate || payload.vehicleYear || payload.vehicleMileage ? {
+        vehicle_info: {
+          ...(payload.vehicleName ? { model: payload.vehicleName } : {}),
+          ...(payload.vehiclePlate ? { license_plate: payload.vehiclePlate } : {}),
+          ...(payload.vehicleYear ? { year: Number(payload.vehicleYear) } : {}),
+          ...(payload.vehicleMileage ? { odometer: Number(String(payload.vehicleMileage).replace(/[^\d]/g, "")) } : {}),
+        },
+      } : {}),
     }),
   });
 }

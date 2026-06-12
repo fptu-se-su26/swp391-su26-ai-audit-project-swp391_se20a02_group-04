@@ -4,7 +4,7 @@ const userAuditSchema = new mongoose.Schema({
   user_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'User ID is required']
+    default: null
   },
   action: {
     type: String,
@@ -19,6 +19,7 @@ const userAuditSchema = new mongoose.Schema({
       'OTP_VERIFY',
       'OTP_RESEND',
       'PROFILE_UPDATE',
+      'PROFILE_UPDATED',
       'ADMIN_UPDATE',
       'ADMIN_DELETE',
       'ADMIN_DEACTIVATE',
@@ -30,12 +31,20 @@ const userAuditSchema = new mongoose.Schema({
       'ACCOUNT_LOCKED',
       'ACCOUNT_UNLOCKED',
       'APPOINTMENT_UPDATED',
+      'APPOINTMENT_ACKNOWLEDGED',
       'APPOINTMENT_STATUS_CHANGED',
       'APPOINTMENT_CANCELLED',
       'APPOINTMENT_NOTES_ADDED',
+      'APPOINTMENT_ASSIGNED',
+      'APPOINTMENT_REASSIGNED',
       'STAFF_ASSIGNED',
       'STAFF_CHECK_IN',
       'STAFF_CHECK_OUT',
+      'SCHEDULE_CREATED',
+      'SCHEDULE_UPDATED',
+      'SCHEDULE_CANCELLED',
+      'ATTENDANCE_MANUALLY_CREATED',
+      'ATTENDANCE_MANUALLY_ADJUSTED',
       'STAFF_MATERIALS_USED',
       'INVENTORY_CREATED',
       'INVENTORY_UPDATED',

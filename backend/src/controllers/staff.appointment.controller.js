@@ -1,7 +1,9 @@
 const Appointment = require('../models/Appointment.model');
-const Service = require('../models/Service.model');
 const User = require('../models/User.model');
 const UserAudit = require('../models/UserAudit.model');
+const StaffAttendance = require('../models/StaffAttendance.model');
+const WorkSchedule = require('../models/WorkSchedule.model');
+const InventoryTransaction = require('../models/InventoryTransaction.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const mongoose = require('mongoose');
 
@@ -13,6 +15,222 @@ const getDateDaysAgo = (days) => {
   const date = new Date();
   date.setDate(date.getDate() - Number(days || 0));
   return toDateString(date);
+};
+
+const isPrivileged = (user = {}) => {
+  const roles = user.roles || [];
+  return roles.includes('ADMIN') || roles.includes('MANAGER');
+};
+
+const createAuditSafely = async (req, action, metadata = {}, userId = req.user.userId) => {
+  try {
+    await UserAudit.create({
+      user_id: userId,
+      action,
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata
+    });
+  } catch (error) {
+    console.warn('Staff audit log failed:', error.message);
+  }
+};
+
+const checkStaffAppointmentOwnership = (appointment, user) => {
+  if (!appointment) return { ok: false, statusCode: 404, message: 'Appointment not found' };
+  if (isPrivileged(user)) return { ok: true };
+  if (appointment.staff_id && appointment.staff_id.toString() === user.userId.toString()) {
+    return { ok: true };
+  }
+  return { ok: false, statusCode: 403, message: 'You can only access appointments assigned to you' };
+};
+
+const getCurrentWeekRange = () => {
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const start = new Date(now);
+  start.setDate(now.getDate() - day + 1);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return [toDateString(start), toDateString(end)];
+};
+
+const getWeekRange = (weekValue) => {
+  if (!weekValue) return getCurrentWeekRange();
+  const match = String(weekValue).match(/^(\d{4})-W(\d{2})$/);
+  if (!match) return getCurrentWeekRange();
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  const firstDay = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
+  const day = firstDay.getUTCDay() || 7;
+  firstDay.setUTCDate(firstDay.getUTCDate() - day + 1);
+  const end = new Date(firstDay);
+  end.setUTCDate(firstDay.getUTCDate() + 6);
+  return [firstDay.toISOString().slice(0, 10), end.toISOString().slice(0, 10)];
+};
+
+const populateStaffAppointment = (query) => query
+  .populate('customer_id', 'full_name email phone avatar_url')
+  .populate('staff_id', 'full_name email phone specialization')
+  .populate('service_id', 'service_name description base_price estimated_duration category')
+  .populate('repair_bay_id', 'name code location equipment status')
+  .populate('cancelled_by', 'full_name email')
+  .populate('acknowledged_by', 'full_name email');
+
+const scheduleResponse = (schedule) => {
+  if (!schedule) return null;
+  return {
+    id: String(schedule._id),
+    staff_id: String(schedule.staff_id),
+    work_date: schedule.work_date,
+    shift: schedule.shift,
+    shift_start: schedule.shift_start,
+    shift_end: schedule.shift_end,
+    status: schedule.status,
+    note: schedule.note || ''
+  };
+};
+
+const attendanceResponse = (attendance) => {
+  if (!attendance) return null;
+  return {
+    id: String(attendance._id),
+    staff_id: String(attendance.staff_id),
+    work_date: attendance.work_date,
+    check_in_at: attendance.check_in_at,
+    check_out_at: attendance.check_out_at,
+    total_minutes: attendance.total_minutes || 0,
+    status: attendance.status,
+    check_in_note: attendance.check_in_note || '',
+    check_out_note: attendance.check_out_note || ''
+  };
+};
+
+const getDashboard = async (req, res) => {
+  try {
+    const staffId = req.user.userId;
+    const today = toDateString();
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const nextWeekDate = toDateString(nextWeek);
+
+    const [
+      profile,
+      schedules,
+      attendance,
+      appointmentsToday,
+      pendingJobs,
+      inProgressJobs,
+      completedToday,
+      upcomingThisWeek
+    ] = await Promise.all([
+      User.findById(staffId).select('full_name email phone avatar_url specialization created_at'),
+      WorkSchedule.find({ staff_id: staffId, work_date: today, status: { $ne: 'CANCELLED' } }).sort({ shift_start: 1 }),
+      StaffAttendance.findOne({ staff_id: staffId, work_date: today }),
+      populateStaffAppointment(Appointment.find({ staff_id: staffId, appointment_date: today }).sort({ start_time: 1 })),
+      Appointment.countDocuments({ staff_id: staffId, status: { $in: ['PENDING', 'CONFIRMED'] } }),
+      Appointment.countDocuments({ staff_id: staffId, status: 'IN_PROGRESS' }),
+      Appointment.countDocuments({ staff_id: staffId, status: 'COMPLETED', appointment_date: today }),
+      Appointment.countDocuments({
+        staff_id: staffId,
+        appointment_date: { $gte: today, $lte: nextWeekDate },
+        status: { $in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] }
+      })
+    ]);
+
+    return successResponse(res, 200, 'Staff dashboard retrieved successfully', {
+      today: {
+        work_date: today,
+        schedule: schedules.length === 1 ? scheduleResponse(schedules[0]) : schedules.map(scheduleResponse),
+        attendance: attendanceResponse(attendance),
+        appointments_today: appointmentsToday
+      },
+      overview: {
+        pending_jobs: pendingJobs,
+        in_progress_jobs: inProgressJobs,
+        completed_today: completedToday,
+        upcoming_this_week: upcomingThisWeek
+      },
+      profile: profile ? {
+        id: String(profile._id),
+        full_name: profile.full_name,
+        email: profile.email,
+        phone: profile.phone,
+        avatar_url: profile.avatar_url,
+        specialization: profile.specialization || '',
+        created_at: profile.created_at
+      } : null
+    });
+  } catch (error) {
+    console.error('Get staff dashboard error:', error);
+    return errorResponse(res, 500, 'Failed to retrieve staff dashboard');
+  }
+};
+
+const getMySchedule = async (req, res) => {
+  try {
+    const staffId = req.user.userId;
+    let dateFrom = req.query.date_from;
+    let dateTo = req.query.date_to;
+    if (!dateFrom && !dateTo) {
+      [dateFrom, dateTo] = getWeekRange(req.query.week);
+    }
+
+    const [schedules, attendanceRecords, appointments] = await Promise.all([
+      WorkSchedule.find({ staff_id: staffId, work_date: { $gte: dateFrom, $lte: dateTo } }).sort({ work_date: 1, shift_start: 1 }),
+      StaffAttendance.find({ staff_id: staffId, work_date: { $gte: dateFrom, $lte: dateTo } }),
+      Appointment.aggregate([
+        { $match: { staff_id: new mongoose.Types.ObjectId(staffId), appointment_date: { $gte: dateFrom, $lte: dateTo } } },
+        { $group: { _id: '$appointment_date', count: { $sum: 1 } } }
+      ])
+    ]);
+
+    const attendanceByDate = new Map(attendanceRecords.map((record) => [record.work_date, attendanceResponse(record)]));
+    const countByDate = new Map(appointments.map((row) => [row._id, row.count]));
+    const grouped = schedules.reduce((acc, schedule) => {
+      if (!acc[schedule.work_date]) {
+        acc[schedule.work_date] = {
+          work_date: schedule.work_date,
+          schedules: [],
+          attendance: attendanceByDate.get(schedule.work_date) || null,
+          appointment_count: countByDate.get(schedule.work_date) || 0
+        };
+      }
+      acc[schedule.work_date].schedules.push(scheduleResponse(schedule));
+      return acc;
+    }, {});
+
+    return successResponse(res, 200, 'Staff schedule retrieved successfully', {
+      date_from: dateFrom,
+      date_to: dateTo,
+      items: Object.values(grouped)
+    });
+  } catch (error) {
+    console.error('Get staff schedule error:', error);
+    return errorResponse(res, 500, 'Failed to retrieve staff schedule');
+  }
+};
+
+const getTodaySchedule = async (req, res) => {
+  try {
+    const today = toDateString();
+    const [schedules, attendance, appointments] = await Promise.all([
+      WorkSchedule.find({ staff_id: req.user.userId, work_date: today, status: { $ne: 'CANCELLED' } }).sort({ shift_start: 1 }),
+      StaffAttendance.findOne({ staff_id: req.user.userId, work_date: today }),
+      populateStaffAppointment(Appointment.find({ staff_id: req.user.userId, appointment_date: today }).sort({ start_time: 1 }))
+    ]);
+
+    return successResponse(res, 200, 'Today schedule retrieved successfully', {
+      work_date: today,
+      schedules: schedules.map(scheduleResponse),
+      attendance: attendanceResponse(attendance),
+      appointments
+    });
+  } catch (error) {
+    console.error('Get today schedule error:', error);
+    return errorResponse(res, 500, 'Failed to retrieve today schedule');
+  }
 };
 
 /**
@@ -52,10 +270,8 @@ const getMyAssignedAppointments = async (req, res) => {
     const sortOrder = sort_order === 'asc' ? 1 : -1;
 
     const [appointments, total] = await Promise.all([
-      Appointment.find(query)
-        .populate('customer_id', 'full_name email phone')
-        .populate('service_id', 'service_name description base_price estimated_duration category')
-        .sort({ [sort_by]: sortOrder })
+      populateStaffAppointment(Appointment.find(query))
+        .sort({ [sort_by]: sortOrder, start_time: sortOrder })
         .limit(parseInt(limit))
         .skip(skip),
       Appointment.countDocuments(query)
@@ -96,11 +312,15 @@ const getAllAppointments = async (req, res) => {
 
     const query = {};
 
+    if (!isPrivileged(req.user)) {
+      query.staff_id = req.user.userId;
+    }
+
     if (status) {
       query.status = status.toUpperCase();
     }
 
-    if (staff_id) {
+    if (staff_id && isPrivileged(req.user)) {
       if (staff_id === 'unassigned') {
         query.staff_id = null;
       } else {
@@ -150,25 +370,35 @@ const getAllAppointments = async (req, res) => {
 };
 
 /**
- * Get appointment by ID (Staff can see any appointment)
+ * Get appointment by ID
  * GET /api/staff/appointments/:id
  */
 const getAppointmentById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const appointment = await Appointment.findById(id)
-      .populate('customer_id', 'full_name email phone avatar_url')
-      .populate('staff_id', 'full_name email phone')
-      .populate('service_id', 'service_name description base_price estimated_duration category')
-      .populate('cancelled_by', 'full_name email');
+    const appointment = await populateStaffAppointment(Appointment.findById(id));
 
     if (!appointment) {
       return errorResponse(res, 404, 'Appointment not found');
     }
 
+    const ownership = checkStaffAppointmentOwnership(appointment, req.user);
+    if (!ownership.ok) {
+      return errorResponse(res, ownership.statusCode, ownership.message);
+    }
+
+    const materials_used = await InventoryTransaction.find({
+      reference_type: 'APPOINTMENT',
+      reference_id: appointment._id
+    })
+      .populate('inventory_item_id', 'item_code item_name unit unit_price quantity')
+      .populate('performed_by', 'full_name email')
+      .sort({ created_at: -1 });
+
     return successResponse(res, 200, 'Appointment retrieved successfully', {
-      appointment
+      appointment,
+      materials_used
     });
 
   } catch (error) {
@@ -201,9 +431,9 @@ const updateAppointmentStatus = async (req, res) => {
       return errorResponse(res, 404, 'Appointment not found');
     }
 
-    // Staff can only update appointments assigned to them
-    if (appointment.staff_id && appointment.staff_id.toString() !== req.user.userId) {
-      return errorResponse(res, 403, 'You can only update appointments assigned to you');
+    const ownership = checkStaffAppointmentOwnership(appointment, req.user);
+    if (!ownership.ok) {
+      return errorResponse(res, ownership.statusCode, ownership.message);
     }
 
     const oldStatus = appointment.status;
@@ -215,11 +445,6 @@ const updateAppointmentStatus = async (req, res) => {
       if (actual_duration) {
         appointment.actual_duration = parseInt(actual_duration);
       }
-    }
-
-    // Auto-assign staff if not assigned and status is being updated
-    if (!appointment.staff_id) {
-      appointment.staff_id = req.user.userId;
     }
 
     if (notes) {
@@ -278,6 +503,11 @@ const addAppointmentNotes = async (req, res) => {
       return errorResponse(res, 404, 'Appointment not found');
     }
 
+    const ownership = checkStaffAppointmentOwnership(appointment, req.user);
+    if (!ownership.ok) {
+      return errorResponse(res, ownership.statusCode, ownership.message);
+    }
+
     const oldNotes = appointment.staff_notes;
     appointment.staff_notes = notes.trim();
     await appointment.save();
@@ -307,6 +537,169 @@ const addAppointmentNotes = async (req, res) => {
   } catch (error) {
     console.error('Add appointment notes error:', error);
     return errorResponse(res, 500, 'Failed to add notes');
+  }
+};
+
+const acknowledgeAppointment = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const ownership = checkStaffAppointmentOwnership(appointment, req.user);
+    if (!ownership.ok) return errorResponse(res, ownership.statusCode, ownership.message);
+    if (appointment.status !== 'CONFIRMED') {
+      return errorResponse(res, 400, 'Only confirmed appointments can be acknowledged');
+    }
+
+    appointment.acknowledged_at = new Date();
+    appointment.acknowledged_by = req.user.userId;
+    await appointment.save();
+
+    await createAuditSafely(req, 'APPOINTMENT_ACKNOWLEDGED', { appointment_id: appointment._id });
+    const updated = await populateStaffAppointment(Appointment.findById(appointment._id));
+    return successResponse(res, 200, 'Appointment acknowledged successfully', { appointment: updated });
+  } catch (error) {
+    console.error('Acknowledge appointment error:', error);
+    return errorResponse(res, 500, 'Failed to acknowledge appointment');
+  }
+};
+
+const startAppointment = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const ownership = checkStaffAppointmentOwnership(appointment, req.user);
+    if (!ownership.ok) return errorResponse(res, ownership.statusCode, ownership.message);
+    if (appointment.status !== 'CONFIRMED') {
+      return errorResponse(res, 400, 'Only confirmed appointments can be started');
+    }
+
+    const oldStatus = appointment.status;
+    appointment.status = 'IN_PROGRESS';
+    appointment.actual_start_time = new Date();
+    if (req.body.notes) appointment.staff_notes = req.body.notes.trim();
+    await appointment.save();
+
+    await createAuditSafely(req, 'APPOINTMENT_STATUS_CHANGED', {
+      appointment_id: appointment._id,
+      old_status: oldStatus,
+      new_status: appointment.status
+    });
+
+    const updated = await populateStaffAppointment(Appointment.findById(appointment._id));
+    return successResponse(res, 200, 'Appointment started successfully', { appointment: updated });
+  } catch (error) {
+    console.error('Start appointment error:', error);
+    return errorResponse(res, 500, 'Failed to start appointment');
+  }
+};
+
+const completeAppointment = async (req, res) => {
+  try {
+    const { completion_notes = '', actual_duration } = req.body;
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const ownership = checkStaffAppointmentOwnership(appointment, req.user);
+    if (!ownership.ok) return errorResponse(res, ownership.statusCode, ownership.message);
+    if (appointment.status !== 'IN_PROGRESS') {
+      return errorResponse(res, 400, 'Only in-progress appointments can be completed');
+    }
+
+    const now = new Date();
+    const oldStatus = appointment.status;
+    appointment.status = 'COMPLETED';
+    appointment.completed_at = now;
+    appointment.actual_end_time = now;
+    appointment.completion_notes = completion_notes || appointment.completion_notes;
+    if (completion_notes) appointment.staff_notes = completion_notes.trim();
+    if (actual_duration) {
+      appointment.actual_duration = Number(actual_duration);
+    } else if (appointment.actual_start_time) {
+      appointment.actual_duration = Math.max(1, Math.round((now - appointment.actual_start_time) / 60000));
+    }
+    await appointment.save();
+
+    await createAuditSafely(req, 'APPOINTMENT_STATUS_CHANGED', {
+      appointment_id: appointment._id,
+      old_status: oldStatus,
+      new_status: appointment.status,
+      actual_duration: appointment.actual_duration
+    });
+
+    const updated = await populateStaffAppointment(Appointment.findById(appointment._id));
+    return successResponse(res, 200, 'Appointment completed successfully', { appointment: updated });
+  } catch (error) {
+    console.error('Complete appointment error:', error);
+    return errorResponse(res, 500, 'Failed to complete appointment');
+  }
+};
+
+const markNoShow = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const ownership = checkStaffAppointmentOwnership(appointment, req.user);
+    if (!ownership.ok) return errorResponse(res, ownership.statusCode, ownership.message);
+    if (appointment.status !== 'CONFIRMED') {
+      return errorResponse(res, 400, 'Only confirmed appointments can be marked no-show');
+    }
+
+    const oldStatus = appointment.status;
+    appointment.status = 'NO_SHOW';
+    if (req.body.notes) appointment.staff_notes = req.body.notes.trim();
+    await appointment.save();
+
+    await createAuditSafely(req, 'APPOINTMENT_STATUS_CHANGED', {
+      appointment_id: appointment._id,
+      old_status: oldStatus,
+      new_status: appointment.status
+    });
+
+    const updated = await populateStaffAppointment(Appointment.findById(appointment._id));
+    return successResponse(res, 200, 'Appointment marked no-show successfully', { appointment: updated });
+  } catch (error) {
+    console.error('No-show appointment error:', error);
+    return errorResponse(res, 500, 'Failed to mark no-show');
+  }
+};
+
+const getAppointmentHistory = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, date_from = '', date_to = '' } = req.query;
+    const query = {
+      staff_id: req.user.userId,
+      status: { $in: ['COMPLETED', 'NO_SHOW'] }
+    };
+    if (date_from || date_to) {
+      query.appointment_date = {};
+      if (date_from) query.appointment_date.$gte = date_from;
+      if (date_to) query.appointment_date.$lte = date_to;
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const [appointments, total] = await Promise.all([
+      populateStaffAppointment(Appointment.find(query))
+        .sort({ appointment_date: -1, start_time: -1 })
+        .limit(Number(limit))
+        .skip(skip),
+      Appointment.countDocuments(query)
+    ]);
+
+    return successResponse(res, 200, 'Appointment history retrieved successfully', {
+      appointments,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Get appointment history error:', error);
+    return errorResponse(res, 500, 'Failed to retrieve appointment history');
   }
 };
 
@@ -366,7 +759,9 @@ const getMyWorkloadStats = async (req, res) => {
       completedAppointments,
       inProgressAppointments,
       upcomingAppointments,
-      todayAppointments
+      todayAppointments,
+      noShowAppointments,
+      attendanceRecords
     ] = await Promise.all([
       Appointment.countDocuments({ 
         staff_id: staffId,
@@ -389,7 +784,16 @@ const getMyWorkloadStats = async (req, res) => {
       Appointment.countDocuments({ 
         staff_id: staffId,
         appointment_date: today
-      })
+      }),
+      Appointment.countDocuments({
+        staff_id: staffId,
+        status: 'NO_SHOW',
+        appointment_date: { $gte: dateFrom }
+      }),
+      StaffAttendance.find({
+        staff_id: staffId,
+        work_date: { $gte: dateFrom }
+      }).select('total_minutes')
     ]);
 
     // Get completion rate
@@ -414,15 +818,22 @@ const getMyWorkloadStats = async (req, res) => {
       { $sort: { _id: 1 } }
     ]);
 
+    const totalMinutes = attendanceRecords.reduce((sum, record) => sum + (record.total_minutes || 0), 0);
+    const overview = {
+      total_assigned: totalAssigned,
+      completed: completedAppointments,
+      in_progress: inProgressAppointments,
+      no_show: noShowAppointments,
+      upcoming: upcomingAppointments,
+      today: todayAppointments,
+      completion_rate: parseFloat(completionRate),
+      total_working_hours: Number((totalMinutes / 60).toFixed(2)),
+      appointments_by_date: appointmentsByDate
+    };
+
     return successResponse(res, 200, 'Workload statistics retrieved successfully', {
-      overview: {
-        total_assigned: totalAssigned,
-        completed: completedAppointments,
-        in_progress: inProgressAppointments,
-        upcoming: upcomingAppointments,
-        today: todayAppointments,
-        completion_rate: parseFloat(completionRate)
-      },
+      ...overview,
+      overview,
       charts: {
         appointments_by_date: appointmentsByDate
       },
@@ -435,12 +846,84 @@ const getMyWorkloadStats = async (req, res) => {
   }
 };
 
+const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('full_name email phone avatar_url specialization created_at is_active');
+    if (!user) return errorResponse(res, 404, 'Profile not found');
+
+    return successResponse(res, 200, 'Staff profile retrieved successfully', {
+      user: {
+        id: String(user._id),
+        full_name: user.full_name,
+        email: user.email,
+        phone: user.phone,
+        avatar_url: user.avatar_url,
+        specialization: user.specialization || '',
+        created_at: user.created_at,
+        is_active: user.is_active
+      }
+    });
+  } catch (error) {
+    console.error('Get staff profile error:', error);
+    return errorResponse(res, 500, 'Failed to retrieve staff profile');
+  }
+};
+
+const updateProfile = async (req, res) => {
+  try {
+    const allowedFields = ['full_name', 'phone', 'specialization'];
+    const unknownFields = Object.keys(req.body || {}).filter((field) => !allowedFields.includes(field));
+    if (unknownFields.length > 0) {
+      return errorResponse(res, 400, `Fields not allowed: ${unknownFields.join(', ')}`);
+    }
+
+    const { full_name, phone, specialization } = req.body;
+    if (phone && !/^[0-9]{10,11}$/.test(String(phone))) {
+      return errorResponse(res, 400, 'Phone must contain 10-11 digits');
+    }
+
+    if (phone) {
+      const duplicate = await User.findOne({ phone, _id: { $ne: req.user.userId } }).select('_id');
+      if (duplicate) return errorResponse(res, 409, 'Phone number already exists');
+    }
+
+    const user = await User.findById(req.user.userId);
+    if (!user) return errorResponse(res, 404, 'Profile not found');
+
+    if (full_name !== undefined) user.full_name = String(full_name).trim();
+    if (phone !== undefined) user.phone = String(phone).trim();
+    if (specialization !== undefined) user.specialization = String(specialization).trim();
+    await user.save();
+
+    await createAuditSafely(req, 'PROFILE_UPDATED', {
+      updated_fields: Object.keys(req.body || {})
+    });
+
+    return successResponse(res, 200, 'Staff profile updated successfully', {
+      user: user.toSafeObject()
+    });
+  } catch (error) {
+    console.error('Update staff profile error:', error);
+    return errorResponse(res, 500, 'Failed to update staff profile');
+  }
+};
+
 module.exports = {
+  acknowledgeAppointment,
+  completeAppointment,
+  getAppointmentHistory,
+  getDashboard,
   getMyAssignedAppointments,
   getAllAppointments,
   getAppointmentById,
+  getMySchedule,
+  getProfile,
   updateAppointmentStatus,
+  updateProfile,
   addAppointmentNotes,
+  markNoShow,
+  startAppointment,
+  getTodaySchedule,
   getTodayAppointments,
   getMyWorkloadStats
 };
