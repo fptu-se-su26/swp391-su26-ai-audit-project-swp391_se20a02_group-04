@@ -22,6 +22,7 @@ export default function StaffLayout() {
           <Route path="schedule" element={<StaffSchedule />} />
           <Route path="jobs" element={<StaffJobs />} />
           <Route path="jobs/:jobId" element={<StaffJobDetail />} />
+          <Route path="jobs/:jobId/detail" element={<StaffJobDetail />} />
           <Route path="jobs/:jobId/start" element={<StaffJobStart />} />
           <Route path="jobs/:jobId/materials" element={<StaffJobMaterials />} />
           <Route path="jobs/:jobId/complete" element={<StaffJobComplete />} />

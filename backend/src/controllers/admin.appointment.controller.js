@@ -14,6 +14,7 @@ const {
   listTechnicians,
   startAppointment
 } = require('../services/appointment-scheduling.service');
+const { validateAppointmentTransition } = require('../utils/appointmentStateMachine');
 
 const getDocumentId = (value) => value?._id || value;
 
@@ -231,23 +232,40 @@ const updateAppointmentStatus = async (req, res) => {
       return errorResponse(res, 400, 'Status is required');
     }
 
-    const validStatuses = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
-    if (!validStatuses.includes(status.toUpperCase())) {
-      return errorResponse(res, 400, 'Invalid status');
-    }
-
     const appointment = await Appointment.findById(id);
 
     if (!appointment) {
       return errorResponse(res, 404, 'Appointment not found');
     }
 
-    const oldStatus = appointment.status;
-    appointment.status = status.toUpperCase();
+    const transition = validateAppointmentTransition(appointment, status);
+    if (!transition.ok) {
+      return errorResponse(res, transition.statusCode, transition.message);
+    }
 
-    // Set completed_at when status is COMPLETED
-    if (status.toUpperCase() === 'COMPLETED' && !appointment.completed_at) {
+    const oldStatus = appointment.status;
+    appointment.status = transition.target;
+
+    if (transition.target === 'IN_PROGRESS' && !appointment.actual_start_time) {
+      appointment.actual_start_time = new Date();
+    }
+
+    if (transition.target === 'COMPLETED' && !appointment.completed_at) {
       appointment.completed_at = new Date();
+      appointment.actual_end_time = appointment.actual_end_time || appointment.completed_at;
+    }
+
+    if (transition.target === 'CONFIRMED' && !appointment.confirmed_at) {
+      appointment.confirmed_at = new Date();
+    }
+
+    if (transition.target === 'CANCELLED' && !appointment.cancelled_at) {
+      appointment.cancelled_at = new Date();
+      appointment.cancelled_by = req.user.userId;
+    }
+
+    if (transition.target === 'NO_SHOW' && !appointment.actual_end_time) {
+      appointment.actual_end_time = new Date();
     }
 
     if (notes) {
@@ -361,11 +379,6 @@ const assignStaff = async (req, res) => {
     const oldStaffId = appointment.staff_id;
     appointment.staff_id = staff_id;
 
-    // Auto-confirm appointment when staff is assigned
-    if (appointment.status === 'PENDING') {
-      appointment.status = 'CONFIRMED';
-    }
-
     await appointment.save();
 
     // Log audit
@@ -404,18 +417,42 @@ const assignAppointmentHandler = async (req, res) => {
   try {
     const { id } = req.params;
     const { technician_id, repair_bay_id, notes } = req.body;
+    const force = req.body.force === true || req.body.force === 'true';
+
+    const currentAppointment = await Appointment.findById(id);
+    if (!currentAppointment) {
+      return errorResponse(res, 404, 'Appointment not found');
+    }
+
+    if (['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(currentAppointment.status)) {
+      return errorResponse(res, 422, 'Appointment đã kết thúc, không thể phân công');
+    }
+
+    const alreadyAssigned = Boolean(currentAppointment.assignment_id || currentAppointment.staff_id || currentAppointment.repair_bay_id);
+    if (alreadyAssigned && ['CONFIRMED', 'IN_PROGRESS'].includes(currentAppointment.status)) {
+      if (currentAppointment.status === 'IN_PROGRESS' || force !== true) {
+        return errorResponse(
+          res,
+          currentAppointment.status === 'IN_PROGRESS' ? 422 : 409,
+          currentAppointment.status === 'IN_PROGRESS'
+            ? 'Không thể phân công lại appointment đang xử lý'
+            : 'Appointment đã được phân công. Hãy huỷ phân công hiện tại trước khi phân công lại'
+        );
+      }
+    }
 
     const appointment = await assignAppointment({
       appointmentId: id,
       technicianId: technician_id,
       repairBayId: repair_bay_id,
       assignedBy: req.user.userId,
-      notes
+      notes,
+      force
     });
 
     await UserAudit.create({
       user_id: getDocumentId(appointment.customer_id),
-      action: 'APPOINTMENT_ASSIGNED',
+      action: alreadyAssigned && force === true ? 'APPOINTMENT_REASSIGNED' : 'APPOINTMENT_ASSIGNED',
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
       status: 'SUCCESS',
@@ -423,7 +460,11 @@ const assignAppointmentHandler = async (req, res) => {
         assigned_by: req.user.userId,
         appointment_id: id,
         technician_id,
-        repair_bay_id
+        repair_bay_id,
+        force: Boolean(force),
+        previous_staff_id: currentAppointment.staff_id,
+        previous_repair_bay_id: currentAppointment.repair_bay_id,
+        previous_assignment_id: currentAppointment.assignment_id
       }
     });
 

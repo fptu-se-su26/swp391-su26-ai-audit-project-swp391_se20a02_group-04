@@ -7,6 +7,7 @@ import {
   getTodayAttendance,
   saveStaffAppointmentNote,
 } from "../../services/staffAppointmentApi";
+import { getJobRouteId, isJobAssignedToUser } from "./staffAppointmentMapper";
 
 export function Icon({ name, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -164,29 +165,35 @@ export function StatCard({ icon, label, value, helper, tone }) {
   );
 }
 
-function getPrimaryAction(job) {
+function buildPrimaryJobAction(job) {
+  const { user } = getAuthSession();
+  const routeId = getJobRouteId(job);
+  const belongsToCurrentStaff = isJobAssignedToUser(job, user);
+
   if (job.statusKey === "assigned") {
-    return { label: "Bắt đầu", to: `/staff/jobs/${job.id}/start`, className: "primary-button" };
+    return { label: "Bắt đầu", to: `/staff/jobs/${routeId}/start`, className: "primary-button" };
   }
 
-  if (job.statusKey === "in_progress") {
-    return { label: "Hoàn thành", to: `/staff/jobs/${job.id}/complete`, className: "primary-button success" };
+  if (job.statusKey === "in_progress" && belongsToCurrentStaff) {
+    return { label: "Hoàn thành", to: `/staff/jobs/${routeId}/complete`, className: "primary-button success" };
   }
 
-  return { label: "Chi tiết", to: `/staff/jobs/${job.id}`, className: "primary-button dark" };
+  return { label: "Chi tiết", to: `/staff/jobs/${routeId}`, className: "primary-button dark" };
 }
 
-function getSecondaryAction(job) {
+function buildSecondaryJobAction(job) {
+  const routeId = getJobRouteId(job);
+
   if (job.statusKey === "in_progress") {
-    return { label: "Thêm vật tư", to: `/staff/jobs/${job.id}/materials` };
+    return { label: "Thêm vật tư", to: `/staff/jobs/${routeId}/materials` };
   }
 
-  return { label: "Chi tiết", to: `/staff/jobs/${job.id}` };
+  return { label: "Chi tiết", to: `/staff/jobs/${routeId}` };
 }
 
 export function JobCard({ job, compact = false }) {
-  const primaryAction = getPrimaryAction(job);
-  const secondaryAction = getSecondaryAction(job);
+  const primaryAction = buildPrimaryJobAction(job);
+  const secondaryAction = buildSecondaryJobAction(job);
 
   return (
     <article className={`job-card ${compact ? "compact-card" : ""}`}>
@@ -382,7 +389,7 @@ export function QuickNote({ job, onSaved }) {
 
     setSaving(true);
     try {
-      await saveStaffAppointmentNote(job.id, note.trim());
+      await saveStaffAppointmentNote(getJobRouteId(job), note.trim());
       setMessage("Da luu ghi chu ky thuat.");
       onSaved?.();
       window.setTimeout(() => setMessage(""), 2200);

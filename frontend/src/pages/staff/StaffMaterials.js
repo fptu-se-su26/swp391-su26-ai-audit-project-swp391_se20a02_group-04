@@ -6,7 +6,7 @@ import {
   getStaffInventory,
   useAppointmentMaterials,
 } from "../../services/staffAppointmentApi";
-import { formatCurrency, getNextJob, mapAppointmentToJob } from "./staffAppointmentMapper";
+import { formatCurrency, getJobRouteId, getNextJob, mapAppointmentToJob } from "./staffAppointmentMapper";
 import "../../styles/staff/StaffMaterials.css";
 
 function getStockClass(item) {
@@ -41,7 +41,7 @@ export default function StaffMaterials() {
       const nextItems = inventoryResponse.data?.items || [];
       setJobs(nextJobs);
       setItems(nextItems);
-      setSelectedJobId((current) => current || getNextJob(nextJobs)?.id || nextJobs[0]?.id || "");
+      setSelectedJobId((current) => current || getJobRouteId(getNextJob(nextJobs)) || getJobRouteId(nextJobs[0]) || "");
       setSelectedItemId((current) => current || nextItems[0]?._id || "");
     } catch (err) {
       setError(err.message || "Không thể tải vật tư.");
@@ -100,7 +100,7 @@ export default function StaffMaterials() {
               Tồn kho khả dụng
             </h3>
             {activeJob && (
-              <Link className="primary-button" to={`/staff/jobs/${activeJob.id}/materials`}>
+              <Link className="primary-button" to={`/staff/jobs/${getJobRouteId(activeJob)}/materials`}>
                 <Icon name="add" />
                 Thêm vật tư theo phiếu
               </Link>
@@ -184,7 +184,7 @@ export default function StaffMaterials() {
                 <select onChange={(event) => setSelectedJobId(event.target.value)} value={selectedJobId}>
                   <option value="">Chọn công việc</option>
                   {jobs.map((job) => (
-                    <option key={job.id} value={job.id}>
+                    <option key={getJobRouteId(job)} value={getJobRouteId(job)}>
                       {job.vehicle} - {job.plate} ({job.statusLabel})
                     </option>
                   ))}
@@ -229,7 +229,7 @@ export default function StaffMaterials() {
             {jobs.length > 0 ? (
               <div className="usage-list">
                 {jobs.map((job) => (
-                  <Link className="usage-item material-job-link" key={job.id} to={`/staff/jobs/${job.id}/materials`}>
+                  <Link className="usage-item material-job-link" key={getJobRouteId(job)} to={`/staff/jobs/${getJobRouteId(job)}/materials`}>
                     <div>
                       <strong>{job.vehicle} - {job.plate}</strong>
                       <span>#{job.code}</span>

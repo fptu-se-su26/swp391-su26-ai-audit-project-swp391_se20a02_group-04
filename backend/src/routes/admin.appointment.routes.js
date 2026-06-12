@@ -51,6 +51,8 @@ const assignAppointmentValidation = [
     .withMessage('Valid technician ID is required'),
   body('repair_bay_id').notEmpty().isMongoId()
     .withMessage('Valid repair bay ID is required'),
+  body('force').optional().isBoolean()
+    .withMessage('force must be boolean'),
   body('notes').optional().trim().isLength({ max: 500 })
     .withMessage('Notes cannot exceed 500 characters')
 ];
@@ -291,7 +293,7 @@ router.put('/appointments/:id/assign',
  */
 router.put('/appointments/:id/start',
   authenticate,
-  authorize('ADMIN', 'MANAGER', 'STAFF'),
+  authorize('ADMIN', 'MANAGER'),
   param('id').isMongoId().withMessage('Invalid appointment ID'),
   validate,
   adminAppointmentController.startAppointmentHandler
@@ -304,7 +306,7 @@ router.put('/appointments/:id/start',
  */
 router.put('/appointments/:id/complete',
   authenticate,
-  authorize('ADMIN', 'MANAGER', 'STAFF'),
+  authorize('ADMIN', 'MANAGER'),
   param('id').isMongoId().withMessage('Invalid appointment ID'),
   completeAppointmentValidation,
   validate,

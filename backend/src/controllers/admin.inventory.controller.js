@@ -285,7 +285,22 @@ const deleteInventoryItem = async (req, res) => {
       return errorResponse(res, 404, 'Inventory item not found');
     }
 
+    if (Number(item.quantity) > 0) {
+      return errorResponse(
+        res,
+        422,
+        permanent === 'true'
+          ? 'Không thể xoá vĩnh viễn vật tư khi còn tồn kho'
+          : 'Không thể vô hiệu hoá vật tư khi còn tồn kho. Vui lòng xuất kho hết trước'
+      );
+    }
+
     if (permanent === 'true') {
+      const transactionCount = await InventoryTransaction.countDocuments({ inventory_item_id: id });
+      if (transactionCount > 0) {
+        return errorResponse(res, 422, 'Không thể xoá vĩnh viễn vật tư đã có lịch sử giao dịch');
+      }
+
       // Permanent deletion
       await InventoryItem.findByIdAndDelete(id);
 
@@ -339,6 +354,7 @@ const stockIn = async (req, res) => {
   try {
     const { id } = req.params;
     const { quantity, unit_cost, supplier_name, invoice_number, notes } = req.body;
+    const overrideMax = req.body.override_max === true || req.body.override_max === 'true';
 
     if (!quantity || quantity <= 0) {
       return errorResponse(res, 400, 'Valid quantity is required');
@@ -351,16 +367,29 @@ const stockIn = async (req, res) => {
     }
 
     const quantityBefore = item.quantity;
-    const quantityAfter = quantityBefore + quantity;
+    const numericQuantity = Number(quantity);
+    const quantityAfter = quantityBefore + numericQuantity;
+
+    if (
+      item.max_stock_level &&
+      quantityAfter > item.max_stock_level &&
+      overrideMax !== true
+    ) {
+      return errorResponse(
+        res,
+        422,
+        `Số lượng nhập vào sẽ vượt mức tồn kho tối đa (max: ${item.max_stock_level}, hiện tại: ${item.quantity}, nhập: ${numericQuantity})`
+      );
+    }
 
     // Update item quantity
-    await item.updateQuantity(quantity, 'STOCK_IN');
+    await item.updateQuantity(numericQuantity, 'STOCK_IN');
 
     // Create transaction record
     await InventoryTransaction.create({
       inventory_item_id: id,
       transaction_type: 'STOCK_IN',
-      quantity_change: quantity,
+      quantity_change: numericQuantity,
       quantity_before: quantityBefore,
       quantity_after: quantityAfter,
       unit_cost: unit_cost || item.cost_price || item.unit_price,
@@ -381,15 +410,16 @@ const stockIn = async (req, res) => {
       metadata: {
         item_id: id,
         item_code: item.item_code,
-        quantity,
+        quantity: numericQuantity,
         quantity_before: quantityBefore,
-        quantity_after: quantityAfter
+        quantity_after: quantityAfter,
+        override_max: overrideMax
       }
     });
 
     return successResponse(res, 200, 'Stock added successfully', {
       item: {
-        _id: item._id,
+        _id: updatedItem._id,
         item_code: item.item_code,
         item_name: item.item_name,
         quantity: item.quantity,
@@ -416,30 +446,32 @@ const stockOut = async (req, res) => {
       return errorResponse(res, 400, 'Valid quantity is required');
     }
 
-    const item = await InventoryItem.findById(id);
+    const numericQuantity = Number(quantity);
+    const updatedItem = await InventoryItem.findOneAndUpdate(
+      {
+        _id: id,
+        quantity: { $gte: numericQuantity },
+        is_active: true
+      },
+      { $inc: { quantity: -numericQuantity } },
+      { new: true, runValidators: true }
+    );
 
-    if (!item) {
-      return errorResponse(res, 404, 'Inventory item not found');
+    if (!updatedItem) {
+      return errorResponse(res, 409, 'Insufficient stock or item not found');
     }
 
-    if (item.quantity < quantity) {
-      return errorResponse(res, 400, 'Insufficient stock');
-    }
-
-    const quantityBefore = item.quantity;
-    const quantityAfter = quantityBefore - quantity;
-
-    // Update item quantity
-    await item.updateQuantity(-quantity, 'STOCK_OUT');
+    const quantityAfter = updatedItem.quantity;
+    const quantityBefore = quantityAfter + numericQuantity;
 
     // Create transaction record
     await InventoryTransaction.create({
       inventory_item_id: id,
       transaction_type: 'STOCK_OUT',
-      quantity_change: -quantity,
+      quantity_change: -numericQuantity,
       quantity_before: quantityBefore,
       quantity_after: quantityAfter,
-      unit_cost: item.cost_price || item.unit_price,
+      unit_cost: updatedItem.cost_price || updatedItem.unit_price,
       performed_by: req.user.userId,
       reference_type: reference_type || 'MANUAL',
       reference_id,
@@ -455,8 +487,8 @@ const stockOut = async (req, res) => {
       status: 'SUCCESS',
       metadata: {
         item_id: id,
-        item_code: item.item_code,
-        quantity,
+        item_code: updatedItem.item_code,
+        quantity: numericQuantity,
         quantity_before: quantityBefore,
         quantity_after: quantityAfter
       }
@@ -465,10 +497,10 @@ const stockOut = async (req, res) => {
     return successResponse(res, 200, 'Stock removed successfully', {
       item: {
         _id: item._id,
-        item_code: item.item_code,
-        item_name: item.item_name,
-        quantity: item.quantity,
-        stock_status: item.stock_status
+        item_code: updatedItem.item_code,
+        item_name: updatedItem.item_name,
+        quantity: updatedItem.quantity,
+        stock_status: updatedItem.stock_status
       }
     });
 
