@@ -11,6 +11,7 @@ import {
 import useAvailabilityCheck from "../../hooks/useAvailabilityCheck";
 import {
   assignAppointment,
+  getAvailableTechnicians,
   getRepairBays,
   getTechnicians
 } from "../../services/appointmentAssignmentApi";
@@ -20,6 +21,48 @@ function getAppointmentId(appointment = {}) {
   return appointment.rawId || appointment.raw?._id || "";
 }
 
+function toApiDate(value) {
+  if (!value) return "";
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const vnMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (vnMatch) {
+    const [, day, month, year] = vnMatch;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+}
+
+function toApiTime(value) {
+  if (!value) return "";
+  const text = String(value).trim();
+  const timeMatch = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (timeMatch) return `${String(timeMatch[1]).padStart(2, "0")}:${timeMatch[2]}`;
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function addMinutesToTime(time, minutes) {
+  const [hours, mins] = String(toApiTime(time) || "09:00").split(":").map(Number);
+  const total = (hours * 60) + mins + Number(minutes || 60);
+  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function getDurationMinutes(appointment = {}) {
+  const direct = Number(appointment.durationMinutes || appointment.raw?.total_service_duration_minutes || appointment.raw?.estimated_duration);
+  if (direct > 0) return direct;
+  const serviceText = Array.isArray(appointment.services) ? appointment.services.map((item) => item.time).join(" ") : "";
+  const match = String(serviceText || appointment.service || "").match(/(\d+)\s*(phut|phút|min|minute)/i);
+  return match ? Number(match[1]) : 60;
+}
+
 export default function AppointmentAssignmentDialog({
   appointment,
   onClose,
@@ -27,6 +70,14 @@ export default function AppointmentAssignmentDialog({
   onError
 }) {
   const appointmentId = getAppointmentId(appointment);
+  const appointmentDate = toApiDate(appointment.raw?.appointment_date || appointment.date || appointment.time);
+  const appointmentStartTime = toApiTime(appointment.startTime || appointment.hour || appointment.raw?.start_time || appointment.raw?.time_slot) || "09:00";
+  const appointmentEndTime = addMinutesToTime(appointmentStartTime, getDurationMinutes(appointment));
+  const availabilityParams = useMemo(() => ({
+    date: appointmentDate,
+    start_time: appointmentStartTime,
+    end_time: appointmentEndTime,
+  }), [appointmentDate, appointmentStartTime, appointmentEndTime]);
   const [technicians, setTechnicians] = useState([]);
   const [repairBays, setRepairBays] = useState([]);
   const [selectedTechnician, setSelectedTechnician] = useState(null);
@@ -37,7 +88,7 @@ export default function AppointmentAssignmentDialog({
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [localError, setLocalError] = useState("");
-  const { checkTechnician, checkRepairBay, loading: checking, error: availabilityError } = useAvailabilityCheck(appointmentId);
+  const { checkTechnician, checkRepairBay, loading: checking, error: availabilityError } = useAvailabilityCheck(appointmentId, availabilityParams);
 
   const isValid = useMemo(() => (
     selectedTechnician &&
@@ -55,7 +106,7 @@ export default function AppointmentAssignmentDialog({
 
       try {
         const [technicianList, bayList] = await Promise.all([
-          getTechnicians(),
+          appointmentDate ? getAvailableTechnicians({ ...availabilityParams, appointment_id: appointmentId }).catch(() => getTechnicians()) : getTechnicians(),
           getRepairBays(),
         ]);
 
@@ -74,7 +125,7 @@ export default function AppointmentAssignmentDialog({
     return () => {
       active = false;
     };
-  }, []);
+  }, [appointmentDate, appointmentId, availabilityParams]);
 
   const selectTechnician = async (technician) => {
     setSelectedTechnician(technician);
@@ -105,9 +156,10 @@ export default function AppointmentAssignmentDialog({
 
     try {
       const response = await assignAppointment(appointmentId, {
-        technician_id: selectedTechnician._id,
+        staff_id: selectedTechnician._id,
         repair_bay_id: selectedBay._id,
-        notes: notes.trim(),
+        start_time: appointmentStartTime,
+        note: notes.trim(),
       });
       onSuccess?.(response.data?.appointment, response);
     } catch (error) {
@@ -124,8 +176,8 @@ export default function AppointmentAssignmentDialog({
       <div className="assignment-dialog" role="dialog" aria-modal="true" aria-label="Assign appointment">
         <div className="assignment-dialog-header">
           <div>
-            <p>Dieu phoi lich hen</p>
-            <h2>Phan cong xu ly</h2>
+            <p>Điều phối lịch hẹn</p>
+            <h2>Phân công xử lý</h2>
           </div>
           <button className="assignment-close-btn" onClick={onClose} disabled={loading} aria-label="Close">
             <X size={20} />
@@ -135,22 +187,22 @@ export default function AppointmentAssignmentDialog({
         {initialLoading ? (
           <div className="assignment-loading">
             <Loader size={24} className="spinner" />
-            <span>Dang tai du lieu phan cong...</span>
+            <span>Đang tải dữ liệu phân công...</span>
           </div>
         ) : (
           <>
             <div className="assignment-dialog-content">
               <div className="appointment-summary">
                 <div className="summary-row">
-                  <span>Lich hen</span>
+                  <span>Lịch hẹn</span>
                   <strong>{appointment.id}</strong>
                 </div>
                 <div className="summary-row">
-                  <span>Dich vu</span>
+                  <span>Dịch vụ</span>
                   <strong>{appointment.service}</strong>
                 </div>
                 <div className="summary-row">
-                  <span>Thoi gian</span>
+                  <span>Thời gian</span>
                   <strong>{appointment.time} {appointment.hour}</strong>
                 </div>
               </div>
@@ -164,38 +216,42 @@ export default function AppointmentAssignmentDialog({
 
               <div className="form-section">
                 <label className="form-label">
-                  <User size={16} /> Ky thuat vien
+                  <User size={16} /> Kỹ thuật viên
                 </label>
                 <div className="technician-list">
                   {technicians.length === 0 ? (
-                    <p className="empty-message">Chua co ky thuat vien dang hoat dong.</p>
+                    <p className="empty-message">Chưa có kỹ thuật viên đang hoạt động.</p>
                   ) : technicians.map((technician) => (
                     <button
                       type="button"
                       key={technician._id}
                       className={`technician-item ${selectedTechnician?._id === technician._id ? "selected" : ""}`}
                       onClick={() => selectTechnician(technician)}
-                      disabled={loading || checking}
+                      disabled={loading || checking || technician.available === false}
                     >
                       <div className="tech-info">
                         <h4>{technician.full_name}</h4>
-                        <p>{technician.specialization || technician.email || "General technician"}</p>
+                        <p>
+                          {technician.available === false
+                            ? (technician.reason || "Không khả dụng")
+                            : `${technician.specialization || technician.email || "Kỹ thuật viên"} - ${technician.appointment_count_today || 0} lịch hôm nay`}
+                        </p>
                       </div>
                     </button>
                   ))}
                 </div>
                 {selectedTechnician && techAvailability && (
-                  <AvailabilityResult available={techAvailability.available} label="Ky thuat vien" />
+                  <AvailabilityResult available={techAvailability.available} label="Kỹ thuật viên" />
                 )}
               </div>
 
               <div className="form-section">
                 <label className="form-label">
-                  <Wrench size={16} /> Ke sua
+                  <Wrench size={16} /> Kệ sửa
                 </label>
                 <div className="repair-bay-list">
                   {repairBays.length === 0 ? (
-                    <p className="empty-message">Chua co ke sua kha dung.</p>
+                    <p className="empty-message">Chưa có kệ sửa khả dụng.</p>
                   ) : repairBays.map((bay) => (
                     <button
                       type="button"
@@ -222,17 +278,17 @@ export default function AppointmentAssignmentDialog({
                   ))}
                 </div>
                 {selectedBay && bayAvailability && (
-                  <AvailabilityResult available={bayAvailability.available} label="Ke sua" />
+                  <AvailabilityResult available={bayAvailability.available} label="Kệ sửa" />
                 )}
               </div>
 
               <div className="form-section">
-                <label className="form-label" htmlFor="assignment-notes">Ghi chu</label>
+                <label className="form-label" htmlFor="assignment-notes">Ghi chú</label>
                 <textarea
                   id="assignment-notes"
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Ghi chu noi bo cho ky thuat vien"
+                  placeholder="Ghi chú nội bộ cho kỹ thuật viên"
                   rows={3}
                   maxLength={500}
                   disabled={loading}
@@ -243,14 +299,14 @@ export default function AppointmentAssignmentDialog({
 
             <div className="assignment-dialog-footer">
               <button className="btn-cancel" onClick={onClose} disabled={loading}>
-                Huy
+                Hủy
               </button>
               <button className="btn-confirm" onClick={handleConfirm} disabled={!isValid || loading || checking}>
                 {loading ? (
                   <>
-                    <Loader size={16} className="spinner" /> Dang phan cong...
+                    <Loader size={16} className="spinner" /> Đang phân công...
                   </>
-                ) : "Xac nhan phan cong"}
+                ) : "Xác nhận phân công"}
               </button>
             </div>
           </>
@@ -264,7 +320,7 @@ function AvailabilityResult({ available, label }) {
   return (
     <div className={`availability-check ${available ? "available" : "conflict"}`}>
       {available ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-      <span>{label} {available ? "kha dung" : "dang bi trung lich"}</span>
+      <span>{label} {available ? "khả dụng" : "không khả dụng"}</span>
     </div>
   );
 }

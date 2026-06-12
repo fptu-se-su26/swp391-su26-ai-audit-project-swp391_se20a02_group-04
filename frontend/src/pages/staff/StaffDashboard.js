@@ -2,10 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Icon, InventoryAlert, JobCard, PageHeader, QuickNote, ShiftSummary, StatCard, WorkHistory } from "./StaffComponents";
 import {
   getAttendanceSummary,
+  getStaffDashboard,
   getStaffAppointmentStats,
-  getStaffAppointments,
   getStaffLowStock,
-  getTodayAttendance,
 } from "../../services/staffAppointmentApi";
 import { mapAppointmentToJob } from "./staffAppointmentMapper";
 import "../../styles/staff/StaffDashboard.css";
@@ -36,19 +35,18 @@ export default function StaffDashboard() {
     setError("");
 
     try {
-      const [appointmentsResponse, statsResponse, lowStockResponse, todayAttendanceResponse, attendanceSummaryResponse] =
+      const [dashboardResponse, statsResponse, lowStockResponse, attendanceSummaryResponse] =
         await Promise.all([
-          getStaffAppointments({ limit: 6, sort_by: "appointment_date", sort_order: "asc" }),
+          getStaffDashboard(),
           getStaffAppointmentStats({ period: 30 }),
           getStaffLowStock({ limit: 4 }),
-          getTodayAttendance(),
           getAttendanceSummary({ period: 30 }),
         ]);
 
-      setJobs((appointmentsResponse.data?.appointments || []).map(mapAppointmentToJob));
+      setJobs((dashboardResponse.data?.today?.appointments_today || []).map(mapAppointmentToJob));
       setStats(statsResponse.data || null);
       setLowStockItems(lowStockResponse.data?.items || []);
-      setTodayAttendance(todayAttendanceResponse.data?.attendance || null);
+      setTodayAttendance(dashboardResponse.data?.today?.attendance || null);
       setAttendanceSummary(attendanceSummaryResponse.data?.overview || null);
     } catch (err) {
       setError(err.message || "Không thể tải tổng quan nhân viên.");

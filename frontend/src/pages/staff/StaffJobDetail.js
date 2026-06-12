@@ -2,11 +2,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { Icon, PageHeader } from "./StaffComponents";
 import {
+  acknowledgeStaffAppointment,
+  completeStaffAppointment,
   getAppointmentMaterials,
   getStaffAppointmentById,
   getStaffInventory,
+  markStaffAppointmentNoShow,
   saveStaffAppointmentNote,
-  updateStaffAppointmentStatus,
+  startStaffAppointment,
   useAppointmentMaterials,
 } from "../../services/staffAppointmentApi";
 import { formatCurrency, mapAppointmentToJob } from "./staffAppointmentMapper";
@@ -24,7 +27,9 @@ function useStaffJob() {
 
     try {
       const response = await getStaffAppointmentById(jobId);
-      setJob(mapAppointmentToJob(response.data?.appointment));
+      const mappedJob = mapAppointmentToJob(response.data?.appointment);
+      mappedJob.materialsUsed = response.data?.materials_used || [];
+      setJob(mappedJob);
     } catch (err) {
       setError(err.message || "Không thể tải chi tiết công việc.");
     } finally {
@@ -176,9 +181,41 @@ function TechnicalNotePanel({ job, onSaved }) {
   );
 }
 
-function ActionRail({ job }) {
+function ActionRail({ job, onChanged }) {
   const canStart = job.statusKey === "assigned";
   const canComplete = job.statusKey === "in_progress";
+  const canAcknowledge = job.status === "CONFIRMED" && !job.raw?.acknowledged_at;
+  const canNoShow = job.status === "CONFIRMED";
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleAcknowledge = async () => {
+    setIsSubmitting(true);
+    setError("");
+    try {
+      await acknowledgeStaffAppointment(job.id);
+      await onChanged?.();
+    } catch (err) {
+      setError(err.message || "Khong the xac nhan nhan viec.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNoShow = async () => {
+    const notes = window.prompt("Ghi chu khach khong den", "Khach khong den theo lich hen.");
+    if (notes === null) return;
+    setIsSubmitting(true);
+    setError("");
+    try {
+      await markStaffAppointmentNoShow(job.id, { notes });
+      await onChanged?.();
+    } catch (err) {
+      setError(err.message || "Khong the ghi nhan no-show.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <aside className="side-column">
@@ -188,6 +225,10 @@ function ActionRail({ job }) {
           Thao tác
         </h3>
         <div className="action-stack">
+          <button className="secondary-button full" disabled={!canAcknowledge || isSubmitting} onClick={handleAcknowledge} type="button">
+            <Icon name="done_all" />
+            Xac nhan nhan viec
+          </button>
           <Link className={`primary-button full ${!canStart ? "disabled-link" : ""}`} to={canStart ? `/staff/jobs/${job.id}/start` : `/staff/jobs/${job.id}`}>
             <Icon name="play_circle" />
             Bắt đầu công việc
@@ -200,6 +241,11 @@ function ActionRail({ job }) {
             <Icon name="task_alt" />
             Hoàn thành công việc
           </Link>
+          <button className="secondary-button full" disabled={!canNoShow || isSubmitting} onClick={handleNoShow} type="button">
+            <Icon name="person_off" />
+            Khach khong den
+          </button>
+          {error && <p className="form-message error">{error}</p>}
         </div>
       </section>
       <section className="panel">
@@ -266,7 +312,7 @@ export default function StaffJobDetail() {
                 onSaved={(staffNotes) => setJob((current) => ({ ...current, staffNotes, note: staffNotes, recommendation: staffNotes }))}
               />
             </div>
-            <ActionRail job={job} />
+            <ActionRail job={job} onChanged={reload} />
           </div>
         </>
       )}
@@ -293,7 +339,7 @@ export function StaffJobStart() {
     setSubmitError("");
 
     try {
-      await updateStaffAppointmentStatus(job.id, { status: "IN_PROGRESS", notes: notes.trim() });
+      await startStaffAppointment(job.id, { notes: notes.trim() });
       navigate(`/staff/jobs/${job.id}`, { replace: true });
     } catch (err) {
       setSubmitError(err.message || "Không thể bắt đầu công việc.");
@@ -342,7 +388,7 @@ export function StaffJobStart() {
                 </div>
               </form>
             </section>
-            <ActionRail job={job} />
+            <ActionRail job={job} onChanged={reload} />
           </div>
         </>
       )}
@@ -392,6 +438,17 @@ export function StaffJobMaterials() {
 
     if (!selectedItems.length) {
       setMaterialsError("Vui lòng nhập số lượng cho ít nhất một vật tư.");
+      return;
+    }
+
+    const overStockItem = selectedItems.find((selected) => {
+      const source = inventory.find((item) => item._id === selected.inventory_item_id);
+      return source && selected.quantity > Number(source.quantity || 0);
+    });
+
+    if (overStockItem) {
+      const source = inventory.find((item) => item._id === overStockItem.inventory_item_id);
+      setMaterialsError(`Số lượng ${source?.item_name || "vật tư"} vượt quá tồn kho hiện có.`);
       return;
     }
 
@@ -482,7 +539,7 @@ export function StaffJobMaterials() {
               </h3>
               <MaterialUsageList transactions={transactions} />
             </section>
-            <ActionRail job={job} />
+            <ActionRail job={job} onChanged={reload} />
           </div>
         </>
       )}
@@ -520,9 +577,8 @@ export function StaffJobComplete() {
     setSubmitError("");
 
     try {
-      await updateStaffAppointmentStatus(job.id, {
-        status: "COMPLETED",
-        notes: notes.trim(),
+      await completeStaffAppointment(job.id, {
+        completion_notes: notes.trim(),
         actual_duration: actualDuration,
       });
       navigate("/staff/jobs", { replace: true });
@@ -586,7 +642,7 @@ export function StaffJobComplete() {
                 </div>
               </form>
             </section>
-            <ActionRail job={job} />
+            <ActionRail job={job} onChanged={reload} />
           </div>
         </>
       )}

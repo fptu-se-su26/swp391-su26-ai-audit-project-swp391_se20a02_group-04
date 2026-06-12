@@ -8,6 +8,7 @@ import {
   Shield,
   Plus,
   HelpCircle,
+  Package,
   User,
   Search,
   Bell,
@@ -81,6 +82,7 @@ function ManagerSidebar({ activeView, onViewChange }) {
     ["services", Wrench, "Dịch vụ"],
     ["customers", Users, "Khách hàng"],
     ["users", Shield, "Người dùng"],
+    ["inventory", Package, "Kho"],
     ["reports", BarChart2, "Báo cáo"],
     ["profile", User, "Hồ sơ"],
   ];

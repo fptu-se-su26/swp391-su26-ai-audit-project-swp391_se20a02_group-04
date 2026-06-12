@@ -198,6 +198,14 @@ button {
   color: var(--muted);
 }
 
+.staff-header-message {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .topbar-actions,
 .job-actions {
   display: flex;
@@ -558,6 +566,33 @@ td {
 
 .panel-title-row h3 {
   margin-bottom: 0;
+}
+
+.staff-inline-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-inline-filter input {
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--text);
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.staff-schedule-shift {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
 }
 
 .text-primary {

@@ -4,7 +4,7 @@ import {
   checkTechnicianAvailability
 } from "../services/appointmentAssignmentApi";
 
-export default function useAvailabilityCheck(appointmentId) {
+export default function useAvailabilityCheck(appointmentId, availabilityParams = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -16,6 +16,7 @@ export default function useAvailabilityCheck(appointmentId) {
     try {
       return await checkTechnicianAvailability(technicianId, {
         appointment_id: appointmentId,
+        ...availabilityParams,
       });
     } catch (err) {
       setError(err.message || "Cannot check technician availability.");
@@ -23,7 +24,7 @@ export default function useAvailabilityCheck(appointmentId) {
     } finally {
       setLoading(false);
     }
-  }, [appointmentId]);
+  }, [appointmentId, availabilityParams]);
 
   const checkRepairBay = useCallback(async (repairBayId) => {
     if (!repairBayId || !appointmentId) return null;
@@ -33,6 +34,7 @@ export default function useAvailabilityCheck(appointmentId) {
     try {
       return await checkRepairBayAvailability(repairBayId, {
         appointment_id: appointmentId,
+        ...availabilityParams,
       });
     } catch (err) {
       setError(err.message || "Cannot check repair bay availability.");
@@ -40,7 +42,7 @@ export default function useAvailabilityCheck(appointmentId) {
     } finally {
       setLoading(false);
     }
-  }, [appointmentId]);
+  }, [appointmentId, availabilityParams]);
 
   return {
     checkRepairBay,

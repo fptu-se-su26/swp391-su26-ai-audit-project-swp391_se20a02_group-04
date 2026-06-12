@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Filter,
   Clock,
+  Package,
   User,
   ClipboardList,
   CheckCircle2,
@@ -112,6 +113,7 @@ function ManagerSidebar({ activeView, onViewChange }) {
     ["services", Wrench, "Dịch vụ"],
     ["customers", Users, "Khách hàng"],
     ["users", Shield, "Người dùng"],
+    ["inventory", Package, "Kho"],
     ["reports", BarChart2, "Báo cáo"],
     ["profile", User, "Hồ sơ"],
   ];
@@ -156,7 +158,7 @@ function ManagerSidebar({ activeView, onViewChange }) {
   );
 }
 
-const AdminCalendar = ({ onViewChange }) => {
+const AdminCalendar = ({ onViewChange, embedded = false }) => {
   const [activeFilter, setActiveFilter] = useState("all");
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [appointments, setAppointments] = useState([]);
@@ -291,8 +293,8 @@ const AdminCalendar = ({ onViewChange }) => {
   }, [activeFilter, appointments]);
 
   return (
-    <div className="calendar-layout dashboard-layout">
-      <ManagerSidebar activeView="calendar" onViewChange={onViewChange} />
+    <div className={`calendar-layout dashboard-layout ${embedded ? "calendar-layout-embedded" : ""}`}>
+      {!embedded && <ManagerSidebar activeView="calendar" onViewChange={onViewChange} />}
 
       <main className="main-content">
         {selectedAppointment ? (

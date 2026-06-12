@@ -57,7 +57,12 @@ export function mockUpdateAppointmentSchedule(appointment, payload) {
       time: payload.appointmentDate,
       hour: payload.appointmentHour,
       channel: payload.channel,
+      vehicleType: payload.vehicleName,
+      plate: payload.vehiclePlate,
+      year: payload.vehicleYear,
+      odometer: payload.vehicleMileage,
       customerNote: payload.customerNote,
+      garageNote: payload.garageNote,
     }),
   });
 }

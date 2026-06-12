@@ -185,6 +185,13 @@ const appointmentSchema = new mongoose.Schema({
   assigned_at: {
     type: Date
   },
+  acknowledged_at: {
+    type: Date
+  },
+  acknowledged_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   confirmed_at: {
     type: Date
   },

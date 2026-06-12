@@ -1,0 +1,16 @@
+{
+  "name": "motocore-garage",
+  "private": true,
+  "scripts": {
+    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev.ps1",
+    "dev:reset": "npm run kill:5000 && npm run dev",
+    "backend": "npm --prefix backend run dev",
+    "frontend": "npm --prefix frontend start",
+    "kill:5000": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-port.ps1 -Port 5000",
+    "kill:3000": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-port.ps1 -Port 3000",
+    "kill:3001": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-port.ps1 -Port 3001",
+    "health": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"try { Invoke-WebRequest http://localhost:5000/health -UseBasicParsing | Select-Object -ExpandProperty Content } catch { Write-Error 'Backend is not reachable at http://localhost:5000' }\"",
+    "build": "npm --prefix frontend run build",
+    "test:backend": "npm --prefix backend test -- --runInBand"
+  }
+}

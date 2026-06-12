@@ -250,6 +250,12 @@ async function startAppointment(appointmentId, userId) {
     throw error;
   }
 
+  if (!appointment.staff_id || !appointment.repair_bay_id) {
+    const error = new Error('Appointment must be assigned to a staff member and repair bay before it can be started');
+    error.statusCode = 409;
+    throw error;
+  }
+
   const now = new Date();
   appointment.status = 'IN_PROGRESS';
   appointment.actual_start_time = now;

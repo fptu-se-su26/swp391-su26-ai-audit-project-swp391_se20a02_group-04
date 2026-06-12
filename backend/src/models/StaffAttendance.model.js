@@ -25,8 +25,24 @@ const staffAttendanceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['CHECKED_IN', 'CHECKED_OUT'],
-    default: 'CHECKED_IN'
+
+    enum: ['IN_SHIFT', 'COMPLETED', 'ABSENT', 'MANUAL'],
+    default: 'IN_SHIFT'
+  },
+  check_in_note: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Check-in note cannot exceed 500 characters']
+  },
+  check_out_note: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Check-out note cannot exceed 500 characters']
+  },
+  adjusted_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+
   }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }

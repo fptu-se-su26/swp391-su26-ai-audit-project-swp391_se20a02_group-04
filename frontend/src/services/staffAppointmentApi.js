@@ -5,6 +5,10 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api
 async function staffRequest(path, options = {}) {
   const { accessToken } = getAuthSession();
 
+  if (!accessToken) {
+    throw new Error("UNAUTHORIZED");
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -88,6 +92,29 @@ export function getStaffAppointments(params = {}) {
   return staffRequest(withQuery("/staff/appointments", params));
 }
 
+export function getStaffDashboard() {
+  return staffRequest("/staff/dashboard");
+}
+
+export function getStaffSchedule(params = {}) {
+  return staffRequest(withQuery("/staff/schedule", params));
+}
+
+export function getTodaySchedule() {
+  return staffRequest("/staff/schedule/today");
+}
+
+export function getStaffProfile() {
+  return staffRequest("/staff/profile");
+}
+
+export function updateStaffProfile(payload = {}) {
+  return staffRequest("/staff/profile", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getTodayStaffAppointments() {
   return staffRequest("/staff/appointments/today");
 }
@@ -98,6 +125,37 @@ export function getStaffAppointmentStats(params = {}) {
 
 export function getStaffAppointmentById(appointmentId) {
   return staffRequest(`/staff/appointments/${appointmentId}`);
+}
+
+export function acknowledgeStaffAppointment(appointmentId) {
+  return staffRequest(`/staff/appointments/${appointmentId}/acknowledge`, {
+    method: "POST",
+  });
+}
+
+export function startStaffAppointment(appointmentId, payload = {}) {
+  return staffRequest(`/staff/appointments/${appointmentId}/start`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function completeStaffAppointment(appointmentId, payload = {}) {
+  return staffRequest(`/staff/appointments/${appointmentId}/complete`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function markStaffAppointmentNoShow(appointmentId, payload = {}) {
+  return staffRequest(`/staff/appointments/${appointmentId}/no-show`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getAppointmentHistory(params = {}) {
+  return staffRequest(withQuery("/staff/appointments/history", params));
 }
 
 export function updateStaffAppointmentStatus(appointmentId, { status, notes, actual_duration } = {}) {
