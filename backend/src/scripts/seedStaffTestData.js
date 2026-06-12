@@ -9,8 +9,8 @@ const StaffAttendance = require('../models/StaffAttendance.model');
 const User = require('../models/User.model');
 const UserRole = require('../models/UserRole.model');
 
-const STAFF_EMAIL = 'staff1@example.com';
-const STAFF_PASSWORD = 'Staff@123';
+const STAFF_EMAIL = process.env.STAFF_TEST_EMAIL || 'staff1@example.com';
+const STAFF_PASSWORD = process.env.STAFF_TEST_PASSWORD || 'Staff@123';
 
 const toDateString = (date = new Date()) => date.toISOString().slice(0, 10);
 

@@ -12,7 +12,8 @@ import {
   startStaffAppointment,
   useAppointmentMaterials,
 } from "../../services/staffAppointmentApi";
-import { formatCurrency, mapAppointmentToJob } from "./staffAppointmentMapper";
+import { getCurrentUserId, getJobRouteId, isJobAssignedToUser, formatCurrency, mapAppointmentToJob } from "./staffAppointmentMapper";
+import { getAuthSession } from "../../services/authApi";
 import "../../styles/staff/StaffJobDetail.css";
 
 function useStaffJob() {
@@ -29,6 +30,17 @@ function useStaffJob() {
       const response = await getStaffAppointmentById(jobId);
       const mappedJob = mapAppointmentToJob(response.data?.appointment);
       mappedJob.materialsUsed = response.data?.materials_used || [];
+
+      if (process.env.NODE_ENV === "development") {
+        const { user } = getAuthSession();
+        console.debug("[staff-appointments] detail-load", {
+          currentUserId: getCurrentUserId(user),
+          appointmentId: jobId,
+          appointmentStaffId: mappedJob.staffId,
+          requestUrl: `/api/staff/appointments/${jobId}`,
+        });
+      }
+
       setJob(mappedJob);
     } catch (err) {
       setError(err.message || "Không thể tải chi tiết công việc.");
@@ -144,7 +156,7 @@ function TechnicalNotePanel({ job, onSaved }) {
 
     setIsSaving(true);
     try {
-      const response = await saveStaffAppointmentNote(job.id, notes.trim());
+      const response = await saveStaffAppointmentNote(getJobRouteId(job), notes.trim());
       onSaved(response.data?.appointment?.staff_notes || notes.trim());
       setMessage("Đã lưu ghi chú kỹ thuật.");
     } catch (err) {
@@ -183,7 +195,10 @@ function TechnicalNotePanel({ job, onSaved }) {
 
 function ActionRail({ job, onChanged }) {
   const canStart = job.statusKey === "assigned";
-  const canComplete = job.statusKey === "in_progress";
+  const { user } = getAuthSession();
+  const routeId = getJobRouteId(job);
+  const belongsToCurrentStaff = isJobAssignedToUser(job, user);
+  const canComplete = job.statusKey === "in_progress" && belongsToCurrentStaff;
   const canAcknowledge = job.status === "CONFIRMED" && !job.raw?.acknowledged_at;
   const canNoShow = job.status === "CONFIRMED";
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -193,7 +208,7 @@ function ActionRail({ job, onChanged }) {
     setIsSubmitting(true);
     setError("");
     try {
-      await acknowledgeStaffAppointment(job.id);
+      await acknowledgeStaffAppointment(routeId);
       await onChanged?.();
     } catch (err) {
       setError(err.message || "Khong the xac nhan nhan viec.");
@@ -208,7 +223,7 @@ function ActionRail({ job, onChanged }) {
     setIsSubmitting(true);
     setError("");
     try {
-      await markStaffAppointmentNoShow(job.id, { notes });
+      await markStaffAppointmentNoShow(routeId, { notes });
       await onChanged?.();
     } catch (err) {
       setError(err.message || "Khong the ghi nhan no-show.");
@@ -229,15 +244,15 @@ function ActionRail({ job, onChanged }) {
             <Icon name="done_all" />
             Xac nhan nhan viec
           </button>
-          <Link className={`primary-button full ${!canStart ? "disabled-link" : ""}`} to={canStart ? `/staff/jobs/${job.id}/start` : `/staff/jobs/${job.id}`}>
+          <Link className={`primary-button full ${!canStart ? "disabled-link" : ""}`} to={canStart ? `/staff/jobs/${routeId}/start` : `/staff/jobs/${routeId}`}>
             <Icon name="play_circle" />
             Bắt đầu công việc
           </Link>
-          <Link className="secondary-button full" to={`/staff/jobs/${job.id}/materials`}>
+          <Link className="secondary-button full" to={`/staff/jobs/${routeId}/materials`}>
             <Icon name="inventory_2" />
             Thêm vật tư
           </Link>
-          <Link className={`primary-button success full ${!canComplete ? "disabled-link" : ""}`} to={canComplete ? `/staff/jobs/${job.id}/complete` : `/staff/jobs/${job.id}`}>
+          <Link className={`primary-button success full ${!canComplete ? "disabled-link" : ""}`} to={canComplete ? `/staff/jobs/${routeId}/complete` : `/staff/jobs/${routeId}`}>
             <Icon name="task_alt" />
             Hoàn thành công việc
           </Link>
@@ -334,13 +349,14 @@ export function StaffJobStart() {
   const handleStart = async (event) => {
     event.preventDefault();
     if (!job) return;
+    const routeId = getJobRouteId(job);
 
     setIsSubmitting(true);
     setSubmitError("");
 
     try {
-      await startStaffAppointment(job.id, { notes: notes.trim() });
-      navigate(`/staff/jobs/${job.id}`, { replace: true });
+      await startStaffAppointment(routeId, { notes: notes.trim() });
+      navigate(`/staff/jobs/${routeId}`, { replace: true });
     } catch (err) {
       setSubmitError(err.message || "Không thể bắt đầu công việc.");
     } finally {
@@ -380,7 +396,7 @@ export function StaffJobStart() {
                 <textarea id="start-note" onChange={(event) => setNotes(event.target.value)} value={notes} />
                 {submitError && <p className="form-message error">{submitError}</p>}
                 <div className="form-actions">
-                  <Link className="secondary-button" to={`/staff/jobs/${job.id}`}>Quay lại</Link>
+                  <Link className="secondary-button" to={`/staff/jobs/${getJobRouteId(job)}`}>Quay lại</Link>
                   <button className="primary-button" disabled={isSubmitting || job.statusKey !== "assigned"} type="submit">
                     <Icon name="check" />
                     {isSubmitting ? "Đang xác nhận..." : "Xác nhận bắt đầu"}
@@ -408,11 +424,12 @@ export function StaffJobMaterials() {
 
   const loadMaterials = async () => {
     if (!job) return;
+    const routeId = getJobRouteId(job);
     setMaterialsError("");
     try {
       const [inventoryResponse, materialsResponse] = await Promise.all([
         getStaffInventory({ limit: 100, sort_by: "item_name", sort_order: "asc" }),
-        getAppointmentMaterials(job.id),
+        getAppointmentMaterials(routeId),
       ]);
       setInventory(inventoryResponse.data?.items || []);
       setTransactions(materialsResponse.data?.transactions || []);
@@ -454,7 +471,7 @@ export function StaffJobMaterials() {
 
     setIsSaving(true);
     try {
-      await useAppointmentMaterials(job.id, { items: selectedItems, notes });
+      await useAppointmentMaterials(getJobRouteId(job), { items: selectedItems, notes });
       setQuantities({});
       setNotes("");
       setMessage("Đã ghi nhận vật tư và trừ kho.");
@@ -525,7 +542,7 @@ export function StaffJobMaterials() {
                 <textarea id="material-note" onChange={(event) => setNotes(event.target.value)} value={notes} />
 
                 <div className="form-actions">
-                  <Link className="secondary-button" to={`/staff/jobs/${job.id}`}>Hủy</Link>
+                  <Link className="secondary-button" to={`/staff/jobs/${getJobRouteId(job)}`}>Hủy</Link>
                   <button className="primary-button" disabled={isSaving || !inventory.length} type="submit">
                     <Icon name="save" />
                     {isSaving ? "Đang lưu..." : "Lưu vật tư"}
@@ -555,12 +572,16 @@ export function StaffJobComplete() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const navigate = useNavigate();
+  const { user } = getAuthSession();
+  const belongsToCurrentStaff = job ? isJobAssignedToUser(job, user) : false;
+  const canComplete = Boolean(job && job.statusKey === "in_progress" && belongsToCurrentStaff);
 
   useEffect(() => {
     if (job) {
+      const routeId = getJobRouteId(job);
       setNotes(job.staffNotes || `${job.service}. ${job.recommendation}`);
       setActualDuration(job.estimatedDuration || "");
-      getAppointmentMaterials(job.id)
+      getAppointmentMaterials(routeId)
         .then((response) => setTransactions(response.data?.transactions || []))
         .catch(() => setTransactions([]));
     }
@@ -572,12 +593,23 @@ export function StaffJobComplete() {
   const handleComplete = async (event) => {
     event.preventDefault();
     if (!job) return;
+    const routeId = getJobRouteId(job);
+
+    if (!belongsToCurrentStaff) {
+      setSubmitError("Công việc này chưa được phân công cho tài khoản staff hiện tại.");
+      return;
+    }
+
+    if (job.statusKey !== "in_progress") {
+      setSubmitError("Chỉ có thể hoàn thành công việc đang làm.");
+      return;
+    }
 
     setIsSubmitting(true);
     setSubmitError("");
 
     try {
-      await completeStaffAppointment(job.id, {
+      await completeStaffAppointment(routeId, {
         completion_notes: notes.trim(),
         actual_duration: actualDuration,
       });
@@ -632,10 +664,12 @@ export function StaffJobComplete() {
                 />
                 <label htmlFor="complete-note">Mô tả công việc đã thực hiện</label>
                 <textarea id="complete-note" onChange={(event) => setNotes(event.target.value)} value={notes} />
+                {!belongsToCurrentStaff && <p className="form-message error">Công việc này chưa được phân công cho tài khoản staff hiện tại.</p>}
+                {job.statusKey !== "in_progress" && <p className="form-message error">Chỉ có thể hoàn thành công việc đang làm.</p>}
                 {submitError && <p className="form-message error">{submitError}</p>}
                 <div className="form-actions">
-                  <Link className="secondary-button" to={`/staff/jobs/${job.id}/materials`}>Thêm vật tư</Link>
-                  <button className="primary-button success" disabled={isSubmitting || job.statusKey !== "in_progress"} type="submit">
+                  <Link className="secondary-button" to={`/staff/jobs/${getJobRouteId(job)}/materials`}>Thêm vật tư</Link>
+                  <button className="primary-button success" disabled={isSubmitting || !canComplete} type="submit">
                     <Icon name="check_circle" />
                     {isSubmitting ? "Đang hoàn thành..." : "Đánh dấu hoàn thành"}
                   </button>

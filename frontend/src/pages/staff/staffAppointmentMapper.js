@@ -15,6 +15,26 @@ const SERVICE_ICON = {
   REPAIR: "plumbing",
 };
 
+export function getEntityId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return value._id || value.id || value.userId || value.user_id || "";
+}
+
+export function getJobRouteId(job = {}) {
+  return job.routeId || job.appointmentId || job.id;
+}
+
+export function getCurrentUserId(user = {}) {
+  return user?._id || user?.id || user?.userId || user?.user_id || "";
+}
+
+export function isJobAssignedToUser(job, user) {
+  const currentUserId = getCurrentUserId(user);
+  if (!job || !currentUserId) return false;
+  return String(job.staffId || "") === String(currentUserId);
+}
+
 export function formatCurrency(value) {
   const amount = Number(value || 0);
   return `${amount.toLocaleString("vi-VN")}đ`;
@@ -42,6 +62,8 @@ function getService(appointment) {
 }
 
 export function mapAppointmentToJob(appointment = {}) {
+  const appointmentId = getEntityId(appointment);
+  const staffId = getEntityId(appointment.staff_id);
   const customer = getCustomer(appointment);
   const vehicle = getVehicle(appointment);
   const service = getService(appointment);
@@ -55,8 +77,11 @@ export function mapAppointmentToJob(appointment = {}) {
   const estimatedPrice = service.estimated_price || serviceDoc.base_price || 0;
 
   return {
-    id: appointment._id,
-    code: appointment.appointment_code || appointment._id,
+    id: appointmentId,
+    appointmentId,
+    routeId: appointmentId,
+    staffId,
+    code: appointment.appointment_code || appointmentId,
     vehicle: vehicleName,
     plate: vehicle.license_plate || "Chưa cập nhật",
     customer: customer.full_name || "Khách hàng",

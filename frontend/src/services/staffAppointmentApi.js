@@ -1,15 +1,53 @@
 import { getAuthSession } from "./authApi";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const STAFF_OWNERSHIP_MESSAGE = "Công việc này chưa được phân công cho tài khoản staff hiện tại.";
+
+function isDevelopment() {
+  return process.env.NODE_ENV === "development";
+}
+
+function getCurrentUserId(user = {}) {
+  return user._id || user.id || user.userId || user.user_id || null;
+}
+
+function getEntityId(value) {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  return value._id || value.id || value.userId || value.user_id || null;
+}
+
+function isStaffPortalSession(roles = []) {
+  const normalizedRoles = roles.map((role) => String(role).toUpperCase());
+  return normalizedRoles.includes("STAFF") && !normalizedRoles.includes("ADMIN") && !normalizedRoles.includes("MANAGER");
+}
+
+function debugStaffAccess(label, data) {
+  if (!isDevelopment()) return;
+  // Staff-only diagnostics. Do not log tokens or personal note contents.
+  console.debug(`[staff-appointments] ${label}`, data);
+}
 
 async function staffRequest(path, options = {}) {
-  const { accessToken } = getAuthSession();
+  const { accessToken, roles, user } = getAuthSession();
+  const currentUserId = getCurrentUserId(user);
+  const requestUrl = `${API_BASE_URL}${path}`;
 
   if (!accessToken) {
     throw new Error("UNAUTHORIZED");
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  if (!isStaffPortalSession(roles)) {
+    throw new Error("Vui lòng đăng nhập bằng tài khoản staff để xem công việc.");
+  }
+
+  debugStaffAccess("request", {
+    currentUserId,
+    requestUrl,
+    method: options.method || "GET",
+  });
+
+  const response = await fetch(requestUrl, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -19,13 +57,30 @@ async function staffRequest(path, options = {}) {
   });
 
   const payload = await response.json().catch(() => ({}));
+  const appointment = payload?.data?.appointment;
+
+  if (appointment) {
+    debugStaffAccess("appointment-response", {
+      currentUserId,
+      appointmentId: getEntityId(appointment),
+      appointmentStaffId: getEntityId(appointment.staff_id),
+      requestUrl,
+    });
+  }
 
   if (!response.ok || payload.success === false) {
     const validationMessage = Array.isArray(payload.errors)
       ? payload.errors.map((error) => error.msg || error.message).join(" ")
       : "";
+    const message = validationMessage || payload.message || "Không thể tải dữ liệu nhân viên.";
 
-    throw new Error(validationMessage || payload.message || "Khong the tai du lieu nhan vien.");
+    if (response.status === 403 && /assigned to you|phân công/i.test(message)) {
+      const error = new Error(STAFF_OWNERSHIP_MESSAGE);
+      error.code = "STAFF_APPOINTMENT_OWNERSHIP";
+      throw error;
+    }
+
+    throw new Error(message);
   }
 
   return payload;

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import {
   LayoutDashboard,
@@ -25,6 +25,7 @@ import AppointmentDetailPage from "./AppointmentDetailPage";
 import ManagerStaff from "./ManagerStaff";
 import ManagerWarehouse from "./ManagerWarehouse";
 import ManagerProfile from "./ManagerProfile";
+import ManagerRevenue from "./ManagerRevenue";
 
 import AdminCalendar from "../admin/AdminCalendar";
 import InventoryModule from "../inventory/InventoryModule";
@@ -143,10 +144,40 @@ const initialBays = [
   { id: 10, name: "Kệ 10", occupied: false, bike: "", service: "", tech: "" }
 ];
 
+const MANAGER_TABS = new Set([
+  "dashboard",
+  "appointments",
+  "appointment-detail",
+  "staff",
+  "inventory",
+  "warehouse",
+  "revenue",
+  "profile"
+]);
+
 function getManagerTabFromPath(pathname) {
+  if (pathname.startsWith("/manager/dashboard")) return "dashboard";
+  if (pathname.startsWith("/manager/appointments")) return "appointments";
+  if (pathname.startsWith("/manager/appointment-detail")) return "appointment-detail";
+  if (pathname.startsWith("/manager/staff")) return "staff";
   if (pathname.startsWith("/manager/inventory")) return "inventory";
   if (pathname.startsWith("/manager/repair-bays")) return "warehouse";
+  if (pathname.startsWith("/manager/warehouse")) return "warehouse";
+  if (pathname.startsWith("/manager/revenue")) return "revenue";
+  if (pathname.startsWith("/manager/profile")) return "profile";
   return "dashboard";
+}
+
+function getManagerPathFromTab(tabName) {
+  if (tabName === "dashboard") return "/manager/dashboard";
+  if (tabName === "appointments") return "/manager/appointments";
+  if (tabName === "appointment-detail") return "/manager/appointment-detail";
+  if (tabName === "staff") return "/manager/staff";
+  if (tabName === "inventory") return "/manager/inventory";
+  if (tabName === "warehouse") return "/manager/repair-bays/diagram";
+  if (tabName === "revenue") return "/manager/revenue";
+  if (tabName === "profile") return "/manager/profile";
+  return "/manager/dashboard";
 }
 
 const ManagerLayout = () => {
@@ -172,9 +203,7 @@ const ManagerLayout = () => {
   };
 
   useEffect(() => {
-    if (location.pathname.startsWith("/manager/inventory") || location.pathname.startsWith("/manager/repair-bays")) {
-      setCurrentTab(getManagerTabFromPath(location.pathname));
-    }
+    setCurrentTab(getManagerTabFromPath(location.pathname));
   }, [location.pathname]);
   const [appointmentFilter, setAppointmentFilter] = useState("ALL"); // ALL, PENDING, CONFIRMED, IN_PROGRESS, COMPLETED
 
@@ -211,14 +240,8 @@ const ManagerLayout = () => {
       setSelectedAppointmentId("");
     }
 
-    if (tabName === "inventory") {
-      navigate("/manager/inventory");
-    } else if (tabName === "warehouse") {
-      navigate("/manager/repair-bays/diagram");
-    } else if (location.pathname.startsWith("/manager/inventory") || location.pathname.startsWith("/manager/repair-bays")) {
-      navigate("/manager");
-    }
-
+    setCurrentTab(tabName);
+    navigate(getManagerPathFromTab(tabName));
   };
 
   const openAppointmentDetail = (appointmentId) => {

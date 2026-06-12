@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Icon, JobCard, PageHeader, QuickNote } from "./StaffComponents";
 import { getStaffAppointments } from "../../services/staffAppointmentApi";
-import { mapAppointmentToJob } from "./staffAppointmentMapper";
+import { getJobRouteId, mapAppointmentToJob } from "./staffAppointmentMapper";
 import "../../styles/staff/StaffJobs.css";
 
 const filters = [
@@ -163,7 +163,7 @@ export default function StaffJobs() {
                 <span className={`status-pill ${nextJob.statusClass}`}>{nextJob.time}</span>
                 <h4>{nextJob.vehicle} - {nextJob.plate}</h4>
                 <p>{nextJob.service}. Du kien xu ly trong {nextJob.estimate}.</p>
-                <Link className="primary-button full" to={`/staff/jobs/${nextJob.id}/start`}>
+                <Link className="primary-button full" to={`/staff/jobs/${getJobRouteId(nextJob)}/start`}>
                   <Icon name="play_circle" />
                   Bat dau viec nay
                 </Link>

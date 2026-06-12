@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminCalendar from './pages/admin/AdminCalendar';
 import AdminProfile from './pages/admin/AdminProfile';
@@ -11,27 +11,38 @@ import AdminReports from './pages/admin/AdminReports';
 import AdminInventory from './pages/admin/AdminInventory';
 import './App.css';
 
+const ADMIN_PAGES = new Set([
+  'dashboard',
+  'calendar',
+  'services',
+  'customers',
+  'users',
+  'reports',
+  'profile',
+  'inventory'
+]);
+
+const getAdminPageFromPath = (pathname = '') => {
+  const [, role, page] = pathname.split('/');
+  if (role !== 'admin') return 'dashboard';
+  if (page === 'appointments') return 'calendar';
+  if (page && ADMIN_PAGES.has(page)) return page;
+  return 'dashboard';
+};
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [currentPage, setCurrentPage] = useState(location.pathname.startsWith('/admin/inventory') ? 'inventory' : 'dashboard');
+  const [currentPage, setCurrentPage] = useState(getAdminPageFromPath(location.pathname));
 
   useEffect(() => {
-    if (location.pathname.startsWith('/admin/inventory')) {
-      setCurrentPage('inventory');
-    }
+    setCurrentPage(getAdminPageFromPath(location.pathname));
   }, [location.pathname]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
-    if (page === 'inventory') {
-      navigate('/admin/inventory');
-    } else if (location.pathname.startsWith('/admin/inventory')) {
-      navigate('/admin');
-    }
-
+    navigate(page === 'dashboard' ? '/admin/dashboard' : `/admin/${page}`);
   };
 
   const renderPage = () => {
