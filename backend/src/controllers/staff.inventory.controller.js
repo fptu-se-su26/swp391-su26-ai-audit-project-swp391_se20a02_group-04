@@ -139,8 +139,12 @@ const useAppointmentMaterials = async (req, res) => {
       return errorResponse(res, 403, 'You can only use materials for appointments assigned to you');
     }
 
-    if (!['IN_PROGRESS', 'COMPLETED'].includes(appointment.status)) {
-      return errorResponse(res, 400, 'Materials can only be used for in-progress or completed appointments');
+    if (appointment.status === 'COMPLETED') {
+      return errorResponse(res, 422, 'Không thể ghi nhận vật tư cho công việc đã hoàn thành');
+    }
+
+    if (appointment.status !== 'IN_PROGRESS') {
+      return errorResponse(res, 422, 'Chỉ có thể ghi nhận vật tư khi appointment đang xử lý');
     }
 
     const createdTransactions = [];
@@ -148,28 +152,34 @@ const useAppointmentMaterials = async (req, res) => {
 
     for (const usage of items) {
       const quantity = Number(usage.quantity);
-      const item = await InventoryItem.findById(usage.inventory_item_id);
-
-      if (!item || !item.is_active) {
-        return errorResponse(res, 404, `Inventory item not found: ${usage.inventory_item_id}`);
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        return errorResponse(res, 400, 'Valid quantity is required');
       }
 
-      if (item.quantity < quantity) {
-        return errorResponse(res, 400, `Insufficient stock for ${item.item_name}`);
+      const updatedItem = await InventoryItem.findOneAndUpdate(
+        {
+          _id: usage.inventory_item_id,
+          quantity: { $gte: quantity },
+          is_active: true
+        },
+        { $inc: { quantity: -quantity } },
+        { new: true, runValidators: true }
+      );
+
+      if (!updatedItem) {
+        return errorResponse(res, 409, 'Insufficient stock or item not found');
       }
 
-      const quantityBefore = item.quantity;
-      const quantityAfter = quantityBefore - quantity;
-
-      await item.updateQuantity(-quantity, 'STAFF_APPOINTMENT_USAGE');
+      const quantityAfter = updatedItem.quantity;
+      const quantityBefore = quantityAfter + quantity;
 
       const transaction = await InventoryTransaction.create({
-        inventory_item_id: item._id,
+        inventory_item_id: updatedItem._id,
         transaction_type: 'STOCK_OUT',
         quantity_change: -quantity,
         quantity_before: quantityBefore,
         quantity_after: quantityAfter,
-        unit_cost: item.cost_price || item.unit_price,
+        unit_cost: updatedItem.cost_price || updatedItem.unit_price,
         performed_by: req.user.userId,
         reference_type: 'APPOINTMENT',
         reference_id: appointment._id,
@@ -178,11 +188,11 @@ const useAppointmentMaterials = async (req, res) => {
 
       createdTransactions.push(transaction);
       updatedItems.push({
-        _id: item._id,
-        item_code: item.item_code,
-        item_name: item.item_name,
-        quantity: item.quantity,
-        stock_status: item.stock_status
+        _id: updatedItem._id,
+        item_code: updatedItem.item_code,
+        item_name: updatedItem.item_name,
+        quantity: updatedItem.quantity,
+        stock_status: updatedItem.stock_status
       });
     }
 
@@ -195,7 +205,7 @@ const useAppointmentMaterials = async (req, res) => {
 
     await UserAudit.create({
       user_id: req.user.userId,
-      action: 'STAFF_MATERIALS_USED',
+      action: 'MATERIAL_USED',
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
       status: 'SUCCESS',

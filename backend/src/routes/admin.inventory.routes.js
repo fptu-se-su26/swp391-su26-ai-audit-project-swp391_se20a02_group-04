@@ -63,6 +63,8 @@ const stockInValidation = [
     .withMessage('Supplier name cannot exceed 200 characters'),
   body('invoice_number').optional().trim().isLength({ max: 100 })
     .withMessage('Invoice number cannot exceed 100 characters'),
+  body('override_max').optional().isBoolean()
+    .withMessage('override_max must be boolean'),
   body('notes').optional().trim().isLength({ max: 500 })
     .withMessage('Notes cannot exceed 500 characters')
 ];

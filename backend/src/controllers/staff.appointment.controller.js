@@ -5,6 +5,7 @@ const StaffAttendance = require('../models/StaffAttendance.model');
 const WorkSchedule = require('../models/WorkSchedule.model');
 const InventoryTransaction = require('../models/InventoryTransaction.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
+const { hasFullAssignment, validateAppointmentTransition } = require('../utils/appointmentStateMachine');
 const mongoose = require('mongoose');
 
 const toDateString = (date = new Date()) => {
@@ -436,12 +437,21 @@ const updateAppointmentStatus = async (req, res) => {
       return errorResponse(res, ownership.statusCode, ownership.message);
     }
 
-    const oldStatus = appointment.status;
-    appointment.status = status.toUpperCase();
+    const transition = validateAppointmentTransition(appointment, status);
+    if (!transition.ok) {
+      return errorResponse(res, transition.statusCode, transition.message);
+    }
 
-    // Set completed_at when status is COMPLETED
-    if (status.toUpperCase() === 'COMPLETED' && !appointment.completed_at) {
+    const oldStatus = appointment.status;
+    appointment.status = transition.target;
+
+    if (transition.target === 'IN_PROGRESS' && !appointment.actual_start_time) {
+      appointment.actual_start_time = new Date();
+    }
+
+    if (transition.target === 'COMPLETED' && !appointment.completed_at) {
       appointment.completed_at = new Date();
+      appointment.actual_end_time = appointment.actual_end_time || appointment.completed_at;
       if (actual_duration) {
         appointment.actual_duration = parseInt(actual_duration);
       }
@@ -550,6 +560,10 @@ const acknowledgeAppointment = async (req, res) => {
     if (appointment.status !== 'CONFIRMED') {
       return errorResponse(res, 400, 'Only confirmed appointments can be acknowledged');
     }
+    if (appointment.acknowledged_at) {
+      const updated = await populateStaffAppointment(Appointment.findById(appointment._id));
+      return successResponse(res, 200, 'Appointment đã được xác nhận trước đó', { appointment: updated });
+    }
 
     appointment.acknowledged_at = new Date();
     appointment.acknowledged_by = req.user.userId;
@@ -573,6 +587,9 @@ const startAppointment = async (req, res) => {
     if (!ownership.ok) return errorResponse(res, ownership.statusCode, ownership.message);
     if (appointment.status !== 'CONFIRMED') {
       return errorResponse(res, 400, 'Only confirmed appointments can be started');
+    }
+    if (!hasFullAssignment(appointment)) {
+      return errorResponse(res, 422, 'Appointment chưa được phân công đầy đủ kỹ thuật viên và kệ sửa chữa');
     }
 
     const oldStatus = appointment.status;
@@ -605,6 +622,9 @@ const completeAppointment = async (req, res) => {
     if (!ownership.ok) return errorResponse(res, ownership.statusCode, ownership.message);
     if (appointment.status !== 'IN_PROGRESS') {
       return errorResponse(res, 400, 'Only in-progress appointments can be completed');
+    }
+    if (!hasFullAssignment(appointment)) {
+      return errorResponse(res, 422, 'Appointment chưa được phân công đầy đủ kỹ thuật viên và kệ sửa chữa');
     }
 
     const now = new Date();

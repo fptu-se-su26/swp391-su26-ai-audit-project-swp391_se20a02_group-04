@@ -138,7 +138,8 @@ async function checkRepairBayAvailability(repairBayId, startTime, endTime, exclu
   };
 }
 
-async function assignAppointment({ appointmentId, technicianId, repairBayId, assignedBy, notes }) {
+async function assignAppointment({ appointmentId, technicianId, repairBayId, assignedBy, notes, force = false }) {
+  const forceReassign = force === true || force === 'true';
   const appointment = await Appointment.findById(appointmentId);
   if (!appointment) {
     const error = new Error('Appointment not found');
@@ -149,6 +150,14 @@ async function assignAppointment({ appointmentId, technicianId, repairBayId, ass
   if (!['PENDING', 'CONFIRMED'].includes(appointment.status)) {
     const error = new Error('Appointment can only be assigned while pending or confirmed');
     error.statusCode = 400;
+    throw error;
+  }
+
+  const existingAssignment = await AppointmentAssignment.findOne({ appointment_id: appointment._id });
+  const alreadyAssigned = Boolean(existingAssignment || appointment.staff_id || appointment.repair_bay_id);
+  if (alreadyAssigned && appointment.status === 'CONFIRMED' && forceReassign !== true) {
+    const error = new Error('Appointment đã được phân công. Hãy huỷ phân công hiện tại trước khi phân công lại');
+    error.statusCode = 409;
     throw error;
   }
 
@@ -198,9 +207,22 @@ async function assignAppointment({ appointmentId, technicianId, repairBayId, ass
     throw error;
   }
 
-  const assignment = await AppointmentAssignment.findOneAndUpdate(
-    { appointment_id: appointment._id },
-    {
+  let assignment;
+  if (existingAssignment) {
+    existingAssignment.set({
+      technician_id: technician._id,
+      repair_bay_id: repairBay._id,
+      assigned_by: assignedBy,
+      assigned_at: new Date(),
+      estimated_start_time: estimatedStartTime,
+      estimated_end_time: estimatedEndTime,
+      duration_minutes: durationMinutes,
+      notes,
+      status: 'ASSIGNED'
+    });
+    assignment = await existingAssignment.save();
+  } else {
+    assignment = await AppointmentAssignment.create({
       appointment_id: appointment._id,
       technician_id: technician._id,
       repair_bay_id: repairBay._id,
@@ -211,9 +233,8 @@ async function assignAppointment({ appointmentId, technicianId, repairBayId, ass
       duration_minutes: durationMinutes,
       notes,
       status: 'ASSIGNED'
-    },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
-  );
+    });
+  }
 
   appointment.staff_id = technician._id;
   appointment.repair_bay_id = repairBay._id;
@@ -283,8 +304,20 @@ async function completeAppointment(appointmentId, { finalCost, completionNotes }
     throw error;
   }
 
-  if (Number(finalCost) <= 0) {
-    const error = new Error('Final cost must be greater than 0');
+  if (!appointment.staff_id || !appointment.repair_bay_id) {
+    const error = new Error('Appointment chưa được phân công đầy đủ kỹ thuật viên và kệ sửa chữa');
+    error.statusCode = 422;
+    throw error;
+  }
+
+  const numericFinalCost = Number(finalCost);
+  if (
+    finalCost === undefined ||
+    finalCost === null ||
+    Number.isNaN(numericFinalCost) ||
+    numericFinalCost <= 0
+  ) {
+    const error = new Error('Chi phí thực tế phải là số dương');
     error.statusCode = 400;
     throw error;
   }
@@ -293,7 +326,7 @@ async function completeAppointment(appointmentId, { finalCost, completionNotes }
   appointment.status = 'COMPLETED';
   appointment.actual_end_time = now;
   appointment.completed_at = now;
-  appointment.final_cost = Number(finalCost);
+  appointment.final_cost = numericFinalCost;
   appointment.completion_notes = completionNotes || appointment.completion_notes;
   if (completionNotes) appointment.staff_notes = completionNotes;
 
