@@ -8,6 +8,7 @@ const User = require('../models/User.model');
 const UserAudit = require('../models/UserAudit.model');
 const UserRole = require('../models/UserRole.model');
 const WorkSchedule = require('../models/WorkSchedule.model');
+const Notification = require('../models/Notification.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const {
   addMinutes,
@@ -898,6 +899,10 @@ async function assignAppointmentWithSchedule(req, res) {
       return errorResponse(res, 400, 'Không thể phân công appointment đã hoàn tất hoặc đã hủy');
     }
 
+    if (appointment.status !== 'CONFIRMED') {
+      return errorResponse(res, 400, 'Appointment must be confirmed before assigning technician and repair bay');
+    }
+
     const staffId = req.body.staff_id || req.body.technician_id;
     const repairBayId = req.body.repair_bay_id;
     const startTime = req.body.start_time || appointment.start_time || appointment.time_slot;
@@ -956,8 +961,6 @@ async function assignAppointmentWithSchedule(req, res) {
     appointment.appointment_start_at = startAt;
     appointment.estimated_end_time = endAt;
     appointment.total_service_duration_minutes = duration;
-    appointment.status = 'CONFIRMED';
-    appointment.confirmed_at = appointment.confirmed_at || new Date();
     if (req.body.note || req.body.notes) appointment.staff_notes = req.body.note || req.body.notes;
     await appointment.save();
 

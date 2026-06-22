@@ -23,7 +23,7 @@ function validateAppointmentTransition(appointment, nextStatus) {
     return {
       ok: false,
       statusCode: 400,
-      message: 'Invalid status'
+      message: 'Invalid appointment status'
     };
   }
 
@@ -31,7 +31,7 @@ function validateAppointmentTransition(appointment, nextStatus) {
     return {
       ok: false,
       statusCode: 422,
-      message: 'Appointment đã kết thúc, không thể thay đổi trạng thái'
+      message: 'Appointment is already closed and cannot change status'
     };
   }
 
@@ -39,17 +39,15 @@ function validateAppointmentTransition(appointment, nextStatus) {
     return {
       ok: false,
       statusCode: 422,
-      message: `Không thể chuyển trạng thái appointment từ ${current} sang ${target}`
+      message: `Cannot move appointment status from ${current} to ${target}`
     };
   }
 
-  if (['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(target) && !hasFullAssignment(appointment)) {
+  if (['IN_PROGRESS', 'COMPLETED'].includes(target) && !hasFullAssignment(appointment)) {
     return {
       ok: false,
       statusCode: 422,
-      message: target === 'CONFIRMED'
-        ? 'Appointment phải được phân công kỹ thuật viên và kệ sửa chữa trước khi xác nhận'
-        : 'Appointment chưa được phân công đầy đủ kỹ thuật viên và kệ sửa chữa'
+      message: 'Appointment must be assigned to a technician and repair bay before it can be started'
     };
   }
 

@@ -1,14 +1,675 @@
 :where(.manager-layout, .appointment-detail-scope) .appointment-detail-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
   width: 100%;
-  max-width: 1280px;
+  max-width: 1320px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 0;
   background: transparent;
   box-sizing: border-box;
   overflow-x: hidden;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-record-page {
+  max-width: none;
+  gap: 14px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  border: 1px solid rgba(226, 191, 176, 0.55);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 26px rgba(25, 28, 29, 0.045);
+  padding: 16px 18px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-header-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  flex: 0 0 auto;
+  border: 0;
+  border-right: 1px solid var(--appointment-border);
+  background: transparent;
+  color: var(--appointment-muted-foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 0 14px 0 0;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-back:hover {
+  color: var(--appointment-brand-red);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-code-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-code-row h1 {
+  margin: 0;
+  color: var(--appointment-foreground);
+  font-size: 1.45rem;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-header-main p {
+  margin: 6px 0 0;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: min(360px, 28vw);
+  height: 38px;
+  border: 1px solid var(--appointment-border);
+  border-radius: 10px;
+  background: #fffdfb;
+  color: var(--appointment-muted-foreground);
+  padding: 0 12px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--appointment-foreground);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-icon-button {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--appointment-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--appointment-muted-foreground);
+  cursor: pointer;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-updated {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+  align-items: start;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-main {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-aside {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-panel,
+:where(.manager-layout, .appointment-detail-scope) .record-side-panel,
+:where(.manager-layout, .appointment-detail-scope) .record-aside .appointment-detail-card {
+  border: 1px solid rgba(226, 191, 176, 0.55);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 26px rgba(25, 28, 29, 0.04);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-panel {
+  padding: 16px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-section-header span,
+:where(.manager-layout, .appointment-detail-scope) .record-side-eyebrow {
+  display: block;
+  color: var(--appointment-brand-red);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-section-header h3 {
+  margin: 3px 0 0;
+  color: var(--appointment-foreground);
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-field-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--appointment-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-field {
+  min-width: 0;
+  padding: 11px 12px;
+  border-right: 1px solid var(--appointment-border);
+  border-bottom: 1px solid var(--appointment-border);
+  background: #fff;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-field:nth-child(4n) {
+  border-right: 0;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-field:nth-last-child(-n + 4) {
+  border-bottom: 0;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-field span,
+:where(.manager-layout, .appointment-detail-scope) .record-entity dt {
+  display: block;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-field strong,
+:where(.manager-layout, .appointment-detail-scope) .record-entity dd {
+  display: block;
+  min-width: 0;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--appointment-foreground);
+  font-size: 0.88rem;
+  font-weight: 850;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-field strong.is-red {
+  color: var(--appointment-brand-red);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-entity-grid,
+:where(.manager-layout, .appointment-detail-scope) .record-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-split-compact {
+  align-items: start;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-entity {
+  min-width: 0;
+  border: 1px solid var(--appointment-border);
+  border-radius: 12px;
+  background: #fffdfb;
+  padding: 14px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-entity-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-entity-title > span {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: var(--appointment-brand-red-soft);
+  color: var(--appointment-brand-red);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-entity h4 {
+  margin: 0;
+  color: var(--appointment-foreground);
+  font-size: 0.98rem;
+  font-weight: 900;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-entity p {
+  margin: 2px 0 0;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-entity dl,
+:where(.manager-layout, .appointment-detail-scope) .record-list,
+:where(.manager-layout, .appointment-detail-scope) .record-side-panel dl {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-entity dl > div {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 10px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-entity dd {
+  margin: 0;
+  white-space: normal;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-table {
+  border: 1px solid var(--appointment-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-table-head,
+:where(.manager-layout, .appointment-detail-scope) .record-table-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 120px 70px 120px 130px;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-table-head {
+  background: #fff7f2;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-table-row {
+  border-top: 1px solid var(--appointment-border);
+  color: var(--appointment-muted-foreground);
+  font-size: 0.86rem;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-table-row strong {
+  color: var(--appointment-foreground);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-table-row b,
+:where(.manager-layout, .appointment-detail-scope) .record-table-total strong {
+  color: var(--appointment-brand-red);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-table-total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 22px;
+  border-top: 1px solid var(--appointment-border);
+  background: #fffdfb;
+  padding: 12px;
+  font-size: 0.9rem;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-payment-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: var(--appointment-brand-red-soft);
+  color: var(--appointment-brand-red);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 850;
+  padding: 6px 10px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-list .record-field {
+  border: 1px solid var(--appointment-border);
+  border-radius: 10px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-empty {
+  display: flex;
+  align-items: center;
+  min-height: 82px;
+  border: 1px dashed var(--appointment-border);
+  border-radius: 12px;
+  background: #fffdfb;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.88rem;
+  font-weight: 800;
+  padding: 0 14px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-flow-empty {
+  align-items: flex-start;
+  min-height: 0;
+  background: #fff7ed;
+  color: #9a3412;
+  line-height: 1.55;
+  padding: 12px 14px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-material-list {
+  display: grid;
+  gap: 8px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-material-list > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--appointment-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-material-list b {
+  color: var(--appointment-brand-red);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-process {
+  display: grid;
+  gap: 10px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-process > div {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: start;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.84rem;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-process i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--appointment-border);
+  margin-top: 4px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-process .done i,
+:where(.manager-layout, .appointment-detail-scope) .record-process .current i {
+  background: var(--appointment-success);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-process strong {
+  display: block;
+  color: var(--appointment-foreground);
+  line-height: 1.25;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-process small {
+  display: block;
+  margin-top: 2px;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-process > div > span {
+  color: var(--appointment-muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-activity {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-activity li {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: start;
+  color: var(--appointment-foreground);
+  font-size: 0.84rem;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-activity time {
+  color: var(--appointment-brand-red);
+  font-weight: 900;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-activity p {
+  margin: 0;
+  font-weight: 800;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-activity span {
+  grid-column: 2;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.78rem;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-notes-panel p {
+  margin: 0;
+  border-left: 3px solid var(--appointment-brand-red);
+  border-radius: 10px;
+  background: #fff7f2;
+  color: var(--appointment-foreground);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  padding: 12px 14px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-side-panel,
+:where(.manager-layout, .appointment-detail-scope) .record-aside .appointment-detail-card {
+  padding: 14px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-side-panel h3 {
+  margin: 6px 0 4px;
+  color: var(--appointment-foreground);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-side-panel p {
+  margin: 0;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-side-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--appointment-border);
+  border-bottom: 1px solid var(--appointment-border);
+  margin: 12px 0;
+  padding: 12px 0;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-side-status strong {
+  color: var(--appointment-brand-red);
+  font-size: 1rem;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-side-panel dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--appointment-muted-foreground);
+  font-size: 0.82rem;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-side-panel dt,
+:where(.manager-layout, .appointment-detail-scope) .record-side-panel dd {
+  margin: 0;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-side-panel dd {
+  color: var(--appointment-foreground);
+  font-weight: 850;
+  text-align: right;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-side-progress {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--appointment-muted);
+  margin-top: 12px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .record-side-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--appointment-brand-red);
+}
+
+@media (max-width: 1240px) {
+  :where(.manager-layout, .appointment-detail-scope) .record-header,
+  :where(.manager-layout, .appointment-detail-scope) .record-layout {
+    grid-template-columns: 1fr;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-aside {
+    position: static;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-header-tools {
+    justify-content: space-between;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-search {
+    width: min(420px, 48vw);
+  }
+}
+
+@media (max-width: 940px) {
+  :where(.manager-layout, .appointment-detail-scope) .record-field-grid,
+  :where(.manager-layout, .appointment-detail-scope) .record-entity-grid,
+  :where(.manager-layout, .appointment-detail-scope) .record-split,
+  :where(.manager-layout, .appointment-detail-scope) .record-aside {
+    grid-template-columns: 1fr;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-field {
+    border-right: 0;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-field:nth-last-child(-n + 4) {
+    border-bottom: 1px solid var(--appointment-border);
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-field:last-child {
+    border-bottom: 0;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-table {
+    overflow-x: auto;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-table-head,
+  :where(.manager-layout, .appointment-detail-scope) .record-table-row {
+    min-width: 760px;
+  }
+}
+
+@media (max-width: 640px) {
+  :where(.manager-layout, .appointment-detail-scope) .record-header,
+  :where(.manager-layout, .appointment-detail-scope) .record-panel {
+    border-radius: 12px;
+    padding: 14px;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-header-main,
+  :where(.manager-layout, .appointment-detail-scope) .record-header-tools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-back {
+    width: fit-content;
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-search {
+    width: 100%;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-updated {
+    white-space: normal;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .record-entity dl > div,
+  :where(.manager-layout, .appointment-detail-scope) .record-list,
+  :where(.manager-layout, .appointment-detail-scope) .record-material-list > div {
+    grid-template-columns: 1fr;
+  }
 }
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-detail-topbar {
@@ -16,44 +677,38 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  background: var(--appointment-card);
-  border: 1px solid var(--appointment-border);
-  border-radius: var(--appointment-radius-xl);
-  box-shadow: var(--appointment-shadow-card);
-  padding: 18px 24px;
+  gap: 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
 }
 
-:where(.manager-layout, .appointment-detail-scope) .appointment-detail-topbar > div:first-child {
-  min-width: 220px;
-  flex: 0 0 auto;
-}
-
-:where(.manager-layout, .appointment-detail-scope) .appointment-detail-topbar p {
+:where(.manager-layout, .appointment-detail-scope) .detail-topbar-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  border-radius: 999px;
+  background: var(--appointment-brand-red-soft);
+  padding: 0 12px;
   color: var(--appointment-brand-red);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin: 0 0 4px;
-}
-
-:where(.manager-layout, .appointment-detail-scope) .appointment-detail-topbar h1 {
-  color: var(--appointment-foreground);
-  font-size: clamp(1.25rem, 1.6vw, 1.55rem);
-  font-weight: 900;
-  margin: 0;
-  line-height: 1.15;
+  white-space: nowrap;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .detail-search {
   flex: 1 1 420px;
-  max-width: 560px;
+  max-width: 520px;
   margin-left: auto;
   min-width: 260px;
-  height: 44px;
-  border-radius: 14px;
-  background: var(--appointment-muted);
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--appointment-border);
+  background: var(--appointment-card);
   color: var(--appointment-muted-foreground);
   display: flex;
   align-items: center;
@@ -71,9 +726,9 @@
 }
 
 :where(.manager-layout, .appointment-detail-scope) .detail-notification-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   border: 1px solid var(--appointment-border);
   background: var(--appointment-card);
   color: var(--appointment-foreground);
@@ -91,7 +746,8 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 10px;
+  min-height: 44px;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-back-btn {
@@ -128,7 +784,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(1.15rem, 1.7vw, 1.55rem);
+  font-size: clamp(1.2rem, 1.45vw, 1.45rem);
   font-weight: 900;
   color: var(--appointment-foreground);
   margin: 0;
@@ -146,8 +802,8 @@
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
   align-items: start;
 }
 
@@ -155,7 +811,7 @@
 :where(.manager-layout, .appointment-detail-scope) .appointment-detail-side {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
   min-width: 0;
 }
 
@@ -168,7 +824,7 @@
 :where(.manager-layout, .appointment-detail-scope) .appointment-note-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
+  gap: 14px;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-note-grid.single {
@@ -178,30 +834,38 @@
 :where(.manager-layout, .appointment-detail-scope) .appointment-detail-card {
   background: var(--appointment-card);
   border: 1px solid var(--appointment-border);
-  border-radius: var(--appointment-radius-2xl);
+  border-radius: var(--appointment-radius-xl);
   box-shadow: var(--appointment-shadow-card);
-  padding: 24px;
+  padding: 14px;
   min-width: 0;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-detail-card-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-detail-card-header > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-detail-card-header h3 {
   color: var(--appointment-foreground);
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 900;
   margin: 0;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-detail-card-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
   background: var(--appointment-brand-red-soft);
   color: var(--appointment-brand-red);
   display: inline-flex;
@@ -210,32 +874,45 @@
   flex-shrink: 0;
 }
 
+:where(.manager-layout, .appointment-detail-scope) .appointment-card-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: var(--appointment-success-soft);
+  color: var(--appointment-success);
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 :where(.manager-layout, .appointment-detail-scope) .appointment-info-grid,
 :where(.manager-layout, .appointment-detail-scope) .assignment-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .assignment-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-info-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
-  padding: 12px;
+  padding: 8px 9px;
   border: 1px solid var(--appointment-border);
-  border-radius: var(--appointment-radius-lg);
-  background: var(--appointment-card);
+  border-radius: var(--appointment-radius-md);
+  background: #fffdfb;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-info-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   background: var(--appointment-secondary);
   color: var(--appointment-muted-foreground);
   display: inline-flex;
@@ -256,7 +933,7 @@
   color: var(--appointment-muted-foreground);
   font-size: 0.78rem;
   font-weight: 600;
-  margin: 0 0 4px;
+  margin: 0 0 2px;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-info-row strong {
@@ -266,7 +943,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--appointment-foreground);
-  font-size: 0.92rem;
+  font-size: 0.86rem;
   line-height: 1.35;
 }
 
@@ -279,7 +956,7 @@
 :where(.manager-layout, .appointment-detail-scope) .quick-customer {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 14px;
   min-width: 0;
 }
 
@@ -291,8 +968,8 @@
 }
 
 :where(.manager-layout, .appointment-detail-scope) .detail-avatar {
-  width: 58px;
-  height: 58px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--appointment-brand-red), var(--appointment-brand-orange));
   color: var(--appointment-card);
@@ -313,7 +990,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--appointment-foreground);
-  font-size: 1rem;
+  font-size: 0.94rem;
   font-weight: 900;
   margin: 0;
 }
@@ -321,8 +998,8 @@
 :where(.manager-layout, .appointment-detail-scope) .member-chip {
   display: inline-flex;
   align-items: center;
-  margin-top: 7px;
-  padding: 4px 8px;
+  margin-top: 5px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: var(--appointment-brand-orange-soft);
   color: var(--appointment-brand-orange);
@@ -331,10 +1008,10 @@
 }
 
 :where(.manager-layout, .appointment-detail-scope) .contact-list {
-  margin-top: 16px;
+  margin-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -351,9 +1028,9 @@
 }
 
 :where(.manager-layout, .appointment-detail-scope) .vehicle-icon-box {
-  width: 58px;
-  height: 58px;
-  border-radius: 20px;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
   background: var(--appointment-brand-red-soft);
   color: var(--appointment-brand-red);
   display: inline-flex;
@@ -375,11 +1052,11 @@
 :where(.manager-layout, .appointment-detail-scope) .vehicle-meta-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
-:where(.manager-layout, .appointment-detail-scope) .vehicle-meta-grid span:last-child {
+:where(.manager-layout, .appointment-detail-scope) .vehicle-meta-grid span:nth-child(n + 3) {
   grid-column: 1 / -1;
 }
 
@@ -400,6 +1077,17 @@
   font-size: 0.9rem;
 }
 
+:where(.manager-layout, .appointment-detail-scope) .vehicle-maintenance-note {
+  margin: 12px 0 0;
+  border-left: 3px solid var(--appointment-brand-red);
+  border-radius: 8px;
+  background: var(--appointment-brand-red-soft);
+  color: #334155;
+  padding: 10px 12px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
 :where(.manager-layout, .appointment-detail-scope) .service-list {
   display: flex;
   flex-direction: column;
@@ -409,8 +1097,8 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 16px;
-  padding: 16px 0;
+  gap: 12px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--appointment-border);
   min-width: 0;
 }
@@ -426,6 +1114,11 @@
   display: flex;
   align-items: center;
   gap: 5px;
+  flex-wrap: wrap;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .service-row p span {
+  color: var(--appointment-muted-foreground);
 }
 
 :where(.manager-layout, .appointment-detail-scope) .service-row > strong {
@@ -435,9 +1128,9 @@
 }
 
 :where(.manager-layout, .appointment-detail-scope) .service-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   background: var(--appointment-brand-orange-soft);
   color: var(--appointment-brand-orange);
   display: inline-flex;
@@ -446,14 +1139,79 @@
 }
 
 :where(.manager-layout, .appointment-detail-scope) .service-total {
-  margin-top: 16px;
-  padding: 16px 18px;
-  border-radius: 14px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
   background: var(--appointment-brand-red-soft);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .material-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .material-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--appointment-border);
+  border-radius: var(--appointment-radius-md);
+  padding: 12px 14px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .material-row strong,
+:where(.manager-layout, .appointment-detail-scope) .material-row span {
+  display: block;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .material-row strong {
+  color: var(--appointment-foreground);
+  font-size: 0.9rem;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .material-row span {
+  color: var(--appointment-muted-foreground);
+  font-size: 0.8rem;
+  margin-top: 3px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .material-row b {
+  color: var(--appointment-brand-red);
+  white-space: nowrap;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 64px;
+  border: 1px dashed var(--appointment-border);
+  border-radius: var(--appointment-radius-lg);
+  background: var(--appointment-muted);
+  color: var(--appointment-muted-foreground);
+  font-weight: 800;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-empty-state span {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--appointment-card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-empty-state p {
+  margin: 0;
+  font-size: 0.9rem;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .service-total span {
@@ -479,7 +1237,7 @@
   position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .timeline-steps::before {
@@ -504,8 +1262,8 @@
 }
 
 :where(.manager-layout, .appointment-detail-scope) .timeline-step > span {
-  width: 42px;
-  height: 42px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 2px solid var(--appointment-border);
   background: var(--appointment-card);
@@ -545,10 +1303,10 @@
 :where(.manager-layout, .appointment-detail-scope) .note-box {
   border-left: 4px solid;
   border-radius: 12px;
-  padding: 16px;
+  padding: 12px 14px;
   color: #111827;
-  font-size: 0.92rem;
-  line-height: 1.65;
+  font-size: 0.82rem;
+  line-height: 1.55;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .note-box.orange {
@@ -565,7 +1323,7 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
   margin: 0;
   padding: 0;
 }
@@ -575,7 +1333,7 @@
   align-items: baseline;
   gap: 9px;
   color: #111827;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .activity-list small {
@@ -600,7 +1358,7 @@
   font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  margin: 0 0 16px;
+  margin: 0 0 10px;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .side-title.muted {
@@ -609,12 +1367,12 @@
 
 :where(.manager-layout, .appointment-detail-scope) .quick-customer {
   align-items: center;
-  padding-bottom: 16px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--appointment-border);
 }
 
 :where(.manager-layout, .appointment-detail-scope) .quick-block {
-  padding: 16px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--appointment-border);
 }
 
@@ -637,8 +1395,8 @@
 :where(.manager-layout, .appointment-detail-scope) .quick-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px 0;
+  gap: 8px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--appointment-border);
 }
 
@@ -669,7 +1427,7 @@
 }
 
 :where(.manager-layout, .appointment-detail-scope) .quick-progress {
-  padding-top: 16px;
+  padding-top: 10px;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .quick-progress > div {
@@ -699,7 +1457,7 @@
   align-items: center;
   gap: 7px;
   border-radius: 999px;
-  padding: 7px 12px;
+  padding: 6px 10px;
   font-size: 0.78rem;
   font-weight: 800;
   white-space: nowrap;
@@ -757,10 +1515,23 @@
 :where(.manager-layout, .appointment-detail-scope) .action-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .detail-flow-note {
+  margin: 0;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.55;
+  padding: 11px 12px;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .detail-primary-btn,
+:where(.manager-layout, .appointment-detail-scope) .detail-edit-btn,
 :where(.manager-layout, .appointment-detail-scope) .detail-print-btn,
 :where(.manager-layout, .appointment-detail-scope) .detail-secondary-btn {
   border: none;
@@ -776,11 +1547,16 @@
 }
 
 :where(.manager-layout, .appointment-detail-scope) .detail-primary-btn,
+:where(.manager-layout, .appointment-detail-scope) .detail-edit-btn,
 :where(.manager-layout, .appointment-detail-scope) .detail-print-btn {
   width: 100%;
   border-radius: 14px;
-  min-height: 48px;
+  min-height: 40px;
   padding: 0 16px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .detail-primary-btn,
+:where(.manager-layout, .appointment-detail-scope) .detail-print-btn {
   color: var(--appointment-card);
 }
 
@@ -788,11 +1564,23 @@
   background: var(--appointment-brand-red);
 }
 
+:where(.manager-layout, .appointment-detail-scope) .detail-primary-btn.state-only {
+  background: var(--appointment-muted);
+  color: var(--appointment-muted-foreground);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .detail-edit-btn {
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  background: var(--appointment-brand-red-soft);
+  color: var(--appointment-brand-red);
+}
+
 :where(.manager-layout, .appointment-detail-scope) .detail-print-btn {
   background: var(--appointment-brand-orange);
 }
 
 :where(.manager-layout, .appointment-detail-scope) .detail-primary-btn:hover,
+:where(.manager-layout, .appointment-detail-scope) .detail-edit-btn:hover,
 :where(.manager-layout, .appointment-detail-scope) .detail-print-btn:hover {
   opacity: 0.92;
 }
@@ -806,12 +1594,12 @@
 :where(.manager-layout, .appointment-detail-scope) .detail-secondary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
   padding-top: 4px;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .detail-secondary-btn {
-  min-height: 44px;
+  min-height: 38px;
   border: 1px solid var(--appointment-border);
   background: var(--appointment-card);
   color: var(--appointment-foreground);
@@ -834,6 +1622,7 @@
 }
 
 :where(.manager-layout, .appointment-detail-scope) .detail-print-btn:disabled,
+:where(.manager-layout, .appointment-detail-scope) .detail-edit-btn:disabled,
 :where(.manager-layout, .appointment-detail-scope) .detail-secondary-btn:disabled {
   cursor: not-allowed;
   opacity: 0.65;
@@ -842,12 +1631,22 @@
 :where(.manager-layout, .appointment-detail-scope) .appointment-action-message {
   margin: -8px 2px 0;
   padding: 12px 14px;
-  border: 1px solid var(--appointment-success-soft);
   border-radius: var(--appointment-radius-md);
-  background: var(--appointment-success-soft);
-  color: var(--appointment-success);
   font-size: 0.84rem;
   font-weight: 800;
+  line-height: 1.5;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-action-message.success {
+  border: 1px solid var(--appointment-success-soft);
+  background: var(--appointment-success-soft);
+  color: var(--appointment-success);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .appointment-action-message.error {
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: var(--appointment-brand-red-soft);
+  color: var(--appointment-brand-red);
 }
 
 :where(.manager-layout, .appointment-detail-scope) .appointment-edit-layer {
@@ -1103,14 +1902,14 @@
 
 @media (max-width: 820px) {
   :where(.manager-layout, .appointment-detail-scope) .appointment-detail-page {
-    padding: 18px;
-    gap: 18px;
+    padding: 0;
+    gap: 12px;
   }
 
   :where(.manager-layout, .appointment-detail-scope) .appointment-detail-topbar {
     align-items: stretch;
     flex-direction: column;
-    padding: 18px;
+    padding: 0;
   }
 
   :where(.manager-layout, .appointment-detail-scope) .detail-search {
@@ -1122,8 +1921,8 @@
 
   :where(.manager-layout, .appointment-detail-scope) .detail-notification-btn {
     position: absolute;
-    top: 18px;
-    right: 18px;
+    top: 0;
+    right: 0;
   }
 
   :where(.manager-layout, .appointment-detail-scope) .appointment-detail-header {
@@ -1159,11 +1958,11 @@
 
 @media (max-width: 560px) {
   :where(.manager-layout, .appointment-detail-scope) .appointment-detail-page {
-    padding: 14px;
+    padding: 0;
   }
 
   :where(.manager-layout, .appointment-detail-scope) .appointment-detail-card {
-    padding: 18px;
+    padding: 14px;
     border-radius: var(--appointment-radius-xl);
   }
 

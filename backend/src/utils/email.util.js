@@ -295,9 +295,84 @@ const sendWelcomeEmail = async (email, name) => {
   }
 };
 
+const sendAppointmentConfirmedEmail = async (email, name, appointment = {}) => {
+  if (!email) return false;
+
+  const transporter = createTransporter();
+  const appointmentCode = appointment.appointment_code || appointment.id || 'lich hen';
+  const appointmentDate = appointment.appointment_date || 'ngay hen';
+  const appointmentTime = appointment.start_time || appointment.time_slot || '--:--';
+  const serviceName = appointment.service_name || appointment.service?.name || appointment.service?.repair_issue || 'Dich vu sua xe';
+  const vehicleName = [appointment.vehicle?.brand, appointment.vehicle?.model].filter(Boolean).join(' ') || 'Xe cua quy khach';
+  const vehiclePlate = appointment.vehicle?.license_plate || appointment.vehicle_info?.license_plate || 'Chua cap nhat';
+
+  const mailOptions = {
+    from: process.env.EMAIL_FROM,
+    to: email,
+    subject: `[MOTOCORE] Lich hen ${appointmentCode} da duoc xac nhan`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #222; background: #f6f7f8; }
+          .container { max-width: 640px; margin: 0 auto; padding: 24px; }
+          .card { background: #fff; border: 1px solid #ead8cf; border-radius: 12px; overflow: hidden; }
+          .header { background: #e4282b; color: #fff; padding: 18px 22px; }
+          .content { padding: 22px; }
+          .meta { margin: 16px 0; border: 1px solid #ead8cf; border-radius: 10px; overflow: hidden; }
+          .row { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #ead8cf; }
+          .row:last-child { border-bottom: 0; }
+          .label { color: #6b7280; font-weight: 700; }
+          .value { color: #111827; font-weight: 800; }
+          .notice { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 14px; margin-top: 16px; }
+          .footer { color: #6b7280; font-size: 12px; padding: 16px 22px; border-top: 1px solid #ead8cf; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="card">
+            <div class="header">
+              <h2 style="margin:0;">MOTOCORE da xac nhan lich hen</h2>
+            </div>
+            <div class="content">
+              <p>Xin chao ${name || 'quy khach'},</p>
+              <p>Lich hen cua quy khach da duoc xac nhan. Nhan vien garage se tiep nhan va thong bao lai cac van de ve xe sau khi kiem tra thuc te.</p>
+              <div class="meta">
+                <div class="row"><span class="label">Ma lich</span><span class="value">${appointmentCode}</span></div>
+                <div class="row"><span class="label">Ngay hen</span><span class="value">${appointmentDate}</span></div>
+                <div class="row"><span class="label">Gio hen</span><span class="value">${appointmentTime}</span></div>
+                <div class="row"><span class="label">Dich vu</span><span class="value">${serviceName}</span></div>
+                <div class="row"><span class="label">Xe</span><span class="value">${vehicleName} - ${vehiclePlate}</span></div>
+              </div>
+              <div class="notice">
+                Sau khi quy khach dua xe den garage, ky thuat vien se kiem tra tinh trang xe, xac nhan hang muc can sua va vat tu can thay the truoc khi tien hanh.
+              </div>
+            </div>
+            <div class="footer">
+              Email nay duoc gui tu he thong quan ly garage MOTOCORE.
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Appointment confirmation email sent to ${email}`);
+    return true;
+  } catch (error) {
+    console.error('Error sending appointment confirmation email:', error);
+    return false;
+  }
+};
+
 module.exports = {
   sendVerificationOTP,
   sendVerificationEmail,
   sendPasswordResetEmail,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendAppointmentConfirmedEmail
 };

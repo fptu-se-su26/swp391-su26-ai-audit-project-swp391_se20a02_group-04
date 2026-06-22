@@ -12,6 +12,15 @@ const toDateString = (date = new Date()) => {
   return date.toISOString().slice(0, 10);
 };
 
+const STAFF_APPOINTMENT_SORT_FIELDS = new Set(['appointment_date', 'start_time', 'time_slot', 'status', 'created_at']);
+
+const normalizeAppointmentSort = (sortBy = 'appointment_date', sortOrder = 'asc') => {
+  const safeSortBy = STAFF_APPOINTMENT_SORT_FIELDS.has(sortBy) ? sortBy : 'appointment_date';
+  const normalizedOrder = String(sortOrder).toLowerCase();
+  const safeSortOrder = normalizedOrder === 'desc' || normalizedOrder === '-1' ? -1 : 1;
+  return { safeSortBy, safeSortOrder };
+};
+
 const getDateDaysAgo = (days) => {
   const date = new Date();
   date.setDate(date.getDate() - Number(days || 0));
@@ -268,11 +277,11 @@ const getMyAssignedAppointments = async (req, res) => {
     }
 
     const skip = (page - 1) * limit;
-    const sortOrder = sort_order === 'asc' ? 1 : -1;
+    const { safeSortBy, safeSortOrder } = normalizeAppointmentSort(sort_by, sort_order);
 
     const [appointments, total] = await Promise.all([
       populateStaffAppointment(Appointment.find(query))
-        .sort({ [sort_by]: sortOrder, start_time: sortOrder })
+        .sort({ [safeSortBy]: safeSortOrder, start_time: safeSortOrder })
         .limit(parseInt(limit))
         .skip(skip),
       Appointment.countDocuments(query)
@@ -341,14 +350,14 @@ const getAllAppointments = async (req, res) => {
     }
 
     const skip = (page - 1) * limit;
-    const sortOrder = sort_order === 'asc' ? 1 : -1;
+    const { safeSortBy, safeSortOrder } = normalizeAppointmentSort(sort_by, sort_order);
 
     const [appointments, total] = await Promise.all([
       Appointment.find(query)
         .populate('customer_id', 'full_name email phone')
         .populate('staff_id', 'full_name email')
         .populate('service_id', 'service_name base_price estimated_duration')
-        .sort({ [sort_by]: sortOrder })
+        .sort({ [safeSortBy]: safeSortOrder })
         .limit(parseInt(limit))
         .skip(skip),
       Appointment.countDocuments(query)

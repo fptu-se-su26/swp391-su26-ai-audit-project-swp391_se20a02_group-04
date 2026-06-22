@@ -12,7 +12,18 @@ import {
   startStaffAppointment,
   useAppointmentMaterials,
 } from "../../services/staffAppointmentApi";
-import { getCurrentUserId, getJobRouteId, isJobAssignedToUser, formatCurrency, mapAppointmentToJob } from "./staffAppointmentMapper";
+import {
+  canCompleteJob,
+  canMarkNoShow,
+  canStartJob,
+  canUseMaterials,
+  getCurrentUserId,
+  getJobRouteId,
+  hasFullJobAssignment,
+  isJobAssignedToUser,
+  formatCurrency,
+  mapAppointmentToJob,
+} from "./staffAppointmentMapper";
 import { getAuthSession } from "../../services/authApi";
 import "../../styles/staff/StaffJobDetail.css";
 
@@ -194,13 +205,13 @@ function TechnicalNotePanel({ job, onSaved }) {
 }
 
 function ActionRail({ job, onChanged }) {
-  const canStart = job.statusKey === "assigned";
   const { user } = getAuthSession();
   const routeId = getJobRouteId(job);
-  const belongsToCurrentStaff = isJobAssignedToUser(job, user);
-  const canComplete = job.statusKey === "in_progress" && belongsToCurrentStaff;
+  const canStart = canStartJob(job);
+  const canUseMaterial = canUseMaterials(job);
+  const canComplete = canCompleteJob(job, user);
   const canAcknowledge = job.status === "CONFIRMED" && !job.raw?.acknowledged_at;
-  const canNoShow = job.status === "CONFIRMED";
+  const canNoShow = canMarkNoShow(job);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -248,7 +259,7 @@ function ActionRail({ job, onChanged }) {
             <Icon name="play_circle" />
             Bắt đầu công việc
           </Link>
-          <Link className="secondary-button full" to={`/staff/jobs/${routeId}/materials`}>
+          <Link className={`secondary-button full ${!canUseMaterial ? "disabled-link" : ""}`} to={canUseMaterial ? `/staff/jobs/${routeId}/materials` : `/staff/jobs/${routeId}`}>
             <Icon name="inventory_2" />
             Thêm vật tư
           </Link>
@@ -351,6 +362,15 @@ export function StaffJobStart() {
     if (!job) return;
     const routeId = getJobRouteId(job);
 
+    if (!canStartJob(job)) {
+      setSubmitError(
+        hasFullJobAssignment(job)
+          ? "Chi co the bat dau cong viec da duoc giao."
+          : "Cong viec chua duoc phan cong day du ky thuat vien va ke sua chua."
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError("");
 
@@ -397,7 +417,7 @@ export function StaffJobStart() {
                 {submitError && <p className="form-message error">{submitError}</p>}
                 <div className="form-actions">
                   <Link className="secondary-button" to={`/staff/jobs/${getJobRouteId(job)}`}>Quay lại</Link>
-                  <button className="primary-button" disabled={isSubmitting || job.statusKey !== "assigned"} type="submit">
+                  <button className="primary-button" disabled={isSubmitting || !canStartJob(job)} type="submit">
                     <Icon name="check" />
                     {isSubmitting ? "Đang xác nhận..." : "Xác nhận bắt đầu"}
                   </button>
@@ -424,6 +444,12 @@ export function StaffJobMaterials() {
 
   const loadMaterials = async () => {
     if (!job) return;
+    if (!canUseMaterials(job)) {
+      setMaterialsError("Chi co the ghi nhan vat tu khi cong viec dang lam.");
+      setInventory([]);
+      setTransactions([]);
+      return;
+    }
     const routeId = getJobRouteId(job);
     setMaterialsError("");
     try {
@@ -458,14 +484,19 @@ export function StaffJobMaterials() {
       return;
     }
 
+    if (!canUseMaterials(job)) {
+      setMaterialsError("Chi co the ghi nhan vat tu khi cong viec dang lam.");
+      return;
+    }
+
     const overStockItem = selectedItems.find((selected) => {
       const source = inventory.find((item) => item._id === selected.inventory_item_id);
-      return source && selected.quantity > Number(source.quantity || 0);
+      return !Number.isInteger(selected.quantity) || selected.quantity > Number(source?.quantity || 0);
     });
 
     if (overStockItem) {
       const source = inventory.find((item) => item._id === overStockItem.inventory_item_id);
-      setMaterialsError(`Số lượng ${source?.item_name || "vật tư"} vượt quá tồn kho hiện có.`);
+      setMaterialsError(`So luong ${source?.item_name || "vat tu"} phai la so nguyen va khong vuot qua ton kho hien co.`);
       return;
     }
 
@@ -520,6 +551,7 @@ export function StaffJobMaterials() {
                         <label>
                           Số lượng
                           <input
+                            step="1"
                             min="0"
                             onChange={(event) => setQuantities((current) => ({ ...current, [item._id]: event.target.value }))}
                             type="number"
@@ -543,7 +575,7 @@ export function StaffJobMaterials() {
 
                 <div className="form-actions">
                   <Link className="secondary-button" to={`/staff/jobs/${getJobRouteId(job)}`}>Hủy</Link>
-                  <button className="primary-button" disabled={isSaving || !inventory.length} type="submit">
+                  <button className="primary-button" disabled={isSaving || !inventory.length || !canUseMaterials(job)} type="submit">
                     <Icon name="save" />
                     {isSaving ? "Đang lưu..." : "Lưu vật tư"}
                   </button>
@@ -574,7 +606,7 @@ export function StaffJobComplete() {
   const navigate = useNavigate();
   const { user } = getAuthSession();
   const belongsToCurrentStaff = job ? isJobAssignedToUser(job, user) : false;
-  const canComplete = Boolean(job && job.statusKey === "in_progress" && belongsToCurrentStaff);
+  const canComplete = Boolean(job && canCompleteJob(job, user));
 
   useEffect(() => {
     if (job) {
@@ -605,14 +637,24 @@ export function StaffJobComplete() {
       return;
     }
 
+    const durationValue = actualDuration === "" ? null : Number(actualDuration);
+    if (durationValue !== null && (!Number.isInteger(durationValue) || durationValue < 1 || durationValue > 480)) {
+      setSubmitError("Thoi gian thuc te phai la so nguyen tu 1 den 480 phut.");
+      return;
+    }
+
+    if (!notes.trim()) {
+      setSubmitError("Vui long nhap mo ta cong viec da thuc hien.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError("");
 
     try {
-      await completeStaffAppointment(routeId, {
-        completion_notes: notes.trim(),
-        actual_duration: actualDuration,
-      });
+      const payload = { completion_notes: notes.trim() };
+      if (durationValue !== null) payload.actual_duration = durationValue;
+      await completeStaffAppointment(routeId, payload);
       navigate("/staff/jobs", { replace: true });
     } catch (err) {
       setSubmitError(err.message || "Không thể hoàn thành công việc.");
@@ -658,6 +700,8 @@ export function StaffJobComplete() {
                 <input
                   id="actual-duration"
                   min="1"
+                  max="480"
+                  step="1"
                   onChange={(event) => setActualDuration(event.target.value)}
                   type="number"
                   value={actualDuration}

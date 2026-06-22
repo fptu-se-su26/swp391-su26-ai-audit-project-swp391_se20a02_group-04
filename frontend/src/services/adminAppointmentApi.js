@@ -79,6 +79,20 @@ function formatTime(timeValue) {
   });
 }
 
+function formatDateTime(dateValue) {
+  if (!dateValue) return "";
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return String(dateValue);
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
 function toApiDate(dateValue) {
   if (!dateValue) return undefined;
   const normalized = String(dateValue).trim();
@@ -136,8 +150,10 @@ export function mapAdminAppointment(appointment = {}) {
   const repairBay = appointment.repair_bay_id || {};
   const assignment = appointment.assignment_id || {};
   const status = String(appointment.status || "PENDING").toUpperCase();
-  const estimatedPrice = service.base_price || appointment.service?.estimated_price || 0;
+  const estimatedPrice = appointment.final_cost || service.base_price || appointment.service?.estimated_price || 0;
   const estimatedDuration = service.estimated_duration || appointment.service?.estimated_duration_minutes || appointment.estimated_duration || 60;
+  const rawPriority = String(appointment.priority || "").toLowerCase();
+  const priority = rawPriority || (status === "IN_PROGRESS" ? "high" : status === "PENDING" ? "medium" : "low");
 
   return {
     raw: appointment,
@@ -169,12 +185,15 @@ export function mapAdminAppointment(appointment = {}) {
     technicianSpecialization: staff.specialization || "",
     startTime: formatTime(assignment.estimated_start_time || appointment.appointment_start_at || appointment.start_time || appointment.time_slot),
     expectedDone: appointment.end_time || (appointment.estimated_end_time ? new Date(appointment.estimated_end_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "--:--"),
+    actualDone: formatDateTime(appointment.actual_end_time || appointment.completed_at),
     urgency: getUrgency(appointment),
     status,
     statusText: statusTextMap[status] || statusTextMap.PENDING,
-    priority: status === "IN_PROGRESS" ? "high" : status === "PENDING" ? "medium" : "low",
+    priority,
     channel: "Database",
     createdDate: formatDate(appointment.created_at),
+    lastUpdated: formatDateTime(appointment.updated_at),
+    paymentStatus: appointment.final_cost || status === "COMPLETED" ? "paid" : "unpaid",
     customerNote: appointment.customer_note || appointment.customer_notes || "Chưa có ghi chú khách hàng.",
     garageNote: appointment.staff_notes || "Chưa có ghi chú garage.",
     services: [
@@ -214,6 +233,13 @@ export async function updateAdminAppointmentStatus(appointmentId, status, notes 
   });
 
   return response;
+}
+
+export async function startAdminAppointment(appointmentId) {
+  return adminAppointmentRequest(`/admin/appointments/${appointmentId}/start`, {
+    method: "PUT",
+    body: JSON.stringify({}),
+  });
 }
 
 export async function updateAdminAppointment(appointmentId, payload = {}) {

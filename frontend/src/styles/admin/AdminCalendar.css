@@ -3,6 +3,33 @@
   background: var(--manager-surface);
 }
 
+.calendar-layout:not(.calendar-layout-embedded) .sidebar {
+  width: 244px;
+  flex-basis: 244px;
+}
+
+.calendar-layout:not(.calendar-layout-embedded) .sidebar-brand {
+  padding: 26px 22px 14px;
+}
+
+.calendar-layout:not(.calendar-layout-embedded) .sidebar-brand h1 {
+  font-size: 26px;
+}
+
+.calendar-layout:not(.calendar-layout-embedded) .sidebar-nav {
+  padding: 0 10px;
+}
+
+.calendar-layout:not(.calendar-layout-embedded) .nav-item {
+  min-height: 44px;
+  border-radius: 10px;
+  padding: 0 12px;
+}
+
+.calendar-layout:not(.calendar-layout-embedded) .sidebar-footer {
+  padding: 18px 22px 24px;
+}
+
 .calendar-layout.calendar-layout-embedded {
   min-height: auto;
   background: transparent;
@@ -132,7 +159,7 @@
 }
 
 .calendar-detail-body {
-  padding: 22px 32px 34px;
+  padding: 14px 18px 28px;
   animation: calendarFadeIn 0.42s ease both;
 }
 
