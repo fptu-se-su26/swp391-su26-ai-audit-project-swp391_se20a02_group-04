@@ -147,8 +147,8 @@ async function assignAppointment({ appointmentId, technicianId, repairBayId, ass
     throw error;
   }
 
-  if (!['PENDING', 'CONFIRMED'].includes(appointment.status)) {
-    const error = new Error('Appointment can only be assigned while pending or confirmed');
+  if (appointment.status !== 'CONFIRMED') {
+    const error = new Error('Appointment must be confirmed before assigning technician and repair bay');
     error.statusCode = 400;
     throw error;
   }

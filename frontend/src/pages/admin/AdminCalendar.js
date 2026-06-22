@@ -29,6 +29,7 @@ import {
   getAdminAppointments,
   getMappedAdminAppointmentById,
   mapAdminAppointment,
+  startAdminAppointment,
   updateAdminAppointment,
   updateAdminAppointmentStatus,
 } from "../../services/adminAppointmentApi";
@@ -263,6 +264,12 @@ const AdminCalendar = ({ onViewChange, embedded = false }) => {
     return refreshAppointmentFromDatabase(appointment);
   };
 
+  const startAppointmentFromDatabase = async (appointment) => {
+    if (!appointment.rawId) return undefined;
+    await startAdminAppointment(appointment.rawId);
+    return refreshAppointmentFromDatabase(appointment);
+  };
+
   const updateScheduleFromDatabase = async (appointment, payload) => {
     if (!appointment.rawId) return undefined;
     await updateAdminAppointment(appointment.rawId, payload);
@@ -303,7 +310,7 @@ const AdminCalendar = ({ onViewChange, embedded = false }) => {
               appointment={selectedAppointment}
               onBack={() => setSelectedAppointment(null)}
               onConfirm={(appointment) => updateStatusFromDatabase(appointment, "CONFIRMED")}
-              onStart={(appointment) => updateStatusFromDatabase(appointment, "IN_PROGRESS")}
+              onStart={startAppointmentFromDatabase}
               onComplete={(appointment) => updateStatusFromDatabase(appointment, "COMPLETED")}
               onUpdateSchedule={updateScheduleFromDatabase}
               onCancel={cancelFromDatabase}

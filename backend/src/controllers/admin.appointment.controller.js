@@ -3,7 +3,9 @@ const Service = require('../models/Service.model');
 const User = require('../models/User.model');
 const UserAudit = require('../models/UserAudit.model');
 const RepairBay = require('../models/RepairBay.model');
+const Notification = require('../models/Notification.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
+const { sendAppointmentConfirmedEmail } = require('../utils/email.util');
 const {
   assignAppointment,
   buildDateTime,
@@ -114,10 +116,11 @@ const getAppointmentById = async (req, res) => {
 
     const appointment = await Appointment.findById(id)
       .populate('customer_id', 'full_name email phone avatar_url')
-      .populate('staff_id', 'full_name email phone')
+      .populate('staff_id', 'full_name email phone specialization')
       .populate('service_id', 'service_name description base_price estimated_duration category')
       .populate('repair_bay_id', 'name code location equipment status')
       .populate('assignment_id')
+      .populate('acknowledged_by', 'full_name email')
       .populate('cancelled_by', 'full_name email');
 
     if (!appointment) {
@@ -204,10 +207,11 @@ const updateAppointment = async (req, res) => {
 
     const updatedAppointment = await Appointment.findById(id)
       .populate('customer_id', 'full_name email phone')
-      .populate('staff_id', 'full_name email')
-      .populate('service_id', 'service_name base_price')
-      .populate('repair_bay_id', 'name code location')
-      .populate('assignment_id');
+      .populate('staff_id', 'full_name email phone specialization')
+      .populate('service_id', 'service_name description base_price estimated_duration category')
+      .populate('repair_bay_id', 'name code location equipment status')
+      .populate('assignment_id')
+      .populate('acknowledged_by', 'full_name email');
 
     return successResponse(res, 200, 'Appointment updated successfully', {
       appointment: updatedAppointment
@@ -274,6 +278,44 @@ const updateAppointmentStatus = async (req, res) => {
 
     await appointment.save();
 
+    const populatedAppointment = await Appointment.findById(id)
+      .populate('customer_id', 'full_name email phone avatar_url')
+      .populate('staff_id', 'full_name email phone specialization')
+      .populate('service_id', 'service_name description base_price estimated_duration category')
+      .populate('repair_bay_id', 'name code location equipment status')
+      .populate('assignment_id')
+      .populate('acknowledged_by', 'full_name email')
+      .populate('cancelled_by', 'full_name email');
+
+    if (transition.target === 'CONFIRMED') {
+      const customer = populatedAppointment.customer_id || populatedAppointment.customer_snapshot || {};
+      const service = populatedAppointment.service_id || populatedAppointment.service || {};
+      const appointmentCode = populatedAppointment.appointment_code || populatedAppointment._id;
+
+      await Notification.create({
+        user_id: populatedAppointment.customer_id?._id || populatedAppointment.customer_id || appointment.customer_id,
+        appointment_id: populatedAppointment._id,
+        type: 'APPOINTMENT_CONFIRMED',
+        title: 'Lịch hẹn đã được xác nhận',
+        message: `Lịch hẹn ${appointmentCode} đã được xác nhận. Nhân viên garage sẽ sớm thông báo các vấn đề về xe và thông tin chi tiết sau khi tiếp nhận/kiểm tra.`,
+        metadata: {
+          appointment_code: appointmentCode,
+          appointment_date: populatedAppointment.appointment_date,
+          start_time: populatedAppointment.start_time || populatedAppointment.time_slot
+        }
+      });
+
+      sendAppointmentConfirmedEmail(customer.email, customer.full_name, {
+        appointment_code: appointmentCode,
+        appointment_date: populatedAppointment.appointment_date,
+        start_time: populatedAppointment.start_time || populatedAppointment.time_slot,
+        service_name: service.service_name || service.name || populatedAppointment.service?.name,
+        vehicle: populatedAppointment.vehicle || populatedAppointment.vehicle_info
+      }).catch((emailError) => {
+        console.error('Failed to send appointment confirmation email:', emailError);
+      });
+    }
+
     // Log audit
     await UserAudit.create({
       user_id: appointment.customer_id,
@@ -290,11 +332,7 @@ const updateAppointmentStatus = async (req, res) => {
     });
 
     return successResponse(res, 200, 'Appointment status updated successfully', {
-      appointment: {
-        _id: appointment._id,
-        status: appointment.status,
-        completed_at: appointment.completed_at
-      }
+      appointment: populatedAppointment
     });
 
   } catch (error) {
@@ -368,6 +406,10 @@ const assignStaff = async (req, res) => {
 
     if (!appointment) {
       return errorResponse(res, 404, 'Appointment not found');
+    }
+
+    if (appointment.status !== 'CONFIRMED') {
+      return errorResponse(res, 400, 'Appointment must be confirmed before assigning staff');
     }
 
     // Verify staff exists and has STAFF role

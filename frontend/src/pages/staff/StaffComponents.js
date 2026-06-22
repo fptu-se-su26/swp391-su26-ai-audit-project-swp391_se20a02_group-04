@@ -7,7 +7,7 @@ import {
   getTodayAttendance,
   saveStaffAppointmentNote,
 } from "../../services/staffAppointmentApi";
-import { getJobRouteId, isJobAssignedToUser } from "./staffAppointmentMapper";
+import { canCompleteJob, canStartJob, canUseMaterials, getJobRouteId } from "./staffAppointmentMapper";
 
 export function Icon({ name, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -125,7 +125,7 @@ export function PageHeader({ title, subtitle, actions = true }) {
     }
   };
 
-  const inShift = attendance?.status === "IN_SHIFT";
+  const inShift = ["IN_SHIFT", "CHECKED_IN"].includes(attendance?.status);
 
   return (
     <header className="topbar">
@@ -168,13 +168,12 @@ export function StatCard({ icon, label, value, helper, tone }) {
 function buildPrimaryJobAction(job) {
   const { user } = getAuthSession();
   const routeId = getJobRouteId(job);
-  const belongsToCurrentStaff = isJobAssignedToUser(job, user);
 
-  if (job.statusKey === "assigned") {
+  if (canStartJob(job)) {
     return { label: "Bắt đầu", to: `/staff/jobs/${routeId}/start`, className: "primary-button" };
   }
 
-  if (job.statusKey === "in_progress" && belongsToCurrentStaff) {
+  if (canCompleteJob(job, user)) {
     return { label: "Hoàn thành", to: `/staff/jobs/${routeId}/complete`, className: "primary-button success" };
   }
 
@@ -184,11 +183,11 @@ function buildPrimaryJobAction(job) {
 function buildSecondaryJobAction(job) {
   const routeId = getJobRouteId(job);
 
-  if (job.statusKey === "in_progress") {
+  if (canUseMaterials(job)) {
     return { label: "Thêm vật tư", to: `/staff/jobs/${routeId}/materials` };
   }
 
-  return { label: "Chi tiết", to: `/staff/jobs/${routeId}` };
+  return null;
 }
 
 export function JobCard({ job, compact = false }) {
@@ -225,9 +224,11 @@ export function JobCard({ job, compact = false }) {
       </div>
 
       <div className="job-actions">
-        <Link className="secondary-button" to={secondaryAction.to}>
-          {secondaryAction.label}
-        </Link>
+        {secondaryAction && (
+          <Link className="secondary-button" to={secondaryAction.to}>
+            {secondaryAction.label}
+          </Link>
+        )}
         <Link className={primaryAction.className} to={primaryAction.to}>
           {primaryAction.label}
         </Link>

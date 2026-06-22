@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Icon, JobCard, PageHeader, QuickNote } from "./StaffComponents";
 import { getStaffAppointments } from "../../services/staffAppointmentApi";
-import { getJobRouteId, mapAppointmentToJob } from "./staffAppointmentMapper";
+import { canStartJob, getJobRouteId, getNextJob, mapAppointmentToJob } from "./staffAppointmentMapper";
 import "../../styles/staff/StaffJobs.css";
 
 const filters = [
@@ -10,6 +10,13 @@ const filters = [
   { label: "Duoc giao", value: "CONFIRMED", status: "CONFIRMED" },
   { label: "Dang lam", value: "IN_PROGRESS", status: "IN_PROGRESS" },
   { label: "Hoan thanh", value: "COMPLETED", status: "COMPLETED" },
+];
+
+const countFilters = [
+  { value: "ALL", status: "" },
+  { value: "CONFIRMED", status: "CONFIRMED" },
+  { value: "IN_PROGRESS", status: "IN_PROGRESS" },
+  { value: "COMPLETED", status: "COMPLETED" },
 ];
 
 export default function StaffJobs() {
@@ -32,7 +39,7 @@ export default function StaffJobs() {
     setError("");
 
     try {
-      const [listResponse, nextResponse] = await Promise.all([
+      const [listResponse, nextResponse, ...countResponses] = await Promise.all([
         getStaffAppointments({
           ...(config.status ? { status: config.status } : {}),
           page: 1,
@@ -47,18 +54,34 @@ export default function StaffJobs() {
           sort_by: "appointment_date",
           sort_order: "asc",
         }),
+        ...countFilters.map((filter) =>
+          getStaffAppointments({
+            ...(filter.status ? { status: filter.status } : {}),
+            page: 1,
+            limit: 1,
+            sort_by: "appointment_date",
+            sort_order: "asc",
+          })
+        ),
       ]);
 
       const appointments = listResponse.data?.appointments || [];
       const nextAppointments = nextResponse.data?.appointments || [];
+      const mappedAppointments = appointments.map(mapAppointmentToJob);
+      const mappedNextAppointments = nextAppointments.map(mapAppointmentToJob);
+      const nextAllowedJob = getNextJob(mappedNextAppointments);
+      const nextFallbackJob = getNextJob(mappedAppointments);
+      const totals = countFilters.reduce((result, filter, index) => {
+        const response = countResponses[index];
+        const responseAppointments = response?.data?.appointments || [];
+        result[filter.value] = response?.data?.pagination?.total ?? responseAppointments.length;
+        return result;
+      }, {});
 
-      setJobs(appointments.map(mapAppointmentToJob));
-      setNextJob(nextAppointments.map(mapAppointmentToJob)[0] || null);
+      setJobs(mappedAppointments);
+      setNextJob(nextAllowedJob || nextFallbackJob || null);
       setPagination(listResponse.data?.pagination || {});
-      setTabTotals((current) => ({
-        ...current,
-        [filterValue]: listResponse.data?.pagination?.total ?? appointments.length,
-      }));
+      setTabTotals(totals);
     } catch (err) {
       setError(err.message === "UNAUTHORIZED"
         ? "Vui long dang nhap lai de xem cong viec."
@@ -163,10 +186,17 @@ export default function StaffJobs() {
                 <span className={`status-pill ${nextJob.statusClass}`}>{nextJob.time}</span>
                 <h4>{nextJob.vehicle} - {nextJob.plate}</h4>
                 <p>{nextJob.service}. Du kien xu ly trong {nextJob.estimate}.</p>
-                <Link className="primary-button full" to={`/staff/jobs/${getJobRouteId(nextJob)}/start`}>
-                  <Icon name="play_circle" />
-                  Bat dau viec nay
-                </Link>
+                {canStartJob(nextJob) ? (
+                  <Link className="primary-button full" to={`/staff/jobs/${getJobRouteId(nextJob)}/start`}>
+                    <Icon name="play_circle" />
+                    Bat dau viec nay
+                  </Link>
+                ) : (
+                  <Link className="secondary-button full" to={`/staff/jobs/${getJobRouteId(nextJob)}`}>
+                    <Icon name="visibility" />
+                    Xem chi tiet
+                  </Link>
+                )}
               </div>
             ) : (
               <div className="state-box">

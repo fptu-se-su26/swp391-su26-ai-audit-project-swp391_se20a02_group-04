@@ -49,6 +49,18 @@ const profileValidation = [
     .withMessage('Specialization cannot exceed 120 characters')
 ];
 
+const appointmentListQueryValidation = [
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+  query('status').optional().isIn(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
+  query('date_from').optional().isISO8601(),
+  query('date_to').optional().isISO8601(),
+  query('sort_by').optional().isIn(['appointment_date', 'start_time', 'time_slot', 'status', 'created_at'])
+    .withMessage('Invalid sort_by'),
+  query('sort_order').optional().isIn(['asc', 'desc', '1', '-1'])
+    .withMessage('Invalid sort_order')
+];
+
 router.get('/dashboard',
   authenticate,
   authorize('STAFF', 'ADMIN', 'MANAGER'),
@@ -128,12 +140,8 @@ router.get('/appointments/history',
 router.get('/appointments/all',
   authenticate,
   authorize('STAFF'),
-  query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 100 }),
-  query('status').optional().isIn(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
+  appointmentListQueryValidation,
   query('staff_id').optional(),
-  query('date_from').optional().isISO8601(),
-  query('date_to').optional().isISO8601(),
   validate,
   staffAppointmentController.getAllAppointments
 );
@@ -146,11 +154,7 @@ router.get('/appointments/all',
 router.get('/appointments',
   authenticate,
   authorize('STAFF'),
-  query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 100 }),
-  query('status').optional().isIn(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
-  query('date_from').optional().isISO8601(),
-  query('date_to').optional().isISO8601(),
+  appointmentListQueryValidation,
   validate,
   staffAppointmentController.getMyAssignedAppointments
 );
