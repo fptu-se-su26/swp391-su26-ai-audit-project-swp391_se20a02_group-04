@@ -179,7 +179,7 @@ export default function HomePage() {
               </a>
               <a href="/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">two_wheeler</span>
-                <span>Nhà xe của tôi</span>
+                <span>Tình trạng xe của tôi</span>
               </a>
               <a href="/booking" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">event_available</span>
