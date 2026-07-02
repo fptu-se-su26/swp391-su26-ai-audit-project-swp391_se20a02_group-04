@@ -14,10 +14,15 @@ import {
   Layers,
   Boxes,
   LogOut,
-  User
+  User,
+  Bike,
+  FileText,
+  Receipt
 } from "lucide-react";
 import "../../styles/manager/ManagerLayout.css";
 import { getAuthSession, clearAuthSession } from "../../services/authApi";
+import { getManagerAppointments, mapManagerAppointment, managerAppointmentRequest, updateManagerAppointmentStatus, updateManagerAppointment, cancelManagerAppointment } from "../../services/managerAppointmentApi";
+import { getTechnicians, getRepairBays } from "../../services/appointmentAssignmentApi";
 
 // Sub-components imports
 import ManagerDashboard from "./ManagerDashboard";
@@ -26,6 +31,12 @@ import ManagerStaff from "./ManagerStaff";
 import ManagerWarehouse from "./ManagerWarehouse";
 import ManagerProfile from "./ManagerProfile";
 import ManagerRevenue from "./ManagerRevenue";
+import ManagerCustomers from "./ManagerCustomers";
+import ManagerVehicles from "./ManagerVehicles";
+import ManagerWorkOrders from "./ManagerWorkOrders";
+import ManagerInvoices from "./ManagerInvoices";
+import ManagerReports from "./ManagerReports";
+import ManagerSettings from "./ManagerSettings";
 
 import AdminCalendar from "../admin/AdminCalendar";
 import InventoryModule from "../inventory/InventoryModule";
@@ -152,7 +163,13 @@ const MANAGER_TABS = new Set([
   "inventory",
   "warehouse",
   "revenue",
-  "profile"
+  "profile",
+  "customers",
+  "vehicles",
+  "work-orders",
+  "invoices",
+  "reports",
+  "settings"
 ]);
 
 function getManagerTabFromPath(pathname) {
@@ -165,6 +182,12 @@ function getManagerTabFromPath(pathname) {
   if (pathname.startsWith("/manager/warehouse")) return "warehouse";
   if (pathname.startsWith("/manager/revenue")) return "revenue";
   if (pathname.startsWith("/manager/profile")) return "profile";
+  if (pathname.startsWith("/manager/customers")) return "customers";
+  if (pathname.startsWith("/manager/vehicles")) return "vehicles";
+  if (pathname.startsWith("/manager/work-orders")) return "work-orders";
+  if (pathname.startsWith("/manager/invoices")) return "invoices";
+  if (pathname.startsWith("/manager/reports")) return "reports";
+  if (pathname.startsWith("/manager/settings")) return "settings";
   return "dashboard";
 }
 
@@ -177,6 +200,12 @@ function getManagerPathFromTab(tabName) {
   if (tabName === "warehouse") return "/manager/repair-bays/diagram";
   if (tabName === "revenue") return "/manager/revenue";
   if (tabName === "profile") return "/manager/profile";
+  if (tabName === "customers") return "/manager/customers";
+  if (tabName === "vehicles") return "/manager/vehicles";
+  if (tabName === "work-orders") return "/manager/work-orders";
+  if (tabName === "invoices") return "/manager/invoices";
+  if (tabName === "reports") return "/manager/reports";
+  if (tabName === "settings") return "/manager/settings";
   return "/manager/dashboard";
 }
 
@@ -211,6 +240,98 @@ const ManagerLayout = () => {
   const [appointments, setAppointments] = useState(initialAppointments);
   const [technicians, setTechnicians] = useState(initialTechnicians);
   const [bays, setBays] = useState(initialBays);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadManagerData = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [appRes, techRes, bayRes] = await Promise.all([
+        getManagerAppointments({ limit: 100 }).catch(err => {
+          console.error("Error loading appointments in layout:", err);
+          return null;
+        }),
+        getTechnicians().catch(err => {
+          console.error("Error loading technicians in layout:", err);
+          return [];
+        }),
+        getRepairBays().catch(err => {
+          console.error("Error loading bays in layout:", err);
+          return [];
+        })
+      ]);
+
+      let mappedApps = [];
+      if (appRes && appRes.data && Array.isArray(appRes.data.appointments)) {
+        mappedApps = appRes.data.appointments.map(mapManagerAppointment);
+        setAppointments(mappedApps);
+      }
+
+      // Map technicians dynamically
+      if (Array.isArray(techRes)) {
+        const mappedTechs = techRes.map(tech => {
+          // Calculate workload (active appointments assigned to them today)
+          const activeTechApps = mappedApps.filter(app => 
+            (app.raw?.staff_id?._id === tech._id || app.raw?.staff_id === tech._id) && 
+            (app.status === 'CONFIRMED' || app.status === 'IN_PROGRESS')
+          );
+          
+          return {
+            id: tech._id,
+            name: tech.full_name,
+            role: "Kỹ thuật viên",
+            specialty: tech.specialization || "Bảo dưỡng tổng quát",
+            avatar: tech.avatar_url || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='12' fill='%23eff6ff'/><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z' fill='%233b82f6'/></svg>`,
+            workload: activeTechApps.length,
+            activeTasks: activeTechApps.map(app => `${app.vehicleType || "Xe"} - ${app.service}`)
+          };
+        });
+        
+        if (mappedTechs.length === 0) {
+          setTechnicians(initialTechnicians);
+        } else {
+          setTechnicians(mappedTechs);
+        }
+      }
+
+      // Map repair bays dynamically
+      if (Array.isArray(bayRes)) {
+        const mappedBays = bayRes.map(bay => {
+          const activeBayApp = mappedApps.find(app => 
+            (app.raw?.repair_bay_id?._id === bay._id || app.raw?.repair_bay_id === bay._id) && 
+            (app.status === 'CONFIRMED' || app.status === 'IN_PROGRESS')
+          );
+          
+          return {
+            id: bay._id,
+            name: bay.name || `Kệ ${bay.code}`,
+            code: bay.code,
+            occupied: !!activeBayApp,
+            bike: activeBayApp ? activeBayApp.vehicle : "",
+            service: activeBayApp ? activeBayApp.service : "",
+            tech: activeBayApp ? activeBayApp.techAssigned : ""
+          };
+        });
+        
+        if (mappedBays.length === 0) {
+          setBays(initialBays);
+        } else {
+          setBays(mappedBays);
+        }
+      }
+
+    } catch (err) {
+      console.error("Failed to load manager layout data:", err);
+      setError("Không thể đồng bộ dữ liệu thời gian thực. Đang hiển thị ngoại tuyến.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadManagerData();
+  }, []);
 
   // Modal active state for Technicians allocation
   const [allocationModal, setAllocationModal] = useState({
@@ -270,50 +391,68 @@ const ManagerLayout = () => {
   };
 
   // Confirm technician allocation
-  const confirmAllocation = () => {
+  const confirmAllocation = async () => {
     const selectedTech = technicians.find(t => t.id === allocationModal.selectedTechId);
     const techName = selectedTech ? selectedTech.name : "";
+    const appId = allocationModal.appointmentId;
 
-    // Update appointment assigned mechanic
-    setAppointments(prev => prev.map(app => {
-      if (app.id === allocationModal.appointmentId) {
-        return {
-          ...app,
-          techAssigned: techName,
-          status: "CONFIRMED", // Auto confirm when assigned
-          statusText: "Đã xác nhận"
-        };
-      }
-      return app;
-    }));
+    if (!selectedTech) {
+      setAllocationModal({ show: false, appointmentId: "", selectedTechId: "" });
+      return;
+    }
 
-    // Update Technician workload & tasks
-    const targetApp = appointments.find(a => a.id === allocationModal.appointmentId);
-    if (selectedTech) {
-      setTechnicians(prev => prev.map(t => {
-        if (t.id === selectedTech.id) {
-          const taskString = `${targetApp.vehicle} - ${targetApp.service}`;
-          if (!t.activeTasks.includes(taskString)) {
+    try {
+      if (appId.startsWith("mock-") || String(appId).includes("mock")) {
+        // Update mock locally
+        setAppointments(prev => prev.map(app => {
+          if (app.id === appId) {
             return {
-              ...t,
-              workload: Math.min(t.workload + 1, 2),
-              activeTasks: [...t.activeTasks, taskString]
+              ...app,
+              techAssigned: techName,
+              status: "CONFIRMED",
+              statusText: "Đã xác nhận"
             };
           }
-        }
-        return t;
-      }));
+          return app;
+        }));
+
+        const targetApp = appointments.find(a => a.id === appId);
+        setTechnicians(prev => prev.map(t => {
+          if (t.id === selectedTech.id) {
+            const taskString = `${targetApp.vehicle} - ${targetApp.service}`;
+            if (!t.activeTasks.includes(taskString)) {
+              return {
+                ...t,
+                workload: Math.min(t.workload + 1, 2),
+                activeTasks: [...t.activeTasks, taskString]
+              };
+            }
+          }
+          return t;
+        }));
+        triggerToast(`Đã phân công thành công cho KTV ${techName}!`, "success");
+      } else {
+        const rawId = appointments.find(a => a.id === appId || a.rawId === appId)?.rawId || appId;
+        await managerAppointmentRequest(`/manager/appointments/${rawId}/assign-staff`, {
+          method: "POST",
+          body: JSON.stringify({ staff_id: selectedTech.id }),
+        });
+        triggerToast(`Đã phân công thành công cho KTV ${techName}!`, "success");
+        await loadManagerData();
+      }
+    } catch (err) {
+      console.error("Error assigning technician:", err);
+      triggerToast(err.message || "Không thể phân công kỹ thuật viên.", "error");
     }
 
     setAllocationModal({ show: false, appointmentId: "", selectedTechId: "" });
-    triggerToast(`Đã phân công thành công cho KTV ${techName}!`, "success");
   };
 
   // Render Sub page contents based on active tab state
   const renderSubPage = () => {
     switch (currentTab) {
       case "dashboard":
-        return <ManagerDashboard bays={bays} technicians={technicians} />;
+        return <ManagerDashboard bays={bays} technicians={technicians} appointments={appointments} refreshData={loadManagerData} />;
       case "appointments":
         return (
           <AdminCalendar
@@ -330,22 +469,66 @@ const ManagerLayout = () => {
           <AppointmentDetailPage
             appointment={selectedAppointment}
             onBack={() => handleTabChange("appointments")}
-            onConfirm={() => {
+            onConfirm={async (app) => {
+              const rawId = app.rawId || selectedAppointment.rawId;
+              if (rawId && !String(rawId).startsWith("mock") && !String(rawId).startsWith("WO-MOCK")) {
+                const res = await updateManagerAppointmentStatus(rawId, "CONFIRMED");
+                triggerToast("Đã xác nhận lịch hẹn.", "success");
+                await loadManagerData();
+                return res;
+              }
               updateAppointmentStatus(selectedAppointment.id, "CONFIRMED", "Đã xác nhận");
-              triggerToast("Đã xác nhận lịch hẹn.", "success");
+              triggerToast("Đã xác nhận lịch hẹn (giả lập).", "success");
             }}
-            onStart={() => {
+            onStart={async (app) => {
+              const rawId = app.rawId || selectedAppointment.rawId;
+              if (rawId && !String(rawId).startsWith("mock") && !String(rawId).startsWith("WO-MOCK")) {
+                const res = await updateManagerAppointmentStatus(rawId, "IN_PROGRESS");
+                triggerToast("Đã bắt đầu xử lý lịch hẹn.", "success");
+                await loadManagerData();
+                return res;
+              }
               updateAppointmentStatus(selectedAppointment.id, "IN_PROGRESS", "Đang xử lý");
-              triggerToast("Đã bắt đầu xử lý lịch hẹn.", "success");
+              triggerToast("Đã bắt đầu xử lý lịch hẹn (giả lập).", "success");
             }}
-            onComplete={() => {
+            onComplete={async (app) => {
+              const rawId = app.rawId || selectedAppointment.rawId;
+              if (rawId && !String(rawId).startsWith("mock") && !String(rawId).startsWith("WO-MOCK")) {
+                const res = await updateManagerAppointmentStatus(rawId, "COMPLETED");
+                triggerToast("Đã hoàn tất lịch hẹn.", "success");
+                await loadManagerData();
+                return res;
+              }
               updateAppointmentStatus(selectedAppointment.id, "COMPLETED", "Hoàn tất");
-              triggerToast("Đã hoàn tất lịch hẹn.", "success");
+              triggerToast("Đã hoàn tất lịch hẹn (giả lập).", "success");
+            }}
+            onUpdateSchedule={async (app, payload) => {
+              const rawId = app.rawId || selectedAppointment.rawId;
+              if (rawId && !String(rawId).startsWith("mock") && !String(rawId).startsWith("WO-MOCK")) {
+                const res = await updateManagerAppointment(rawId, payload);
+                triggerToast("Đã cập nhật lịch hẹn thành công.", "success");
+                await loadManagerData();
+                return res;
+              }
+              triggerToast("Đã cập nhật lịch hẹn (giả lập).", "success");
+            }}
+            onCancel={async (app, reasonObj) => {
+              const rawId = app.rawId || selectedAppointment.rawId;
+              const reason = typeof reasonObj === "string" ? reasonObj : reasonObj?.reason || "Hủy từ trang quản trị";
+              if (rawId && !String(rawId).startsWith("mock") && !String(rawId).startsWith("WO-MOCK")) {
+                const res = await cancelManagerAppointment(rawId, reason);
+                triggerToast("Đã hủy lịch hẹn.", "success");
+                await loadManagerData();
+                return res;
+              }
+              updateAppointmentStatus(selectedAppointment.id, "CANCELLED", "Đã hủy");
+              triggerToast("Đã hủy lịch hẹn (giả lập).", "success");
             }}
             onAppointmentChange={(updatedAppointment) => {
               setAppointments((prev) =>
                 prev.map((item) => (item.id === updatedAppointment.id ? { ...item, ...updatedAppointment } : item))
               );
+              loadManagerData();
             }}
           />
         );
@@ -356,11 +539,23 @@ const ManagerLayout = () => {
       case "warehouse":
         return <ManagerWarehouse bays={bays} />;
       case "revenue":
-        return <ManagerRevenue />;
+        return <ManagerRevenue appointments={appointments} />;
       case "profile":
         return <ManagerProfile />;
+      case "customers":
+        return <ManagerCustomers />;
+      case "vehicles":
+        return <ManagerVehicles />;
+      case "work-orders":
+        return <ManagerWorkOrders appointments={appointments} refreshData={loadManagerData} onSelectAppointment={openAppointmentDetail} />;
+      case "invoices":
+        return <ManagerInvoices appointments={appointments} refreshData={loadManagerData} />;
+      case "reports":
+        return <ManagerReports appointments={appointments} technicians={technicians} />;
+      case "settings":
+        return <ManagerSettings />;
       default:
-        return <ManagerDashboard bays={bays} technicians={technicians} />;
+        return <ManagerDashboard bays={bays} technicians={technicians} appointments={appointments} refreshData={loadManagerData} />;
     }
   };
 
@@ -460,13 +655,13 @@ const ManagerLayout = () => {
           <div className="sidebar-brand" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div className="brand-logo-circle" style={{ width: "36px", height: "36px", borderRadius: "50%", backgroundColor: "#ff6b00", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#ffffff" }}>
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="18.5" cy="17.5" r="2.5"/>
-                <circle cx="5.5" cy="17.5" r="2.5"/>
-                <path d="M15 6h1a2 2 0 0 1 2 2v2"/>
-                <path d="M12 12h3.5"/>
-                <path d="M16 12a1.5 1.5 0 1 1 2-2.7L18.5 10"/>
-                <path d="M12 6 7.5 14.5"/>
-                <path d="M5.5 15h11.5"/>
+                <circle cx="18.5" cy="17.5" r="2.5" />
+                <circle cx="5.5" cy="17.5" r="2.5" />
+                <path d="M15 6h1a2 2 0 0 1 2 2v2" />
+                <path d="M12 12h3.5" />
+                <path d="M16 12a1.5 1.5 0 1 1 2-2.7L18.5 10" />
+                <path d="M12 6 7.5 14.5" />
+                <path d="M5.5 15h11.5" />
               </svg>
             </div>
             <div>
@@ -475,7 +670,7 @@ const ManagerLayout = () => {
             </div>
           </div>
 
-          <nav className="sidebar-nav">
+          <nav className="sidebar-nav" style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto" }}>
             <a
               href="#"
               className={`nav-item ${currentTab === "dashboard" ? "active" : ""}`}
@@ -518,11 +713,43 @@ const ManagerLayout = () => {
             </a>
             <a
               href="#"
-              className={`nav-item ${currentTab === "revenue" ? "active" : ""}`}
-              onClick={(e) => { e.preventDefault(); handleTabChange("revenue"); }}
+              className={`nav-item ${currentTab === "customers" ? "active" : ""}`}
+              onClick={(e) => { e.preventDefault(); handleTabChange("customers"); }}
+            >
+              <Users className="nav-icon" />
+              <span>Khách hàng</span>
+            </a>
+            <a
+              href="#"
+              className={`nav-item ${currentTab === "vehicles" ? "active" : ""}`}
+              onClick={(e) => { e.preventDefault(); handleTabChange("vehicles"); }}
+            >
+              <Bike className="nav-icon" />
+              <span>Xe cộ</span>
+            </a>
+            <a
+              href="#"
+              className={`nav-item ${currentTab === "work-orders" ? "active" : ""}`}
+              onClick={(e) => { e.preventDefault(); handleTabChange("work-orders"); }}
+            >
+              <FileText className="nav-icon" />
+              <span>Lệnh sửa chữa</span>
+            </a>
+            <a
+              href="#"
+              className={`nav-item ${currentTab === "invoices" ? "active" : ""}`}
+              onClick={(e) => { e.preventDefault(); handleTabChange("invoices"); }}
+            >
+              <Receipt className="nav-icon" />
+              <span>Hóa đơn</span>
+            </a>
+            <a
+              href="#"
+              className={`nav-item ${currentTab === "reports" ? "active" : ""}`}
+              onClick={(e) => { e.preventDefault(); handleTabChange("reports"); }}
             >
               <BarChart2 className="nav-icon" />
-              <span>Hiá»‡u suáº¥t</span>
+              <span>Báo cáo</span>
             </a>
             <a
               href="#"
@@ -531,6 +758,14 @@ const ManagerLayout = () => {
             >
               <User className="nav-icon" />
               <span>Hồ sơ cá nhân</span>
+            </a>
+            <a
+              href="#"
+              className={`nav-item ${currentTab === "settings" ? "active" : ""}`}
+              onClick={(e) => { e.preventDefault(); handleTabChange("settings"); }}
+            >
+              <Settings className="nav-icon" />
+              <span>Cài đặt</span>
             </a>
           </nav>
         </div>
@@ -550,19 +785,19 @@ const ManagerLayout = () => {
               </div>
 
               {/* Right Side: Small circular Logout Icon Button */}
-              <button 
-                onClick={handleLogout} 
+              <button
+                onClick={handleLogout}
                 title="Đăng xuất"
-                style={{ 
-                  background: "#fef2f2", 
-                  border: "none", 
-                  color: "#ef4444", 
-                  width: "32px", 
-                  height: "32px", 
-                  borderRadius: "50%", 
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
+                style={{
+                  background: "#fef2f2",
+                  border: "none",
+                  color: "#ef4444",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   cursor: "pointer",
                   transition: "all 0.2s ease",
                   flexShrink: 0

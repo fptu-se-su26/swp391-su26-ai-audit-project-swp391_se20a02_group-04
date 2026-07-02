@@ -20,6 +20,7 @@ const adminAppointmentRoutes = require('./routes/admin.appointment.routes');
 const adminInventoryRoutes = require('./routes/admin.inventory.routes');
 const adminServiceRoutes = require('./routes/admin.service.routes');
 const managerStaffRoutes = require('./routes/manager.staff.routes');
+const managerAppointmentRoutes = require('./routes/manager.appointment.routes');
 
 const app = express();
 
@@ -83,6 +84,7 @@ app.use('/api/admin', adminAppointmentRoutes);
 app.use('/api/admin', adminInventoryRoutes);
 app.use('/api/admin', adminServiceRoutes);
 app.use('/api/manager', managerStaffRoutes);
+app.use('/api/manager', managerAppointmentRoutes);
 
 // 404 handler
 app.use((req, res) => {
