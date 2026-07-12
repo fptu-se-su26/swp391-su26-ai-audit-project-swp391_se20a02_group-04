@@ -32,11 +32,6 @@ import ManagerWarehouse from "./ManagerWarehouse";
 import ManagerProfile from "./ManagerProfile";
 import ManagerRevenue from "./ManagerRevenue";
 import ManagerCustomers from "./ManagerCustomers";
-import ManagerVehicles from "./ManagerVehicles";
-import ManagerWorkOrders from "./ManagerWorkOrders";
-import ManagerInvoices from "./ManagerInvoices";
-import ManagerReports from "./ManagerReports";
-import ManagerSettings from "./ManagerSettings";
 
 import AdminCalendar from "../admin/AdminCalendar";
 import InventoryModule from "../inventory/InventoryModule";
@@ -164,12 +159,7 @@ const MANAGER_TABS = new Set([
   "warehouse",
   "revenue",
   "profile",
-  "customers",
-  "vehicles",
-  "work-orders",
-  "invoices",
-  "reports",
-  "settings"
+  "customers"
 ]);
 
 function getManagerTabFromPath(pathname) {
@@ -183,11 +173,6 @@ function getManagerTabFromPath(pathname) {
   if (pathname.startsWith("/manager/revenue")) return "revenue";
   if (pathname.startsWith("/manager/profile")) return "profile";
   if (pathname.startsWith("/manager/customers")) return "customers";
-  if (pathname.startsWith("/manager/vehicles")) return "vehicles";
-  if (pathname.startsWith("/manager/work-orders")) return "work-orders";
-  if (pathname.startsWith("/manager/invoices")) return "invoices";
-  if (pathname.startsWith("/manager/reports")) return "reports";
-  if (pathname.startsWith("/manager/settings")) return "settings";
   return "dashboard";
 }
 
@@ -201,11 +186,6 @@ function getManagerPathFromTab(tabName) {
   if (tabName === "revenue") return "/manager/revenue";
   if (tabName === "profile") return "/manager/profile";
   if (tabName === "customers") return "/manager/customers";
-  if (tabName === "vehicles") return "/manager/vehicles";
-  if (tabName === "work-orders") return "/manager/work-orders";
-  if (tabName === "invoices") return "/manager/invoices";
-  if (tabName === "reports") return "/manager/reports";
-  if (tabName === "settings") return "/manager/settings";
   return "/manager/dashboard";
 }
 
@@ -544,16 +524,7 @@ const ManagerLayout = () => {
         return <ManagerProfile />;
       case "customers":
         return <ManagerCustomers />;
-      case "vehicles":
-        return <ManagerVehicles />;
-      case "work-orders":
-        return <ManagerWorkOrders appointments={appointments} refreshData={loadManagerData} onSelectAppointment={openAppointmentDetail} />;
-      case "invoices":
-        return <ManagerInvoices appointments={appointments} refreshData={loadManagerData} />;
-      case "reports":
-        return <ManagerReports appointments={appointments} technicians={technicians} />;
-      case "settings":
-        return <ManagerSettings />;
+
       default:
         return <ManagerDashboard bays={bays} technicians={technicians} appointments={appointments} refreshData={loadManagerData} />;
     }
@@ -670,7 +641,7 @@ const ManagerLayout = () => {
             </div>
           </div>
 
-          <nav className="sidebar-nav" style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto" }}>
+          <nav className="sidebar-nav" style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto", overflowX: "hidden" }}>
             <a
               href="#"
               className={`nav-item ${currentTab === "dashboard" ? "active" : ""}`}
@@ -721,51 +692,11 @@ const ManagerLayout = () => {
             </a>
             <a
               href="#"
-              className={`nav-item ${currentTab === "vehicles" ? "active" : ""}`}
-              onClick={(e) => { e.preventDefault(); handleTabChange("vehicles"); }}
-            >
-              <Bike className="nav-icon" />
-              <span>Xe cộ</span>
-            </a>
-            <a
-              href="#"
-              className={`nav-item ${currentTab === "work-orders" ? "active" : ""}`}
-              onClick={(e) => { e.preventDefault(); handleTabChange("work-orders"); }}
-            >
-              <FileText className="nav-icon" />
-              <span>Lệnh sửa chữa</span>
-            </a>
-            <a
-              href="#"
-              className={`nav-item ${currentTab === "invoices" ? "active" : ""}`}
-              onClick={(e) => { e.preventDefault(); handleTabChange("invoices"); }}
-            >
-              <Receipt className="nav-icon" />
-              <span>Hóa đơn</span>
-            </a>
-            <a
-              href="#"
-              className={`nav-item ${currentTab === "reports" ? "active" : ""}`}
-              onClick={(e) => { e.preventDefault(); handleTabChange("reports"); }}
-            >
-              <BarChart2 className="nav-icon" />
-              <span>Báo cáo</span>
-            </a>
-            <a
-              href="#"
               className={`nav-item ${currentTab === "profile" ? "active" : ""}`}
               onClick={(e) => { e.preventDefault(); handleTabChange("profile"); }}
             >
               <User className="nav-icon" />
               <span>Hồ sơ cá nhân</span>
-            </a>
-            <a
-              href="#"
-              className={`nav-item ${currentTab === "settings" ? "active" : ""}`}
-              onClick={(e) => { e.preventDefault(); handleTabChange("settings"); }}
-            >
-              <Settings className="nav-icon" />
-              <span>Cài đặt</span>
             </a>
           </nav>
         </div>

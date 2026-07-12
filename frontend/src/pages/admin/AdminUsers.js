@@ -22,6 +22,7 @@ import {
 import { adminUserService } from "../../services/adminUserService";
 import "../../styles/admin/AdminDashboard.css";
 import "../../styles/admin/AdminUsers.css";
+import AdminSidebar from "../../components/AdminSidebar";
 
 const ROLE_OPTIONS = [
   ["ADMIN", "Admin"],
@@ -38,57 +39,7 @@ const STATUS_LABELS = {
   banned: "Đã ban",
 };
 
-function ManagerSidebar({ activeView, onViewChange }) {
-  const navItems = [
-    ["dashboard", LayoutDashboard, "Tổng quan"],
-    ["calendar", Calendar, "Lịch hẹn"],
-    ["services", Wrench, "Dịch vụ"],
-    ["customers", Users, "Khách hàng"],
-    ["users", Shield, "Người dùng"],
-    ["inventory", Package, "Kho"],
-    ["reports", BarChart2, "Báo cáo"],
-    ["profile", User, "Hồ sơ"],
-  ];
 
-  return (
-    <aside className="sidebar">
-      <div>
-        <div className="sidebar-brand">
-          <h1>MOTOCORE</h1>
-          <p>Quản lý garage</p>
-        </div>
-
-        <nav className="sidebar-nav" aria-label="Quản lý garage">
-          {navItems.map(([view, Icon, label]) => (
-            <a
-              className={`nav-item ${activeView === view ? "active" : ""}`}
-              href="#"
-              key={view}
-              onClick={(event) => {
-                event.preventDefault();
-                onViewChange?.(view);
-              }}
-            >
-              <Icon className="nav-icon" />
-              <span>{label}</span>
-            </a>
-          ))}
-        </nav>
-      </div>
-
-      <div className="sidebar-footer">
-        <button className="btn-primary" type="button" onClick={() => onViewChange?.("calendar")}>
-          <Plus className="btn-icon" />
-          Đặt lịch mới
-        </button>
-        <a href="#" className="support-link" onClick={(event) => event.preventDefault()}>
-          <HelpCircle className="support-icon" />
-          <span>Hỗ trợ</span>
-        </a>
-      </div>
-    </aside>
-  );
-}
 
 function getPrimaryRole(roles = []) {
   const normalizedRoles = roles
@@ -244,7 +195,7 @@ export default function AdminUsers({ onViewChange }) {
 
   return (
     <div className="users-layout dashboard-layout">
-      <ManagerSidebar activeView="users" onViewChange={onViewChange} />
+      <AdminSidebar activeView="users" onViewChange={onViewChange} />
 
       <main className="main-content">
         <header className="users-topbar">

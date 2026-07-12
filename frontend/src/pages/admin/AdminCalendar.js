@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import "../../styles/admin/AdminDashboard.css";
 import "../../styles/admin/AdminCalendar.css";
+import AdminSidebar from "../../components/AdminSidebar";
 import AppointmentDetailPage from "../manager/AppointmentDetailPage";
 import {
   cancelAdminAppointment,
@@ -107,57 +108,7 @@ const filterOptions = [
   ["COMPLETED", "Hoàn tất"],
 ];
 
-function ManagerSidebar({ activeView, onViewChange }) {
-  const navItems = [
-    ["dashboard", LayoutDashboard, "Tổng quan"],
-    ["calendar", Calendar, "Lịch hẹn"],
-    ["services", Wrench, "Dịch vụ"],
-    ["customers", Users, "Khách hàng"],
-    ["users", Shield, "Người dùng"],
-    ["inventory", Package, "Kho"],
-    ["reports", BarChart2, "Báo cáo"],
-    ["profile", User, "Hồ sơ"],
-  ];
 
-  return (
-    <aside className="sidebar">
-      <div>
-        <div className="sidebar-brand">
-          <h1>MOTOCORE</h1>
-        <p>Quản lý garage</p>
-        </div>
-
-        <nav className="sidebar-nav" aria-label="Quản lý garage">
-          {navItems.map(([view, Icon, label]) => (
-            <a
-              className={`nav-item ${activeView === view ? "active" : ""}`}
-              href="#"
-              key={view}
-              onClick={(event) => {
-                event.preventDefault();
-                onViewChange?.(view);
-              }}
-            >
-              <Icon className="nav-icon" />
-              <span>{label}</span>
-            </a>
-          ))}
-        </nav>
-      </div>
-
-      <div className="sidebar-footer">
-        <button className="btn-primary" type="button">
-          <Plus className="btn-icon" />
-          Đặt lịch mới
-        </button>
-        <a href="#" className="support-link" onClick={(event) => event.preventDefault()}>
-          <HelpCircle className="support-icon" />
-          <span>Hỗ trợ</span>
-        </a>
-      </div>
-    </aside>
-  );
-}
 
 const AdminCalendar = ({ onViewChange, embedded = false }) => {
   const [activeFilter, setActiveFilter] = useState("all");
@@ -301,7 +252,7 @@ const AdminCalendar = ({ onViewChange, embedded = false }) => {
 
   return (
     <div className={`calendar-layout dashboard-layout ${embedded ? "calendar-layout-embedded" : ""}`}>
-      {!embedded && <ManagerSidebar activeView="calendar" onViewChange={onViewChange} />}
+      {!embedded && <AdminSidebar activeView="calendar" onViewChange={onViewChange} />}
 
       <main className="main-content">
         {selectedAppointment ? (

@@ -25,6 +25,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import "../../styles/admin/AdminProfile.css";
+import AdminSidebar from "../../components/AdminSidebar";
 import { profileService } from "../../services/profileService";
 
 const activityLogs = [
@@ -262,105 +263,7 @@ const AdminProfile = ({ onViewChange }) => {
       )}
 
       {/* Sidebar */}
-      <aside className="sidebar">
-        <div>
-          <div className="sidebar-brand">
-            <h1>QUẢN LÝ GARAGE</h1>
-            <p>Hệ thống quản lý</p>
-          </div>
-
-          <nav className="sidebar-nav">
-            <a
-              href="#"
-              className="nav-item"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("dashboard");
-              }}
-            >
-              <LayoutDashboard className="nav-icon" />
-              <span>Tổng quan</span>
-            </a>
-            <a
-              href="#"
-              className="nav-item"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("calendar");
-              }}
-            >
-              <Calendar className="nav-icon" />
-              <span>Lịch hẹn</span>
-            </a>
-            <a
-              href="#"
-              className="nav-item"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("services");
-              }}
-            >
-              <Wrench className="nav-icon" />
-              <span>Dịch vụ</span>
-            </a>
-            <a
-              href="#"
-              className="nav-item"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("customers");
-              }}
-            >
-              <Users className="nav-icon" />
-              <span>Khách hàng</span>
-            </a>
-            <a
-              href="#"
-              className="nav-item"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("users");
-              }}
-            >
-              <Shield className="nav-icon" />
-              <span>Người dùng</span>
-            </a>
-            <a
-              href="#"
-              className="nav-item"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("reports");
-              }}
-            >
-              <BarChart2 className="nav-icon" />
-              <span>Báo cáo</span>
-            </a>
-            <a
-              href="#"
-              className="nav-item active"
-              onClick={(event) => {
-                event.preventDefault();
-                if (onViewChange) onViewChange("profile");
-              }}
-            >
-              <User className="nav-icon" />
-              <span>Hồ sơ</span>
-            </a>
-          </nav>
-        </div>
-
-        <div className="sidebar-footer">
-          <button className="btn-primary" onClick={() => onViewChange("calendar")}>
-            <Plus className="btn-icon" />
-            ĐẶT LỊCH MỚI
-          </button>
-          <a href="#" className="support-link" onClick={(e) => e.preventDefault()}>
-            <HelpCircle className="support-icon" />
-            <span>Hỗ trợ</span>
-          </a>
-        </div>
-      </aside>
+      <AdminSidebar activeView="profile" onViewChange={onViewChange} />
 
       {/* Main Content */}
       <main className="main-content">
