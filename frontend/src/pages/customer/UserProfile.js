@@ -20,7 +20,7 @@ const tabs = [
   { id: "info", icon: "person", label: "Thông tin" },
   { id: "password", icon: "lock", label: "Bảo mật" },
   { id: "appointments", icon: "event_available", label: "Lịch hẹn" },
-  { id: "garage", icon: "two_wheeler", label: "Nhà xe" },
+  { id: "garage", icon: "two_wheeler", label: "Tình trạng xe" },
   { id: "vouchers", icon: "confirmation_number", label: "Ưu đãi" },
   { id: "logs", icon: "history", label: "Nhật ký" },
 ];
@@ -51,7 +51,7 @@ const fallbackAppointments = [
     created_at: "2026-05-27T08:20:00.000Z",
   },
   {
-    _id: "demo-appointment-2",
+    _id: "demo-ppointment-2",
     appointment_code: "APT-20260521-014",
     appointment_date: "2026-05-21",
     time_slot: "15:00",
@@ -206,6 +206,13 @@ export default function UserProfile() {
     { brand: "Honda", model: "CBR650R", plate: "29A1-999.88", year: "2023", color: "Đỏ đen" },
     { brand: "Ducati", model: "Monster 821", plate: "29A1-123.45", year: "2022", color: "Vàng cát" },
   ]);
+  const [selectedBike, setSelectedBike] = useState(null);
+  const bikeAppointments = selectedBike
+  ? fallbackAppointments.filter(
+      (appointment) =>
+        appointment.vehicle?.license_plate === selectedBike.plate
+    )
+  : [];
 
   const [vouchers] = useState([
     { code: "MOTOCORE15", desc: "Giảm 15% gói rửa xe cao cấp", expiry: "30/06/2026", status: "Còn hiệu lực" },
@@ -540,7 +547,7 @@ export default function UserProfile() {
               </a>
               <a href="/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <MaterialIcon>two_wheeler</MaterialIcon>
-                <span>Nhà xe của tôi</span>
+                <span>Tình trạng xe của tôi</span>
               </a>
               <a href="/profile?tab=appointments" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <MaterialIcon>event_available</MaterialIcon>
@@ -646,6 +653,7 @@ export default function UserProfile() {
                   {activeTab === "logs" && "Nhật ký tài khoản"}
                 </h2>
               </div>
+            
 
               {activeTab === "info" && (
                 <form onSubmit={handleSaveInfo} className="pane-fade-animation">
@@ -871,67 +879,138 @@ export default function UserProfile() {
               )}
 
               {activeTab === "garage" && (
-                <div className="pane-fade-animation">
-                  <div className="profile-panel-toolbar">
-                    <p className="profile-panel-note">Lưu sẵn xe của bạn để đặt lịch nhanh hơn ở những lần tiếp theo.</p>
-                    <button className="user-btn-add-bike" onClick={() => setShowAddBike(!showAddBike)} type="button">
-                      <MaterialIcon>{showAddBike ? "close" : "add"}</MaterialIcon>
-                      <span>{showAddBike ? "Đóng" : "Thêm xe"}</span>
-                    </button>
-                  </div>
+  <div className="pane-fade-animation">
+    <div className="profile-panel-toolbar">
+      <p className="profile-panel-note">
+        Lưu sẵn xe của bạn để đặt lịch nhanh hơn ở những lần tiếp theo.
+      </p>
 
-                  {showAddBike && (
-                    <form onSubmit={handleAddBike} className="add-bike-inline-form">
-                      <div className="user-form-grid">
-                        <label className="user-input-label">
-                          Hãng xe *
-                          <input type="text" placeholder="Honda, Yamaha, Ducati..." value={newBike.brand} onChange={(e) => setNewBike({ ...newBike, brand: e.target.value })} />
-                        </label>
-                        <label className="user-input-label">
-                          Dòng xe *
-                          <input type="text" placeholder="CBR650R, Exciter..." value={newBike.model} onChange={(e) => setNewBike({ ...newBike, model: e.target.value })} />
-                        </label>
-                        <label className="user-input-label">
-                          Biển số *
-                          <input type="text" placeholder="29A1-999.99" value={newBike.plate} onChange={(e) => setNewBike({ ...newBike, plate: e.target.value })} />
-                        </label>
-                        <label className="user-input-label">
-                          Màu sắc
-                          <input type="text" placeholder="Đỏ, đen, xanh..." value={newBike.color} onChange={(e) => setNewBike({ ...newBike, color: e.target.value })} />
-                        </label>
-                        <label className="user-input-label">
-                          Năm sản xuất
-                          <input type="text" placeholder="2023" value={newBike.year} onChange={(e) => setNewBike({ ...newBike, year: e.target.value })} />
-                        </label>
-                      </div>
-                      <button className="user-submit-bike-btn" type="submit">
-                        <MaterialIcon>check_circle</MaterialIcon>
-                        Lưu xe
-                      </button>
-                    </form>
-                  )}
+      <button
+        className="user-btn-add-bike"
+        onClick={() => setShowAddBike(!showAddBike)}
+        type="button"
+      >
+        <MaterialIcon>{showAddBike ? "close" : "add"}</MaterialIcon>
+        <span>{showAddBike ? "Đóng" : "Thêm xe"}</span>
+      </button>
+    </div>
 
-                  <div className="bikes-grid-layout">
-                    {bikes.map((bike) => (
-                      <article className="bike-card-item" key={bike.plate}>
-                        <div className="bike-icon-box">
-                          <MaterialIcon>two_wheeler</MaterialIcon>
-                        </div>
-                        <div className="bike-details-info">
-                          <h3>{bike.brand} {bike.model}</h3>
-                          <p>{bike.plate}</p>
-                          <div>
-                            <span>{bike.color || "Chưa chọn màu"}</span>
-                            <span>{bike.year || "Chưa rõ đời xe"}</span>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </div>
-              )}
+    {/* FORM thêm xe */}
+    {showAddBike && (
+      <form onSubmit={handleAddBike} className="add-bike-inline-form">
+        <div className="user-form-grid">
+          <label>
+            Hãng xe *
+            <input
+              value={newBike.brand}
+              onChange={(e) =>
+                setNewBike({ ...newBike, brand: e.target.value })
+              }
+            />
+          </label>
 
-              {activeTab === "vouchers" && (
+          <label>
+            Dòng xe *
+            <input
+              value={newBike.model}
+              onChange={(e) =>
+                setNewBike({ ...newBike, model: e.target.value })
+              }
+            />
+          </label>
+
+          <label>
+            Biển số *
+            <input
+              value={newBike.plate}
+              onChange={(e) =>
+                setNewBike({ ...newBike, plate: e.target.value })
+              }
+            />
+          </label>
+
+          <label>
+            Màu sắc
+            <input
+              value={newBike.color}
+              onChange={(e) =>
+                setNewBike({ ...newBike, color: e.target.value })
+              }
+            />
+          </label>
+
+          <label>
+            Năm sản xuất
+            <input
+              value={newBike.year}
+              onChange={(e) =>
+                setNewBike({ ...newBike, year: e.target.value })
+              }
+            />
+          </label>
+        </div>
+
+        <button type="submit" className="user-submit-bike-btn">
+          <MaterialIcon>check_circle</MaterialIcon>
+          Lưu xe
+        </button>
+      </form>
+    )}
+
+    {/* LIST XE */}
+    <div className="bikes-grid-layout">
+      {bikes.map((bike) => (
+        <article
+          key={bike.plate}
+          className={`bike-card-item ${
+            selectedBike?.plate === bike.plate ? "active" : ""
+          }`}
+          onClick={() => setSelectedBike(bike)}
+        >
+          <div className="bike-icon-box">
+            <MaterialIcon>two_wheeler</MaterialIcon>
+          </div>
+
+          <div className="bike-details-info">
+            <h3>
+              {bike.brand} {bike.model}
+            </h3>
+            <p>{bike.plate}</p>
+
+            <div>
+              <span>{bike.color || "Chưa chọn màu"}</span>
+              <span>{bike.year || "Chưa rõ đời xe"}</span>
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+
+    {/* DETAIL XE */}
+    {selectedBike && (
+      <div className="bike-detail-wrapper">
+        <h3>
+          {selectedBike.brand} {selectedBike.model}
+        </h3>
+
+        {bikeAppointments?.length > 0 ? (
+          bikeAppointments.map((appointment) => (
+            <div key={appointment._id}>
+              <p>Mã lịch: {appointment.appointment_code}</p>
+              <p>Dịch vụ: {appointment.service?.name}</p>
+              <p>Ngày: {appointment.appointment_date}</p>
+            </div>
+          ))
+        ) : (
+          <p>Xe này chưa có lịch sử.</p>
+        )}
+      </div>
+    )}
+  </div>
+)}
+
+
+   {activeTab === "vouchers" && (
                 <div className="pane-fade-animation">
                   <p className="profile-panel-note">Các ưu đãi đang có thể dùng khi đặt lịch tại MOTOCORE.</p>
                   <div className="vouchers-grid-layout">
@@ -983,4 +1062,5 @@ export default function UserProfile() {
       </main>
     </div>
   );
-}
+};
+

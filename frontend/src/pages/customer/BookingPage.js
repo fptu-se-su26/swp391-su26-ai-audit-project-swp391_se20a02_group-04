@@ -61,7 +61,9 @@ const repairIssues = [
   "Lốp / xăm",
 ];
 
-const timeSlots = ["08:00", "09:30", "10:30", "13:30", "15:00", "16:30", "18:00"];
+// const timeSlots = ["08:00", "09:30", "10:30", "13:30", "15:00", "16:30", "18:00"];
+const morningSlots = ["08:00", "09:30", "10:00", "11:00"];
+const afternoonSlots = ["13:00", "14:00", "15:00", "16:00"];
 
 function MaterialIcon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
@@ -75,7 +77,7 @@ function getTomorrowDateValue() {
 
 function getMaxAppointmentDateValue() {
   const date = new Date();
-  date.setDate(date.getDate() + 60);
+  date.setDate(date.getDate() + 7);
   return date.toISOString().slice(0, 10);
 }
 
@@ -128,11 +130,12 @@ function getAppointmentService(appointment) {
 
 export default function BookingPage() {
   const [serviceType, setServiceType] = useState("wash");
-  const [washPackage, setWashPackage] = useState(washPackages[1].id);
-  const [maintenancePackage, setMaintenancePackage] = useState(maintenancePackages[1].id);
-  const [repairIssue, setRepairIssue] = useState(repairIssues[0]);
-  const [timeSlot, setTimeSlot] = useState(timeSlots[1]);
-  const [appointmentDate, setAppointmentDate] = useState(getTomorrowDateValue());
+  const [washPackage, setWashPackage] = useState(washPackages.id);
+  const [maintenancePackage, setMaintenancePackage] = useState(maintenancePackages.id);
+  const [repairIssue, setRepairIssue] = useState(repairIssues);
+  const [daySession, setDaySession] = useState("morning"); 
+  const [timeSlot, setTimeSlot] = useState("");
+  const [appointmentDate, setAppointmentDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
   const [submitError, setSubmitError] = useState("");
@@ -144,6 +147,14 @@ export default function BookingPage() {
     email: "namnh.customer@gmail.com",
     avatar: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6d1f"/></svg>'
   });
+
+  useEffect(() => {
+    if (daySession === "morning") {
+      setTimeSlot(morningSlots);
+    } else {
+      setTimeSlot(afternoonSlots);
+    }
+  }, [daySession]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -203,6 +214,29 @@ export default function BookingPage() {
     setIsSubmitting(true);
     setSubmitError("");
     setSubmitResult(null);
+
+    if (!appointmentDate || !timeSlot) {
+      setSubmitError("Vui lòng chọn đầy đủ ngày hẹn và khung giờ!");
+      setIsSubmitting(false);
+      return;
+    }
+
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const selectedDate = new Date(appointmentDate);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    const diffTime = selectedDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 7) {
+      setSubmitError("Không thể đặt lịch trước trên 7 ngày!");
+      setIsSubmitting(false);
+      return;
+    }
+
 
     const formData = new FormData(formElement);
     const payload = {
@@ -502,12 +536,23 @@ export default function BookingPage() {
                   value={appointmentDate}
                 />
               </label>
+              
+              <label>
+                Chọn Buổi
+                <select value={daySession} onChange={(event) => setDaySession(event.target.value)}>
+                  <option value="morning">Buổi sáng (08h - 11h)</option>
+                  <option value="afternoon">Buổi chiều (13h - 16h)</option>
+                </select>
+              </label>
+
               <label>
                 Khung giờ
-                <select value={timeSlot} onChange={(event) => setTimeSlot(event.target.value)}>
-                  {timeSlots.map((slot) => (
-                    <option key={slot}>{slot}</option>
-                  ))}
+                <select value={timeSlot} onChange={(event) => setTimeSlot(event.target.value)} required>
+                  <option value="">-- Chọn giờ --</option>
+                  {daySession === "morning"
+                    ? morningSlots.map((slot) => <option key={slot} value={slot}>{slot}</option>)
+                    : afternoonSlots.map((slot) => <option key={slot} value={slot}>{slot}</option>)
+                  }
                 </select>
               </label>
             </div>
@@ -546,7 +591,7 @@ export default function BookingPage() {
                 </div>
                 <div>
                   <MaterialIcon>event</MaterialIcon>
-                  <span>Khung giờ {timeSlot}</span>
+                  <span>{appointmentDate ? `${appointmentDate} - ` : ""} Khung giờ {timeSlot || "chưa chọn"}</span>
                 </div>
                 <div>
                   <MaterialIcon>pending_actions</MaterialIcon>

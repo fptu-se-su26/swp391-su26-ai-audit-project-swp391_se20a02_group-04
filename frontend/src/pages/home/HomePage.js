@@ -132,17 +132,33 @@ export default function HomePage() {
           <a href="/booking">Lịch hẹn</a>
           <a href="/about">Về chúng tôi</a>
         </nav>
+        
         <div className="home-actions" style={{ position: "relative" }}>
           <button className="icon-button" type="button" aria-label="Tìm kiếm">
             <MaterialIcon>search</MaterialIcon>
           </button>
-          <a className="home-contact-button" href="/booking">
-            Liên hệ ngay
-          </a>
-          {user && (
-            <button className="user-menu-trigger" type="button" aria-label="Menu" onClick={() => setShowUserMenu(!showUserMenu)}>
-              <MaterialIcon>menu</MaterialIcon>
-            </button>
+          
+          {/* PHẦN CODE ĐƯỢC CHỈNH SỬA Ở ĐÂY */}
+          {!user ? (
+            // Trạng thái: CHƯA LOGIN -> Hiển thị Đăng nhập & Đăng ký
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <a className="home-contact-button" href="/login">
+                Đăng nhập
+              </a>
+              <a className="primary-button" href="/register" style={{ padding: '8px 16px', fontSize: '14px', textDecoration: 'none' }}>
+                Đăng ký
+              </a>
+            </div>
+          ) : (
+            // Trạng thái: ĐÃ LOGIN -> Hiển thị nút Liên hệ ngay & Menu Avatar
+            <>
+              <a className="home-contact-button" href="/booking">
+                Liên hệ ngay
+              </a>
+              <button className="user-menu-trigger" type="button" aria-label="Menu" onClick={() => setShowUserMenu(!showUserMenu)}>
+                <MaterialIcon>menu</MaterialIcon>
+              </button>
+            </>
           )}
 
           {user && showUserMenu && (
@@ -163,7 +179,7 @@ export default function HomePage() {
               </a>
               <a href="/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">two_wheeler</span>
-                <span>Nhà xe của tôi</span>
+                <span>Tình trạng xe của tôi</span>
               </a>
               <a href="/booking" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">event_available</span>
