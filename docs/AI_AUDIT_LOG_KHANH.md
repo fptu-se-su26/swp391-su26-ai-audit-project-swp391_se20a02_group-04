@@ -46,7 +46,9 @@ Em sử dụng AI để hỗ trợ các phần việc sau trong project:
 3. Tìm giải pháp kỹ thuật để bấm phím tắt từ trang ngoài có thể nhảy trực tiếp và chuyển đổi active tab tương ứng trong trang Profile.
 4. Hỗ trợ xây dựng giao diện các chức năng quản lý của Manager (src/pages/manager/* bao gồm ManagerProfile, ManagerSettings, ManagerWorkOrders, ManagerLayout...) và thiết lập kết nối logic APIs.
 5. Sửa lỗi layout (CSS), gỡ các phần UI thừa của Admin, thiết kế Sidebar linh hoạt.
+6. Trích xuất component AdminSidebar dùng chung cho 8 trang Admin để loại bỏ trùng lặp code; dọn dẹp các trang thừa của Manager và kết nối API thực tế cho Manager Dashboard.
 ```
+
 
 ---
 
@@ -375,6 +377,62 @@ AI gợi ý sử dụng class CSS động kết hợp với state `isSidebarOpen
 
 ---
 
+### Lần sử dụng AI số 7
+
+| Nội dung | Thông tin |
+|---|---|
+| Ngày sử dụng | 12/07/2026 |
+| Công cụ AI | Antigravity |
+| Mục đích sử dụng | Tối ưu hóa code Admin & Manager, trích xuất AdminSidebar dùng chung và dọn dẹp các trang dư thừa, kết nối API lấy dữ liệu thực tế cho Dashboard. |
+| Phần việc liên quan | Frontend / Refactoring / Tái sử dụng component / Kết nối API / Dọn dẹp mã nguồn |
+| Mức độ sử dụng | Hỗ trợ nhiều |
+
+#### 4.1. Prompt đã sử dụng
+
+```text
+Giúp trích xuất ManagerSidebar trong các trang Admin thành component AdminSidebar.js dùng chung để tránh trùng lặp code, đồng thời dọn dẹp các trang thừa của Manager (Invoices, Reports, Settings, Vehicles, WorkOrders) và cập nhật ManagerDashboard lấy dữ liệu tồn kho thấp và hiệu suất thợ từ API thực tế.
+```
+
+#### 4.2. Kết quả AI gợi ý
+
+```text
+AI đề xuất tách sidebar ra thành component frontend/src/components/AdminSidebar.js nhận các props activeView và onViewChange, kết nối hook useNavigate của react-router-dom và hàm getAuthSession để hiển thị avatar, tên quản trị viên động. Ngoài ra, AI gợi ý dọn dẹp các tab không còn sử dụng trong ManagerLayout và gọi API getLowStockItems cùng managerStaffApi.getStaffPerformance trong ManagerDashboard.js.
+```
+
+#### 4.3. Phần sinh viên/nhóm đã sử dụng từ AI
+
+```text
+- Áp dụng cấu trúc trích xuất của file AdminSidebar.js và cách truyền callback onViewChange.
+- Xóa các trang manager dư thừa và cập nhật ManagerLayout.
+- Viết useEffect gọi API lấy danh sách hàng tồn kho thấp và hiệu suất nhân viên.
+```
+
+#### 4.4. Phần sinh viên/nhóm tự chỉnh sửa hoặc cải tiến
+
+```text
+- Tự căn chỉnh lại flexbox layout và icon logout trong AdminSidebar.js để hiển thị tinh tế, đẹp mắt hơn.
+- Thêm cơ chế catch lỗi khi gọi API trên Dashboard để tránh trang bị đơ/trắng màn hình khi backend không phản hồi.
+```
+
+#### 4.5. Minh chứng
+
+| Loại minh chứng | Nội dung |
+|---|---|
+| Link commit | Chưa commit (uncommitted changes) |
+| File liên quan | frontend/src/components/AdminSidebar.js, frontend/src/pages/admin/*, frontend/src/pages/manager/ManagerDashboard.js, frontend/src/pages/manager/ManagerLayout.js |
+| Screenshot | Giao diện dashboard manager hiển thị số liệu thật từ API và AdminSidebar dùng chung ở các trang Admin hoạt động trơn tru |
+| Kết quả chạy/test | Click các menu trên AdminSidebar hoạt động chính xác, dữ liệu Dashboard của Manager tải thành công từ DB thực tế |
+
+#### 4.6. Nhận xét cá nhân/nhóm
+
+```text
+- Hiểu được lợi ích lớn của việc tái sử dụng component (DRY - Don't Repeat Yourself) để bảo trì code dễ dàng hơn.
+- Nắm bắt được cách tích hợp đồng thời nhiều API trên trang Dashboard để cập nhật trạng thái hệ thống theo thời gian thực.
+```
+
+---
+
+
 ## 5. Bảng tổng hợp mức độ sử dụng AI
 
 Đánh dấu mức độ AI hỗ trợ ở từng hạng mục.
@@ -386,14 +444,15 @@ AI gợi ý sử dụng class CSS động kết hợp với state `isSidebarOpen
 | Thiết kế database | x |  |  |  |  |
 | Thiết kế kiến trúc hệ thống | x |  |  |  |  |
 | Thiết kế giao diện |  | x |  |  | Ý tưởng bố cục các tab |
-| Code frontend |  |  | x |  | Giao diện Profile, Settings, WorkOrders, Sidebar |
+| Code frontend |  |  | x |  | Giao diện Profile, Settings, WorkOrders, Sidebar, AdminSidebar |
 | Code backend | x |  |  |  |  |
 | Debug lỗi |  |  | x |  | Sửa tràn viền avatar & responsive sidebar |
 | Viết test case | x |  |  |  |  |
 | Kiểm thử sản phẩm |  | x |  |  | Kiểm tra responsive và hoạt động của modal |
-| Tối ưu code |  | x |  |  | Đồng bộ activeTab qua URL, giải phóng event listener |
+| Tối ưu code |  |  | x |  | Đồng bộ activeTab qua URL, trích xuất AdminSidebar dùng chung |
 | Viết báo cáo |  | x |  |  | Tự viết báo cáo |
 | Làm slide thuyết trình | x |  |  |  |  |
+
 
 ---
 
@@ -407,6 +466,8 @@ Ghi lại các trường hợp AI trả lời sai, thiếu, chưa phù hợp ho�
 | 2 | AI gợi ý viết cấu trúc dropdown-user-info dạng thẻ `div` tĩnh làm mất đi hiệu ứng hover mượt mà. | Rà soát cấu trúc HTML và kiểm tra hoạt động khi rê chuột. | Thay đổi thẻ `div` thành thẻ liên kết `<a>` trỏ thẳng tới `#/profile?tab=info`. |
 | 3 | AI code cứng (hardcode) các thông số cấu hình mặc định trong `ManagerSettings.js` mà không quản lý qua form state hoàn chỉnh. | Thay đổi giá trị trên giao diện nhưng khi bấm lưu không cập nhật. | Khai báo lại toàn bộ các state object (generalForm, bookingForm) và gán hàm `onChange` cho từng input. |
 | 4 | AI import một số biểu tượng (icons) không tồn tại hoặc phiên bản cũ từ thư viện `lucide-react` dẫn đến crash trang. | Trình duyệt báo lỗi compile-time: "Export not found". | Rà soát lại và thay thế bằng các biểu tượng chuẩn hiện hành như `ShieldCheck` thay cho `ShieldOk`. |
+| 5 | AI đề xuất trích xuất component AdminSidebar nhưng thiếu import hook useNavigate từ react-router-dom và không xử lý avatar fallback khi user chưa cập nhật ảnh. | Trình duyệt báo lỗi compile-time và ảnh avatar hiển thị rỗng. | Tự bổ sung useNavigate, import getAuthSession để lấy thông tin user thực tế và thêm mã ảnh SVG làm avatar mặc định. |
+
 
 ---
 
@@ -436,9 +497,10 @@ Không áp dụng (Đây là dự án làm việc nhóm).
 
 | Thành viên | MSSV | Nhiệm vụ chính | Có sử dụng AI không? | Minh chứng đóng góp |
 |---|---|---|---|---|
-| Nguyễn Trần Vĩnh Khánh | DE181058 | Làm UI & API Profile, thiết kế Dropdown Menu, điều hướng Tab, gỡ bỏ UI thừa Admin, làm Sidebar và Profile Manager | Có | Đóng góp source code trong `src/pages/manager/*`, `UserProfile.js` và file `AI_AUDIT_LOG_KHANH.md` |
+| Nguyễn Trần Vĩnh Khánh | DE181058 | Làm UI & API Profile, thiết kế Dropdown Menu, điều hướng Tab, gỡ bỏ UI thừa Admin, làm Sidebar, Profile Manager, trích xuất AdminSidebar dùng chung cho Admin, dọn dẹp trang Manager thừa và tích hợp API thực tế cho Manager Dashboard | Có | Đóng góp source code trong `src/pages/manager/*`, `src/components/*`, `UserProfile.js` và file `AI_AUDIT_LOG_KHANH.md` |
 | Phan Thanh Nghĩa |  | UI role staff, API customer booking | Có | Đóng góp mã nguồn phần booking & staff, các API tương ứng |
 | Hồ Sỹ Hưng |  | Create Authentication API, setup MongoDB Atlas, API management | Có | Đóng góp mã nguồn phần backend API và cơ sở dữ liệu MongoDB |
+
 
 ---
 
@@ -447,8 +509,9 @@ Không áp dụng (Đây là dự án làm việc nhóm).
 ### 9.1. AI đã hỗ trợ em/nhóm ở điểm nào?
 
 ```text
-AI đã hỗ trợ nhiều trong việc phác thảo nhanh cấu trúc các trang quản lý của Manager, cung cấp giải pháp xử lý bắt tham số URL để chuyển tab mượt mờ và gợi ý các đoạn code CSS responsive tốt.
+AI đã hỗ trợ nhiều trong việc phác thảo nhanh cấu trúc các trang quản lý của Manager, cung cấp giải pháp xử lý bắt tham số URL để chuyển tab mượt mờ, gợi ý các đoạn code CSS responsive tốt, và hỗ trợ trích xuất component sidebar dùng chung để dọn dẹp tối ưu dự án.
 ```
+
 
 ### 9.2. Phần nào em/nhóm không sử dụng theo gợi ý của AI? Vì sao?
 
@@ -494,4 +557,5 @@ Sinh viên/nhóm cam kết rằng:
 
 | Đại diện sinh viên/nhóm | Ngày xác nhận |
 |---|---|
-| Nguyễn Trần Vĩnh Khánh | 29/06/2026 |
+| Nguyễn Trần Vĩnh Khánh | 12/07/2026 |
+
