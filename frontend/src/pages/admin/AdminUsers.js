@@ -10,7 +10,6 @@ import {
   Package,
   User,
   Search,
-  Bell,
   Shield,
   UserCheck,
   Lock,
@@ -216,9 +215,6 @@ export default function AdminUsers({ onViewChange }) {
             </label>
             <button className="users-icon-btn" type="button" onClick={loadUsers} aria-label="Tải lại">
               <RefreshCw />
-            </button>
-            <button className="users-icon-btn" type="button" aria-label="Thông báo">
-              <Bell />
             </button>
           </div>
         </header>

@@ -9,7 +9,6 @@ import {
   Plus,
   HelpCircle,
   Search,
-  Bell,
   ChevronRight,
   Filter,
   Clock,
@@ -281,9 +280,6 @@ const AdminCalendar = ({ onViewChange, embedded = false }) => {
               <Search />
               <input type="text" placeholder="Tìm mã lịch, khách hàng, biển số..." />
             </label>
-            <button className="topbar-icon" type="button" aria-label="Thông báo">
-              <Bell />
-            </button>
           </div>
         </header>
 
