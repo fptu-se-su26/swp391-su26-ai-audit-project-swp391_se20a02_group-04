@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "../../styles/home/HomePage.css";
 import { clearAuthSession, getAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
@@ -66,6 +66,19 @@ export default function HomePage() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [user, setUser] = useState(null);
 
+  // --- HOOKS QUẢN LÝ CHATBOX ---
+  const [showChatBox, setShowChatBox] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState([
+    { sender: "admin", text: "Xin chào! MOTOCORE có thể hỗ trợ gì cho chiến mã của bạn hôm nay?" },
+  ]);
+  const chatEndRef = useRef(null);
+
+  // Tự động cuộn xuống cuối khi có tin nhắn mới
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, showChatBox]);
+
   useEffect(() => {
     const normalizeUser = (sourceUser) => ({
       fullname: sourceUser.full_name || sourceUser.fullname || sourceUser.name || "",
@@ -116,6 +129,35 @@ export default function HomePage() {
   const handleLogout = () => {
     clearAuthSession();
     setShowUserMenu(false);
+    setShowChatBox(false); // Đóng chatbox nếu logout
+  };
+
+  // --- XỬ LÝ GỬI TIN NHẮN ---
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    // 1. Thêm tin nhắn của User vào danh sách hiển thị
+    const userMessage = { sender: "user", text: chatInput.trim() };
+    setChatMessages((prev) => [...prev, userMessage]);
+    const sentText = chatInput.trim();
+    setChatInput("");
+
+    // 2. GIẢ LẬP / KẾT NỐI API: Gửi thông tin tin nhắn tới Admin
+    // Ở đây bạn có thể gọi axios hoặc socket.io để gửi tin nhắn đến DB/Admin dashboard
+    console.log("Gửi tin nhắn tới Admin:", {
+      user: user?.fullname,
+      email: user?.email,
+      message: sentText,
+    });
+
+    // 3. Phản hồi tự động tạm thời từ hệ thống
+    setTimeout(() => {
+      setChatMessages((prev) => [
+        ...prev,
+        { sender: "admin", text: "Cảm ơn bạn. Yêu cầu đã được chuyển tới kỹ thuật viên trực ban, chúng tôi sẽ phản hồi ngay!" },
+      ]);
+    }, 1000);
   };
 
   return (
@@ -138,7 +180,7 @@ export default function HomePage() {
             <MaterialIcon>search</MaterialIcon>
           </button>
           
-          {/* PHẦN CODE ĐƯỢC CHỈNH SỬA Ở ĐÂY */}
+          {/* PHẦN ĐÃ CHỈNH SỬA: Xóa nút "Liên hệ ngay" khi đã đăng nhập */}
           {!user ? (
             // Trạng thái: CHƯA LOGIN -> Hiển thị Đăng nhập & Đăng ký
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -150,11 +192,8 @@ export default function HomePage() {
               </a>
             </div>
           ) : (
-            // Trạng thái: ĐÃ LOGIN -> Hiển thị nút Liên hệ ngay & Menu Avatar
+            // Trạng thái: ĐÃ LOGIN -> Chỉ giữ lại Menu Avatar (Nút Liên hệ ngay đã bị xóa)
             <>
-              <a className="home-contact-button" href="/booking">
-                Liên hệ ngay
-              </a>
               <button className="user-menu-trigger" type="button" aria-label="Menu" onClick={() => setShowUserMenu(!showUserMenu)}>
                 <MaterialIcon>menu</MaterialIcon>
               </button>
@@ -179,7 +218,7 @@ export default function HomePage() {
               </a>
               <a href="/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">two_wheeler</span>
-                <span>Tình trạng xe của tôi</span>
+                <span>Nhà xe của tôi</span>
               </a>
               <a href="/booking" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <span className="material-symbols-outlined">event_available</span>
@@ -409,6 +448,63 @@ export default function HomePage() {
           Tài khoản
         </a>
       </nav>
+
+      {/* --- PHẦN MỚI THÊM: CHATBOX BONG BÓNG FLOATING CHỈ KHI ĐÃ ĐĂNG NHẬP --- */}
+      {user && (
+        <div className="chatbox-wrapper">
+          {/* Bong bóng chat nổi ở góc dưới */}
+          <button 
+            className={`chat-badge ${showChatBox ? 'active' : ''}`} 
+            onClick={() => setShowChatBox(!showChatBox)}
+            aria-label="Nhắn tin với hỗ trợ"
+          >
+            <MaterialIcon>{showChatBox ? 'close' : 'chat'}</MaterialIcon>
+          </button>
+
+          {/* Cửa sổ khung Chat */}
+          {showChatBox && (
+            <div className="chatbox-container">
+              <div className="chatbox-header">
+                <div className="chatbox-header-title">
+                  <div className="online-indicator"></div>
+                  <span>Hỗ trợ trực tuyến MOTOCORE</span>
+                </div>
+                <button className="chatbox-close" onClick={() => setShowChatBox(false)}>
+                  <MaterialIcon>close</MaterialIcon>
+                </button>
+              </div>
+
+              {/* Vùng hiển thị tin nhắn */}
+              <div className="chatbox-messages">
+                {chatMessages.map((msg, index) => (
+                  <div key={index} className={`message-row ${msg.sender === 'user' ? 'me' : 'them'}`}>
+                    {msg.sender === 'them' && (
+                      <div className="chat-avatar-mini">
+                        <img src={DEFAULT_AVATAR} alt="Admin" />
+                      </div>
+                    )}
+                    <div className="message-bubble">{msg.text}</div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Form gửi tin nhắn */}
+              <form className="chatbox-input-area" onSubmit={handleSendMessage}>
+                <input 
+                  type="text" 
+                  value={chatInput} 
+                  onChange={(e) => setChatInput(e.target.value)} 
+                  placeholder="Nhập tin nhắn của bạn..." 
+                />
+                <button type="submit">
+                  <MaterialIcon>send</MaterialIcon>
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

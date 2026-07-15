@@ -958,3 +958,224 @@
   color: #ff6d1f;
 }
 
+
+/* ==========================================================================
+   CHATBOX & FLOATING ACTION CSS
+   ========================================================================== */
+
+.chatbox-wrapper {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  font-family: inherit;
+}
+
+/* Nút bong bóng chat nổi */
+.chat-badge {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #ff6d1f; /* Tông cam của MOTOCORE */
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(255, 109, 31, 0.4);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.chat-badge:hover {
+  transform: scale(1.1);
+  background: #e05615;
+}
+
+.chat-badge.active {
+  background: #1e1e1e;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.chat-badge span {
+  font-size: 28px;
+}
+
+/* Cửa sổ khung chat */
+.chatbox-container {
+  position: absolute;
+  bottom: 75px;
+  right: 0;
+  width: 360px;
+  height: 480px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #f0f0f0;
+  animation: slideInUp 0.3s ease;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header chat */
+.chatbox-header {
+  background: #1e1e1e;
+  color: white;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chatbox-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.online-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.4);
+}
+
+.chatbox-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.chatbox-close:hover {
+  color: white;
+}
+
+/* Khu vực tin nhắn */
+.chatbox-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  background: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message-row {
+  display: flex;
+  gap: 8px;
+  max-width: 85%;
+  align-items: flex-end;
+}
+
+.message-row.me {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.message-row.them {
+  align-self: flex-start;
+}
+
+.chat-avatar-mini {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+}
+
+.chat-avatar-mini img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.message-bubble {
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.message-row.me .message-bubble {
+  background: #ff6d1f;
+  color: white;
+  border-bottom-right-radius: 2px;
+}
+
+.message-row.them .message-bubble {
+  background: white;
+  color: #333;
+  border-bottom-left-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Thanh nhập tin nhắn */
+.chatbox-input-area {
+  display: flex;
+  padding: 12px;
+  background: white;
+  border-top: 1px solid #eee;
+  gap: 8px;
+}
+
+.chatbox-input-area input {
+  flex: 1;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.chatbox-input-area input:focus {
+  border-color: #ff6d1f;
+}
+
+.chatbox-input-area button {
+  background: #ff6d1f;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.chatbox-input-area button:hover {
+  background: #e05615;
+}
+
+/* Ẩn bớt trên mobile nếu bị đè bởi mobile bottom nav */
+@media (max-width: 768px) {
+  .chatbox-wrapper {
+    bottom: 80px; /* Nhấc cao lên để không đè lên mobile navigation */
+  }
+}

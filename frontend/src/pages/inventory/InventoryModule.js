@@ -453,9 +453,36 @@ const BRANDS = [
   { value: 'motul', label: 'Motul' },
   { value: 'irc', label: 'IRC' }
 ];
+// --- LOGIC LỌC KHOẢNG GIÁ Ở FRONTEND ---
+const getFilteredItems = () => {
+  if (!state.items) return [];
+  
+  const range = filters.price_range;
+  if (!range) return state.items; // Nếu chọn "Tất cả" thì không lọc giá
+
+  return state.items.filter((item) => {
+    // Ép giá bán (unit_price) về kiểu số nguyên để so sánh chính xác
+    const price = parseInt(item.unit_price, 10) || 0;
+
+    switch (range) {
+      case "0-500":
+        return price < 500000;
+      case "500-1000":
+        return price >= 500000 && price <= 1000000;
+      case "1000+":
+        return price > 1000000;
+      default:
+        return true;
+    }
+  });
+};
+
+// Gọi danh sách vật tư đã được lọc theo khoảng giá
+const displayedItems = getFilteredItems();
 
 
- return (
+
+return (
   <section className={`inventory-panel inventory-list-panel ${embedded ? "embedded" : ""}`}>
     {!embedded && (
       <InventoryHeader 
@@ -496,7 +523,6 @@ const BRANDS = [
     {/* --- BỘ LỌC THÔNG MINH --- */}
     <div className="smart-filter-container" style={{ background: '#fff', padding: '16px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
       <div className="smart-filter-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontWeight: 'bold', fontSize: '16px', color: '#1a1a1a' }}>
-        {/* Sử dụng Search icon sẵn có thay cho SlidersHorizontal để tránh lỗi import */}
         <Search size={18} /> 
         <span>Bộ lọc thông minh</span>
       </div>
@@ -504,51 +530,55 @@ const BRANDS = [
       <div className="smart-filter-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '12px' }}>
         {/* DANH MỤC */}
         <div className="filter-group">
-          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Danh mục</label>
+          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+            Danh mục
+          </label>
           <select 
             onChange={(event) => updateFilter("category", event.target.value)} 
             value={filters.category}
             style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
           >
             {INVENTORY_CATEGORIES.map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>
+                {label}
+              </option>
             ))}
           </select>
         </div>
 
         {/* DÒNG XE */}
-<div className="filter-group" style={{ display: 'flex', flexDirection: 'column' }}>
-  <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-    Dòng xe
-  </label>
-  <select 
-    onChange={(event) => updateFilter("car_model", event.target.value)} 
-    value={filters.car_model || ""}
-    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
-  >
-    <option value="">Tất cả</option>
-    {CAR_MODELS.map((item) => (
-      <option key={item.value} value={item.value}>{item.label}</option>
-    ))}
-  </select>
-</div>
+        <div className="filter-group" style={{ display: 'flex', flexDirection: 'column' }}>
+          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+            Dòng xe
+          </label>
+          <select 
+            onChange={(event) => updateFilter("car_model", event.target.value)} 
+            value={filters.car_model || ""}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
+          >
+            <option value="">Tất cả</option>
+            {CAR_MODELS.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
+        </div>
 
         {/* THƯƠNG HIỆU */}
-  <div className="filter-group" style={{ display: 'flex', flexDirection: 'column' }}>
-  <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-    Thương hiệu
-  </label>
-  <select 
-    onChange={(event) => updateFilter("brand", event.target.value)} 
-    value={filters.brand || ""}
-    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
-  >
-    <option value="">Tất cả</option>
-    {BRANDS.map((item) => (
-      <option key={item.value} value={item.value}>{item.label}</option>
-    ))}
-  </select>
-</div>
+        <div className="filter-group" style={{ display: 'flex', flexDirection: 'column' }}>
+          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+            Thương hiệu
+          </label>
+          <select 
+            onChange={(event) => updateFilter("brand", event.target.value)} 
+            value={filters.brand || ""}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
+          >
+            <option value="">Tất cả</option>
+            {BRANDS.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
+        </div>
 
         {/* CHẤT LƯỢNG */}
         <div className="filter-group">
@@ -601,7 +631,7 @@ const BRANDS = [
     {/* --- DANH SÁCH BẢNG SẢN PHẨM --- */}
     {state.loading ? <InventorySkeleton /> : state.error ? (
       <StateCard type="error" title="Không tải được danh sách kho" message={state.error} onRetry={loadItems} />
-    ) : !state.items.length ? (
+    ) : !displayedItems.length ? ( // Sử dụng displayedItems thay thế state.items
       <StateCard title="Không có vật tư phù hợp" message="Thử đổi từ khóa tìm kiếm hoặc bộ lọc." />
     ) : (
       <>
@@ -620,7 +650,7 @@ const BRANDS = [
               </tr>
             </thead>
             <tbody>
-              {state.items.map((item) => (
+              {displayedItems.map((item) => ( // Sử dụng displayedItems thay thế state.items
                 <InventoryRow
                   basePath={basePath}
                   item={item}
