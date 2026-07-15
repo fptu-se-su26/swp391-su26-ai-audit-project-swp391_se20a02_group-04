@@ -24,6 +24,26 @@ const inventoryItemSchema = new mongoose.Schema({
     enum: ['SPARE_PARTS', 'TOOLS', 'CONSUMABLES', 'ACCESSORIES', 'OTHER'],
     default: 'SPARE_PARTS'
   },
+  // --- THÊM DÒNG XE Ở ĐÂY ---
+  car_model: {
+    type: String,
+    trim: true,
+    enum: ['vision', 'sh', 'wave', 'exciter', 'winner', ''], // Các value tương ứng với bộ lọc Frontend
+    default: ''
+  },
+  // --- THÊM THƯƠNG HIỆU Ở ĐÂY ---
+  brand: {
+    type: String,
+    trim: true,
+    enum: ['michelin', 'castrol', 'motul', 'irc', ''], // Các value tương ứng với bộ lọc Frontend
+    default: ''
+  },
+  // --- THÊM PHÂN LOẠI CHẤT LƯỢNG (PREMIUM / STANDARD) ---
+  quality: {
+    type: String,
+    enum: ['PREMIUM', 'STANDARD', ''],
+    default: 'STANDARD'
+  },
   unit: {
     type: String,
     required: [true, 'Unit is required'],

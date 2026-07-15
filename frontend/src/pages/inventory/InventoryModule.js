@@ -439,102 +439,205 @@ function ListView({ basePath, embedded = false, go: externalGo, notify, readOnly
     }));
   };
 
-  return (
-    <section className={`inventory-panel inventory-list-panel ${embedded ? "embedded" : ""}`}>
-      {!embedded && (
-        <InventoryHeader title={readOnly ? "Kho vật tư" : "Danh sách vật tư"} subtitle={readOnly ? "Tra cứu tồn kho vật tư đang hoạt động." : "Tìm kiếm, lọc và quản lý vật tư trong garage."}>
-          {!readOnly && (
-            <>
-              <button className="inventory-btn secondary" onClick={() => go(`${basePath}/transactions`)} type="button">
-                <ClipboardList size={18} />
-                Giao dịch
-              </button>
-              <button className="inventory-btn primary" onClick={() => go(`${basePath}/items/new`)} type="button">
-                <Plus size={18} />
-                Thêm mới
-              </button>
-            </>
-          )}
-        </InventoryHeader>
-      )}
+  const CAR_MODELS = [
+  { value: 'vision', label: 'Honda Vision' },
+  { value: 'sh', label: 'Honda SH' },
+  { value: 'wave', label: 'Honda Wave' },
+  { value: 'exciter', label: 'Yamaha Exciter' },
+  { value: 'winner', label: 'Honda Winner' }
+];
 
-      <div className="inventory-toolbar">
-        <label className="inventory-search">
-          <Search size={18} />
-          <input
-            onChange={(event) => {
-              setDraftSearch(event.target.value);
-              setFilters((prev) => ({ ...prev, page: 1 }));
-            }}
-            placeholder="Tìm theo mã hoặc tên vật tư..."
-            value={draftSearch}
-          />
-        </label>
-        <select onChange={(event) => updateFilter("category", event.target.value)} value={filters.category}>
-          {INVENTORY_CATEGORIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <select onChange={(event) => updateFilter("stock_status", event.target.value)} value={filters.stock_status}>
-          <option value="">Tất cả trạng thái tồn</option>
-          <option value="OUT_OF_STOCK">Hết hàng</option>
-          <option value="LOW_STOCK">Sắp hết</option>
-          <option value="BELOW_MIN">Dưới mức tối thiểu</option>
-          <option value="IN_STOCK">Còn hàng</option>
-          <option value="OVERSTOCK">Tồn kho cao</option>
-        </select>
+const BRANDS = [
+  { value: 'michelin', label: 'Michelin' },
+  { value: 'castrol', label: 'Castrol' },
+  { value: 'motul', label: 'Motul' },
+  { value: 'irc', label: 'IRC' }
+];
+
+
+ return (
+  <section className={`inventory-panel inventory-list-panel ${embedded ? "embedded" : ""}`}>
+    {!embedded && (
+      <InventoryHeader 
+        title={readOnly ? "Kho vật tư" : "Danh sách vật tư"} 
+        subtitle={readOnly ? "Tra cứu tồn kho vật tư đang hoạt động." : "Tìm kiếm, lọc và quản lý vật tư trong garage."}
+      >
         {!readOnly && (
-          <select onChange={(event) => updateFilter("is_active", event.target.value)} value={filters.is_active}>
-            <option value="">Tất cả hoạt động</option>
-            <option value="true">Đang hoạt động</option>
-            <option value="false">Đã khóa</option>
-          </select>
+          <>
+            <button className="inventory-btn secondary" onClick={() => go(`${basePath}/transactions`)} type="button">
+              <ClipboardList size={18} />
+              Giao dịch
+            </button>
+            <button className="inventory-btn primary" onClick={() => go(`${basePath}/items/new`)} type="button">
+              <Plus size={18} />
+              Thêm mới
+            </button>
+          </>
         )}
-        <select onChange={(event) => updateFilter("limit", Number(event.target.value))} value={filters.limit}>
-          <option value={20}>20 / trang</option>
-          <option value={50}>50 / trang</option>
-          <option value={100}>100 / trang</option>
-        </select>
+      </InventoryHeader>
+    )}
+
+    {/* --- THANH TÌM KIẾM --- */}
+    <div className="inventory-search-wrap" style={{ marginBottom: '16px' }}>
+      <label className="inventory-search" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+        <Search size={18} />
+        <input
+          onChange={(event) => {
+            setDraftSearch(event.target.value);
+            setFilters((prev) => ({ ...prev, page: 1 }));
+          }}
+          placeholder="Tìm theo mã hoặc tên vật tư..."
+          value={draftSearch}
+          style={{ width: '100%', border: 'none', outline: 'none' }}
+        />
+      </label>
+    </div>
+
+    {/* --- BỘ LỌC THÔNG MINH --- */}
+    <div className="smart-filter-container" style={{ background: '#fff', padding: '16px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      <div className="smart-filter-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontWeight: 'bold', fontSize: '16px', color: '#1a1a1a' }}>
+        {/* Sử dụng Search icon sẵn có thay cho SlidersHorizontal để tránh lỗi import */}
+        <Search size={18} /> 
+        <span>Bộ lọc thông minh</span>
       </div>
 
-      {state.loading ? <InventorySkeleton /> : state.error ? (
-        <StateCard type="error" title="Không tải được danh sách kho" message={state.error} onRetry={loadItems} />
-      ) : !state.items.length ? (
-        <StateCard title="Không có vật tư phù hợp" message="Thử đổi từ khóa tìm kiếm hoặc bộ lọc." />
-      ) : (
-        <>
-          <div className="inventory-table-wrap">
-            <table className="inventory-table">
-              <thead>
-                <tr>
-                  <th onClick={() => toggleSort("item_code")}>Mã vật tư</th>
-                  <th onClick={() => toggleSort("item_name")}>Tên vật tư</th>
-                  <th onClick={() => toggleSort("category")}>Danh mục</th>
-                  <th onClick={() => toggleSort("quantity")}>Số lượng</th>
-                  <th>Trạng thái tồn</th>
-                  <th onClick={() => toggleSort("unit_price")}>Đơn giá bán</th>
-                  <th>Nhà cung cấp</th>
-                  {!readOnly && <th>Hoạt động</th>}
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {state.items.map((item) => (
-                  <InventoryRow
-                    basePath={basePath}
-                    item={item}
-                    key={getItemId(item)}
-                    notify={notify}
-                    onChanged={loadItems}
-                    readOnly={readOnly}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination filters={filters} pagination={state.pagination} updateFilter={updateFilter} />
-        </>
-      )}
-    </section>
-  );
+      <div className="smart-filter-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '12px' }}>
+        {/* DANH MỤC */}
+        <div className="filter-group">
+          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Danh mục</label>
+          <select 
+            onChange={(event) => updateFilter("category", event.target.value)} 
+            value={filters.category}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
+          >
+            {INVENTORY_CATEGORIES.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* DÒNG XE */}
+<div className="filter-group" style={{ display: 'flex', flexDirection: 'column' }}>
+  <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+    Dòng xe
+  </label>
+  <select 
+    onChange={(event) => updateFilter("car_model", event.target.value)} 
+    value={filters.car_model || ""}
+    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
+  >
+    <option value="">Tất cả</option>
+    {CAR_MODELS.map((item) => (
+      <option key={item.value} value={item.value}>{item.label}</option>
+    ))}
+  </select>
+</div>
+
+        {/* THƯƠNG HIỆU */}
+  <div className="filter-group" style={{ display: 'flex', flexDirection: 'column' }}>
+  <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+    Thương hiệu
+  </label>
+  <select 
+    onChange={(event) => updateFilter("brand", event.target.value)} 
+    value={filters.brand || ""}
+    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
+  >
+    <option value="">Tất cả</option>
+    {BRANDS.map((item) => (
+      <option key={item.value} value={item.value}>{item.label}</option>
+    ))}
+  </select>
+</div>
+
+        {/* CHẤT LƯỢNG */}
+        <div className="filter-group">
+          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Chất lượng</label>
+          <select 
+            onChange={(event) => updateFilter("quality", event.target.value)} 
+            value={filters.quality || ""}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
+          >
+            <option value="">Tất cả</option>
+            <option value="PREMIUM">Premium</option>
+            <option value="STANDARD">Standard</option>
+          </select>
+        </div>
+
+        {/* TRẠNG THÁI */}
+        <div className="filter-group">
+          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Trạng thái</label>
+          <select 
+            onChange={(event) => updateFilter("stock_status", event.target.value)} 
+            value={filters.stock_status}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
+          >
+            <option value="">Tất cả</option>
+            <option value="OUT_OF_STOCK">Hết hàng</option>
+            <option value="LOW_STOCK">Sắp hết</option>
+            <option value="BELOW_MIN">Dưới mức tối thiểu</option>
+            <option value="IN_STOCK">Còn hàng</option>
+            <option value="OVERSTOCK">Tồn kho cao</option>
+          </select>
+        </div>
+
+        {/* KHOẢNG GIÁ */}
+        <div className="filter-group">
+          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Khoảng giá</label>
+          <select 
+            onChange={(event) => updateFilter("price_range", event.target.value)} 
+            value={filters.price_range || ""}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
+          >
+            <option value="">Tất cả</option>
+            <option value="0-500">Dưới 500,000đ</option>
+            <option value="500-1000">500,000đ - 1,000,000đ</option>
+            <option value="1000+">Trên 1,000,000đ</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    {/* --- DANH SÁCH BẢNG SẢN PHẨM --- */}
+    {state.loading ? <InventorySkeleton /> : state.error ? (
+      <StateCard type="error" title="Không tải được danh sách kho" message={state.error} onRetry={loadItems} />
+    ) : !state.items.length ? (
+      <StateCard title="Không có vật tư phù hợp" message="Thử đổi từ khóa tìm kiếm hoặc bộ lọc." />
+    ) : (
+      <>
+        <div className="inventory-table-wrap">
+          <table className="inventory-table">
+            <thead>
+              <tr>
+                <th onClick={() => toggleSort("item_name")}>Sản phẩm</th>
+                <th>Thông tin</th>
+                <th>Phân loại</th>
+                <th onClick={() => toggleSort("purchase_price")}>Giá nhập</th>
+                <th onClick={() => toggleSort("unit_price")}>Giá bán</th>
+                <th onClick={() => toggleSort("quantity")}>Tồn kho</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.items.map((item) => (
+                <InventoryRow
+                  basePath={basePath}
+                  item={item}
+                  key={getItemId(item)}
+                  notify={notify}
+                  onChanged={loadItems}
+                  readOnly={readOnly}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Pagination filters={filters} pagination={state.pagination} updateFilter={updateFilter} />
+      </>
+    )}
+  </section>
+);
 }
 
 function InventoryRow({ basePath, item, readOnly, notify, onChanged }) {
