@@ -305,8 +305,8 @@ function DashboardView({ basePath, go, notify, readOnly }) {
             <StatCard icon={ClipboardList} label="Giao dịch 30 ngày" value={overview.recent_transactions || 0} tone="info" />
           </div>
 
-          <div className="inventory-two-col">
-            <section className="inventory-panel">
+          {/* <div className="inventory-two-col"> */}
+            {/* <section className="inventory-panel">
               <div className="inventory-panel-head">
                 <h3>Cần đặt thêm</h3>
                 <button className="inventory-link-btn" onClick={() => go(`${basePath}/items?stock_status=LOW_STOCK`)} type="button">
@@ -316,9 +316,9 @@ function DashboardView({ basePath, go, notify, readOnly }) {
               {state.lowStock.length ? state.lowStock.map((item) => (
                 <ItemMiniRow item={item} key={getItemId(item)} onClick={() => go(`${basePath}/items/${getItemId(item)}`)} />
               )) : <StateCard title="Kho ổn định" message="Chưa có vật tư chạm ngưỡng đặt thêm." />}
-            </section>
+            </section> */}
 
-            <section className="inventory-panel">
+            {/* <section className="inventory-panel">
               <div className="inventory-panel-head">
                 <h3>Top giá trị tồn kho</h3>
               </div>
@@ -331,10 +331,10 @@ function DashboardView({ basePath, go, notify, readOnly }) {
                   <b>{formatVND(item.stock_value)}</b>
                 </div>
               ))}
-            </section>
-          </div>
+            </section> */}
+          {/* </div> */}
 
-          <div className="inventory-two-col">
+          {/* <div className="inventory-two-col">
             <section className="inventory-panel">
               <div className="inventory-panel-head">
                 <h3>Phân bổ theo danh mục</h3>
@@ -347,7 +347,7 @@ function DashboardView({ basePath, go, notify, readOnly }) {
               </div>
               <SimpleBars data={(charts.stock_movements || []).map((row) => ({ label: `${row._id?.date} ${row._id?.type === "STOCK_IN" ? "IN" : "OUT"}`, value: row.total_quantity }))} />
             </section>
-          </div>
+          </div> */}
 
           <ListView basePath={basePath} embedded go={go} notify={notify} readOnly={readOnly} />
         </div>
