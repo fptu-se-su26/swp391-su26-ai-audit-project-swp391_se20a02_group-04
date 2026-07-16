@@ -7,8 +7,6 @@ import {
   Users,
   BarChart2,
   Shield,
-  Plus,
-  HelpCircle,
   Package,
   User,
   LogOut,
@@ -114,15 +112,6 @@ export default function AdminSidebar({ activeView, onViewChange }) {
             <LogOut size={16} />
           </button>
         </div>
-
-        <button className="btn-primary" type="button" onClick={() => onViewChange?.("calendar")}>
-          <Plus className="btn-icon" />
-          Đặt lịch mới
-        </button>
-        <a href="#" className="support-link" onClick={(event) => event.preventDefault()} style={{ marginTop: "8px" }}>
-          <HelpCircle className="support-icon" />
-          <span>Hỗ trợ</span>
-        </a>
       </div>
     </aside>
   );

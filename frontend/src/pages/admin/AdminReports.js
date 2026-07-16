@@ -11,7 +11,6 @@ import {
   Package,
   User,
   Search,
-  Bell,
   Download,
   TrendingUp,
   ClipboardList,
@@ -68,9 +67,6 @@ export default function AdminReports({ onViewChange }) {
               <Search />
               <input type="text" placeholder="Tìm chỉ số, dịch vụ, nhân sự..." />
             </label>
-            <button className="reports-icon-btn" type="button" aria-label="Thông báo">
-              <Bell />
-            </button>
           </div>
         </header>
 

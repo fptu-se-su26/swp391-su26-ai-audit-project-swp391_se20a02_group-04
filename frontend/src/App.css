@@ -36,3 +36,191 @@
     transform: rotate(360deg);
   }
 }
+
+/* FLOATING NOTIFICATION BELL BUTTON WIDGET FOR ADMIN */
+.App .floating-notif-wrapper {
+    position: fixed;
+    top: 24px;
+    right: 32px;
+    z-index: 1050;
+    display: inline-block;
+}
+
+.App .floating-notif-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    color: #dc2626;
+    border: 2px solid #fecaca;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(220, 38, 38, 0.12);
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+}
+
+.App .floating-notif-btn:hover {
+    transform: scale(1.08);
+    background-color: #fef2f2;
+    border-color: #f87171;
+    color: #b91c1c;
+    box-shadow: 0 6px 24px rgba(220, 38, 38, 0.22);
+}
+
+.App .floating-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background-color: #dc2626;
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 999px;
+    border: 2px solid #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(220, 38, 38, 0.2);
+}
+
+.App .floating-notif-dropdown {
+    position: absolute;
+    top: 54px; /* Opens below the top floating button */
+    right: 0;
+    width: 380px;
+    background-color: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: slideDownFloating 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideDownFloating {
+    from {
+        transform: translateY(-10px) scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+.App .dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.App .dropdown-header h3 {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+}
+
+.App .mark-all-btn {
+    background: none;
+    border: none;
+    color: #dc2626;
+    font-size: 0.75rem;
+    font-weight: 750;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.App .mark-all-btn:hover {
+    color: #b91c1c;
+}
+
+.App .dropdown-divider {
+    height: 1px;
+    background-color: #f1f5f9;
+}
+
+.App .notifications-list {
+    max-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px;
+}
+
+.App .no-notifications {
+    text-align: center;
+    color: #64748b;
+    font-size: 0.85rem;
+    padding: 24px 0;
+}
+
+.App .notification-item-card {
+    padding: 12px;
+    border-radius: 10px;
+    background-color: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+}
+
+.App .notification-item-card:hover {
+    background-color: #f8fafc;
+}
+
+.App .notification-item-card.unread {
+    background-color: #fff5f5;
+    border-color: #fee2e2;
+}
+
+.App .notification-item-card.unread:hover {
+    background-color: #fef2f2;
+}
+
+.App .notif-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.App .notif-title {
+    font-size: 0.85rem;
+    font-weight: 750;
+    color: #1e293b;
+}
+
+.App .unread-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #dc2626;
+    flex-shrink: 0;
+}
+
+.App .notif-message {
+    font-size: 0.8rem;
+    color: #475569;
+    line-height: 1.45;
+    margin: 0;
+}
+
+.App .notif-time {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    margin-top: 2px;
+    font-weight: 500;
+}

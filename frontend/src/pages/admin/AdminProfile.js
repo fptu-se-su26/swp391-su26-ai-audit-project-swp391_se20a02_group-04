@@ -285,10 +285,6 @@ const AdminProfile = ({ onViewChange }) => {
               />
             </div>
             <div className="header-icons">
-              <div className="icon-wrapper">
-                <Bell className="header-icon" />
-                <span className="badge" />
-              </div>
               <Settings className="header-icon active-icon" onClick={() => onViewChange("profile")} />
               <div className="avatar" onClick={() => onViewChange("profile")}>
                 <img src={profile.avatar} alt="Ảnh đại diện" />
