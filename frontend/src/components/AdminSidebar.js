@@ -10,6 +10,7 @@ import {
   Package,
   User,
   LogOut,
+  CircleHelp, // thêm dòng này
 } from "lucide-react";
 import { getAuthSession, clearAuthSession } from "../services/authApi";
 import "../styles/admin/AdminDashboard.css";
@@ -30,17 +31,16 @@ export default function AdminSidebar({ activeView, onViewChange }) {
   };
 
   const navItems = [
-    ["dashboard", LayoutDashboard, "Tổng quan"],
-    ["calendar", Calendar, "Lịch hẹn"],
-    ["services", Wrench, "Dịch vụ"],
-    ["customers", Users, "Khách hàng"],
-    ["users", Shield, "Người dùng"],
-    ["inventory", Package, "Kho"],
-    ["reports", BarChart2, "Báo cáo"],
-    ["profile", User, "Hồ sơ"],
-    ["contact", HelpCircle, "Liên hệ"],
-  ];
-
+  ["dashboard", LayoutDashboard, "Tổng quan"],
+  ["calendar", Calendar, "Lịch hẹn"],
+  ["services", Wrench, "Dịch vụ"],
+  ["customers", Users, "Khách hàng"],
+  ["users", Shield, "Người dùng"],
+  ["inventory", Package, "Kho"],
+  ["reports", BarChart2, "Báo cáo"],
+  ["profile", User, "Hồ sơ"],
+  ["contact", CircleHelp, "Liên hệ"], // sửa dòng này
+];
   return (
     <aside className="sidebar">
       <div>
