@@ -12,5 +12,8 @@
     "health": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"try { Invoke-WebRequest http://localhost:5000/health -UseBasicParsing | Select-Object -ExpandProperty Content } catch { Write-Error 'Backend is not reachable at http://localhost:5000' }\"",
     "build": "npm --prefix frontend run build",
     "test:backend": "npm --prefix backend test -- --runInBand"
+  },
+  "dependencies": {
+    "lucide-react": "^1.24.0"
   }
 }
