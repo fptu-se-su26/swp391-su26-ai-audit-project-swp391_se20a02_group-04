@@ -43,7 +43,7 @@ describe('staff model validation', () => {
 
     attendance.checkOut(checkOut);
 
-    expect(attendance.status).toBe('CHECKED_OUT');
+    expect(attendance.status).toBe('COMPLETED');
     expect(attendance.total_hours).toBe(3.5);
     expect(attendance.check_out_time).toEqual(checkOut);
   });

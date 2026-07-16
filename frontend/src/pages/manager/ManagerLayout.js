@@ -664,7 +664,7 @@ const ManagerLayout = () => {
               onClick={(e) => { e.preventDefault(); handleTabChange("staff"); }}
             >
               <Users className="nav-icon" />
-              <span>Staff Management</span>
+              <span>Nhân sự</span>
             </a>
             <a
               href="#"

@@ -35,7 +35,9 @@ const STATUS_META = {
 
 const HISTORY_STATUS = {
   CHECKED_IN: { label: "Đang làm", className: "status-yellow", icon: "pending_actions" },
+  IN_SHIFT: { label: "Đang làm", className: "status-yellow", icon: "pending_actions" },
   CHECKED_OUT: { label: "Hoàn tất", className: "status-green", icon: "task_alt" },
+  COMPLETED: { label: "Hoàn tất", className: "status-green", icon: "task_alt" },
 };
 
 function formatDate(value) {
@@ -329,7 +331,7 @@ export default function StaffAttendance() {
                           <td>{formatShortDate(record.work_date)}</td>
                           <td>{formatTime(record.check_in_time)}</td>
                           <td>{formatTime(record.check_out_time)}</td>
-                          <td>{record.status === "CHECKED_OUT" ? formatHours(record.total_hours) : "Đang tính"}</td>
+                          <td>{record.status === "CHECKED_OUT" || record.status === "COMPLETED" ? formatHours(record.total_hours) : "Đang tính"}</td>
                           <td>
                             <span className={`table-status ${historyMeta.className}`}>
                               <Icon name={historyMeta.icon} />

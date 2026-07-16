@@ -354,7 +354,7 @@ async function seedStaffTestData() {
         staff_id: staff._id,
         work_date: today,
         check_in_time: checkInAt,
-        status: 'CHECKED_IN'
+        status: 'IN_SHIFT'
       }),
       ensureAttendance(staff._id, yesterday, {
         staff_id: staff._id,
@@ -362,7 +362,7 @@ async function seedStaffTestData() {
         check_in_time: yesterdayCheckIn,
         check_out_time: checkOutAt,
         total_hours: Number(((checkOutAt.getTime() - yesterdayCheckIn.getTime()) / 3600000).toFixed(2)),
-        status: 'CHECKED_OUT'
+        status: 'COMPLETED'
       })
     ]);
 

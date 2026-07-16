@@ -783,3 +783,121 @@
     grid-template-columns: 1fr;
   }
 }
+
+.week-header {
+  align-items: center;
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.week-nav strong {
+  min-width: 140px;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.week-day-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.week-day-chip {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.week-day-chip span {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.week-day-chip strong {
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.week-matrix-wrap {
+  overflow-x: auto;
+}
+
+.week-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.week-matrix-table th,
+.week-matrix-table td {
+  border: 1px solid #e2e8f0;
+  padding: 12px 10px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.week-matrix-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.8rem;
+}
+
+.week-matrix-table th span {
+  display: block;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.week-matrix-table th small {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.week-matrix-table td:first-child,
+.week-matrix-table th:first-child {
+  text-align: left;
+  min-width: 180px;
+}
+
+.week-matrix-table td:first-child strong {
+  display: block;
+  color: #0f172a;
+}
+
+.week-matrix-table td:first-child small {
+  color: #64748b;
+}
+
+.week-matrix-table td.working {
+  background: #ecfdf5;
+  color: #047857;
+  font-weight: 900;
+}
+
+.week-matrix-table td.off {
+  background: #fff7f7;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.workload-table .staff-table-row {
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+}
+
+@media (max-width: 900px) {
+  .week-day-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+

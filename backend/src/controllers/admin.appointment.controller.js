@@ -62,14 +62,14 @@ const getAllAppointments = async (req, res) => {
       query.service_id = service_id;
     }
 
-    // Date range filter
+    // Date range filter (appointment_date is YYYY-MM-DD string)
     if (date_from || date_to) {
       query.appointment_date = {};
       if (date_from) {
-        query.appointment_date.$gte = new Date(date_from);
+        query.appointment_date.$gte = String(date_from).slice(0, 10);
       }
       if (date_to) {
-        query.appointment_date.$lte = new Date(date_to);
+        query.appointment_date.$lte = String(date_to).slice(0, 10);
       }
     }
 
@@ -910,10 +910,14 @@ const getAppointmentCalendar = async (req, res) => {
       .populate('service_id', 'service_name estimated_duration')
       .sort({ appointment_date: 1, start_time: 1 });
 
-    // Group by date
+    // Group by date (YYYY-MM-DD string, or legacy Date values)
     const calendar = {};
     appointments.forEach(apt => {
-      const dateKey = apt.appointment_date.toISOString().split('T')[0];
+      const raw = apt.appointment_date;
+      const dateKey = raw instanceof Date
+        ? raw.toISOString().slice(0, 10)
+        : String(raw || '').slice(0, 10);
+      if (!dateKey) return;
       if (!calendar[dateKey]) {
         calendar[dateKey] = [];
       }

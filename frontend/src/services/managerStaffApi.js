@@ -45,6 +45,10 @@ export const managerStaffApi = {
     return request(`/manager/staff${queryString(params)}`);
   },
 
+  getWeeklyMatrix(params = {}) {
+    return request(`/manager/staff/week-matrix${queryString(params)}`);
+  },
+
   getStaffDetail(staffId) {
     return request(`/manager/staff/${staffId}`);
   },
