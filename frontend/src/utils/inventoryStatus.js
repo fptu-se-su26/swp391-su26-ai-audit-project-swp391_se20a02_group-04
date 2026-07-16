@@ -21,13 +21,16 @@ export const INVENTORY_STATUS = {
   },
 };
 
+// File: inventoryStatus.js
+// File: inventoryStatus.js
+// File: inventoryStatus.js
 export const INVENTORY_CATEGORIES = [
-  ["", "Tất cả danh mục"],
-  ["SPARE_PARTS", "Phụ tùng"],
-  ["TOOLS", "Dụng cụ"],
-  ["CONSUMABLES", "Vật tư tiêu hao"],
-  ["ACCESSORIES", "Phụ kiện"],
-  ["OTHER", "Khác"],
+  ["", "tất cả"],
+  ["SPARE_PARTS", "spare parts"],
+  ["TOOLS", "tools"],
+  ["CONSUMABLES", "consumables"],
+  ["ACCESSORIES", "accessories"],
+  ["OTHER", "other"],
 ];
 
 export const TRANSACTION_TYPES = [

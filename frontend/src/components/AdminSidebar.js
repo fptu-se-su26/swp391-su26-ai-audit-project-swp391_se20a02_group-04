@@ -38,6 +38,7 @@ export default function AdminSidebar({ activeView, onViewChange }) {
     ["inventory", Package, "Kho"],
     ["reports", BarChart2, "Báo cáo"],
     ["profile", User, "Hồ sơ"],
+    ["contact", HelpCircle, "Liên hệ"],
   ];
 
   return (

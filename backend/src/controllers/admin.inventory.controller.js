@@ -101,6 +101,39 @@ const getInventoryItemById = async (req, res) => {
   }
 };
 
+// Trong hàm xử lý API GET danh sách vật tư:
+const getInventoryItems = async (req, res) => {
+  try {
+    const { category, car_model, brand, quality, price_range } = req.query;
+    
+    // Khởi tạo query object
+    let query = {};
+
+    // Gắn các bộ lọc nếu có truyền từ Frontend lên
+    if (category) query.category = category;
+    if (car_model) query.car_model = car_model;
+    if (brand) query.brand = brand;
+    if (quality) query.quality = quality;
+
+    // Xử lý bộ lọc khoảng giá nếu có
+    if (price_range) {
+      if (price_range === '0-500') {
+        query.unit_price = { $lt: 500000 };
+      } else if (price_range === '500-1000') {
+        query.unit_price = { $gte: 500000, $lte: 1000000 };
+      } else if (price_range === '1000+') {
+        query.unit_price = { $gt: 1000000 };
+      }
+    }
+
+    // Thực hiện tìm kiếm trong Database
+    const items = await InventoryItem.find(query);
+    res.status(200).json({ success: true, items });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 /**
  * Create new inventory item
  * POST /api/admin/inventory
