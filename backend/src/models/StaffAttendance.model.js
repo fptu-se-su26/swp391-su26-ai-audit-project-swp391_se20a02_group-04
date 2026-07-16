@@ -54,7 +54,7 @@ staffAttendanceSchema.index({ status: 1 });
 
 staffAttendanceSchema.methods.checkOut = function(checkOutTime = new Date()) {
   this.check_out_time = checkOutTime;
-  this.status = 'CHECKED_OUT';
+  this.status = 'COMPLETED';
   const workedMs = checkOutTime.getTime() - this.check_in_time.getTime();
   this.total_hours = Number((Math.max(0, workedMs) / 3600000).toFixed(2));
 };

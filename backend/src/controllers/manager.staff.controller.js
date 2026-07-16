@@ -19,6 +19,8 @@ const {
 } = require('../services/appointment-scheduling.service');
 
 const ACTIVE_APPOINTMENT_STATUSES = ['PENDING', 'CONFIRMED', 'IN_PROGRESS'];
+const WORKLOAD_BUSY_IN_PROGRESS = 4;
+const WORKLOAD_BUSY_ORDERS = 7;
 const SHIFT_DEFAULTS = {
   MORNING: ['07:00', '12:00'],
   AFTERNOON: ['12:00', '18:00'],
@@ -36,6 +38,32 @@ function isDateString(value) {
 function normalizeDate(value) {
   if (!value) return todayString();
   return String(value).slice(0, 10);
+}
+
+/** Monday (local) of the week containing dateStr; returns YYYY-MM-DD */
+function getMondayOfWeek(dateStr) {
+  const date = new Date(`${normalizeDate(dateStr)}T12:00:00`);
+  const day = date.getDay(); // 0 Sun .. 6 Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Mon→Sat (6 days) from Monday */
+function getWorkWeekDates(weekStart) {
+  const monday = getMondayOfWeek(weekStart);
+  return Array.from({ length: 6 }, (_, index) => {
+    const day = new Date(`${monday}T12:00:00`);
+    day.setDate(day.getDate() + index);
+    return day.toISOString().slice(0, 10);
+  });
+}
+
+function getWorkloadStatus(inProgressCount, ordersReceived) {
+  if (inProgressCount >= WORKLOAD_BUSY_IN_PROGRESS || ordersReceived >= WORKLOAD_BUSY_ORDERS) {
+    return 'busy';
+  }
+  return 'ok';
 }
 
 function timeToMinutes(value) {
@@ -255,11 +283,18 @@ async function buildAvailabilityForStaff(staff, { date, start_time, end_time, ap
   }).sort({ shift_start: 1 });
 
   const attendance = await StaffAttendance.findOne({ staff_id: staff._id, work_date: date });
-  const dayAppointments = await Appointment.find({
-    staff_id: staff._id,
-    appointment_date: date,
-    status: { $in: ACTIVE_APPOINTMENT_STATUSES }
-  }).select('appointment_code start_time time_slot estimated_end_time estimated_duration total_service_duration_minutes');
+  const [dayAppointments, inProgressCount] = await Promise.all([
+    Appointment.find({
+      staff_id: staff._id,
+      appointment_date: date,
+      status: { $in: ACTIVE_APPOINTMENT_STATUSES }
+    }).select('appointment_code status start_time time_slot estimated_end_time estimated_duration total_service_duration_minutes'),
+    Appointment.countDocuments({ staff_id: staff._id, status: 'IN_PROGRESS' })
+  ]);
+
+  const ordersReceived = dayAppointments.length;
+  const onDuty = Boolean(staff.is_active && schedules.length);
+  const matchingSchedule = schedules.find((schedule) => rangeInsideSchedule(start_time, end_time, schedule));
 
   const busySlots = dayAppointments.map((appointment) => {
     const start = appointment.start_time || appointment.time_slot || '';
@@ -270,25 +305,12 @@ async function buildAvailabilityForStaff(staff, { date, start_time, end_time, ap
       appointment_id: String(appointment._id),
       appointment_code: appointment.appointment_code,
       start_time: start,
-      end_time: end
+      end_time: end,
+      status: appointment.status
     };
   });
 
-  let available = Boolean(staff.is_active);
-  let reason = available ? null : 'Staff inactive';
-  const matchingSchedule = schedules.find((schedule) => rangeInsideSchedule(start_time, end_time, schedule));
-
-  if (available && !schedules.length) {
-    available = false;
-    reason = 'Không có ca làm việc';
-  }
-
-  if (available && !matchingSchedule) {
-    available = false;
-    reason = 'Appointment nằm ngoài giờ làm';
-  }
-
-  const conflicts = available ? await getAppointmentConflicts({
+  const conflicts = onDuty && start_time && end_time ? await getAppointmentConflicts({
     staffId: staff._id,
     date,
     startTime: start_time,
@@ -296,10 +318,32 @@ async function buildAvailabilityForStaff(staff, { date, start_time, end_time, ap
     excludeAppointmentId: appointment_id
   }) : [];
 
-  if (available && conflicts.length) {
-    available = false;
-    reason = 'Staff đã có lịch hẹn khác trong khung giờ này';
+  const warnings = [];
+  if (onDuty && schedules.length && start_time && end_time && !matchingSchedule) {
+    warnings.push('Khung giờ hẹn nằm ngoài ca đăng ký (vẫn có thể phân công)');
   }
+  if (conflicts.length) {
+    warnings.push('Staff đã có lịch hẹn khác trong khung giờ này (vẫn có thể phân công)');
+  }
+
+  let presence = 'Nghỉ';
+  if (onDuty) {
+    if (attendance?.status === 'IN_SHIFT' || (attendance?.check_in_time && !attendance?.check_out_time)) {
+      presence = 'Có mặt';
+    } else if (attendance?.status === 'COMPLETED') {
+      presence = 'Đã checkout';
+    } else {
+      presence = 'Có lịch';
+    }
+  }
+
+  const workloadStatus = getWorkloadStatus(inProgressCount, ordersReceived);
+
+  // selectable = đang làm ngày đó; available giữ tương thích FE (không chặn theo giờ)
+  const available = onDuty;
+  let reason = null;
+  if (!staff.is_active) reason = 'Staff inactive';
+  else if (!schedules.length) reason = 'Không làm việc ngày này';
 
   return {
     staff_id: String(staff._id),
@@ -308,12 +352,73 @@ async function buildAvailabilityForStaff(staff, { date, start_time, end_time, ap
     phone: staff.phone,
     specialization: staff.specialization || '',
     available,
+    on_duty: onDuty,
+    selectable: onDuty,
     reason,
+    warnings,
+    presence,
+    in_progress_count: inProgressCount,
+    orders_received_count: ordersReceived,
+    appointment_count_today: ordersReceived,
+    workload_status: workloadStatus,
     schedule: matchingSchedule ? scheduleResponse(matchingSchedule) : (schedules[0] ? scheduleResponse(schedules[0]) : null),
     attendance_status: attendance?.status || null,
-    appointment_count_today: dayAppointments.length,
     busy_slots: busySlots
   };
+}
+
+async function getWeeklyStaffMatrix(req, res) {
+  try {
+    const weekStart = getMondayOfWeek(req.query.week_start || todayString());
+    const dates = getWorkWeekDates(weekStart);
+    const dayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+    const allStaff = await getStaffBase({ is_active: true });
+    const schedules = await WorkSchedule.find({
+      staff_id: { $in: allStaff.map((item) => item._id) },
+      work_date: { $in: dates },
+      status: { $nin: ['CANCELLED', 'ABSENT'] }
+    }).select('staff_id work_date shift shift_start shift_end status');
+
+    const scheduleSet = new Set(schedules.map((row) => `${row.staff_id}|${row.work_date}`));
+
+    const technicians_per_day = dates.map((date, index) => ({
+      date,
+      label: dayLabels[index],
+      working_count: allStaff.filter((staff) => scheduleSet.has(`${staff._id}|${date}`)).length
+    }));
+
+    const rows = allStaff.map((staff) => {
+      const days = {};
+      dates.forEach((date, index) => {
+        const working = scheduleSet.has(`${staff._id}|${date}`);
+        days[date] = {
+          label: dayLabels[index],
+          working,
+          status: working ? 'WORKING' : 'OFF'
+        };
+      });
+      return {
+        staff_id: String(staff._id),
+        full_name: staff.full_name,
+        email: staff.email,
+        specialization: staff.specialization || '',
+        days
+      };
+    });
+
+    return successResponse(res, 200, 'Lấy lịch tuần thành công', {
+      week_start: weekStart,
+      week_end: dates[dates.length - 1],
+      dates,
+      day_labels: dayLabels,
+      technicians_per_day,
+      rows
+    });
+  } catch (error) {
+    console.error('Weekly staff matrix error:', error);
+    return errorResponse(res, 500, 'Không thể lấy lịch tuần nhân sự');
+  }
 }
 
 async function getManagerStaff(req, res) {
@@ -342,15 +447,26 @@ async function getManagerStaff(req, res) {
     const staffIds = staff.map((item) => item._id);
     const date = todayString();
 
-    const [schedules, attendance, appointments] = await Promise.all([
+    const [schedules, attendance, appointments, inProgress] = await Promise.all([
       WorkSchedule.find({ staff_id: { $in: staffIds }, work_date: date, status: { $ne: 'CANCELLED' } }).sort({ shift_start: 1 }),
       StaffAttendance.find({ staff_id: { $in: staffIds }, work_date: date }),
-      Appointment.find({ staff_id: { $in: staffIds }, appointment_date: date, status: { $in: ACTIVE_APPOINTMENT_STATUSES } }).select('staff_id')
+      Appointment.find({ staff_id: { $in: staffIds }, appointment_date: date, status: { $in: ACTIVE_APPOINTMENT_STATUSES } }).select('staff_id status'),
+      Appointment.find({ staff_id: { $in: staffIds }, status: 'IN_PROGRESS' }).select('staff_id')
     ]);
 
     const items = staff.map((item) => {
-      const itemSchedules = schedules.filter((schedule) => String(schedule.staff_id) === String(item._id));
+      const itemSchedules = schedules.filter((schedule) => String(schedule.staff_id) === String(item._id) && schedule.status !== 'ABSENT');
       const itemAttendance = attendance.find((row) => String(row.staff_id) === String(item._id));
+      const dayOrders = appointments.filter((appointment) => String(appointment.staff_id) === String(item._id));
+      const inProgressCount = inProgress.filter((appointment) => String(appointment.staff_id) === String(item._id)).length;
+      const onDuty = itemSchedules.length > 0;
+      let presence = 'Nghỉ';
+      if (onDuty) {
+        if (itemAttendance?.status === 'IN_SHIFT' || (itemAttendance?.check_in_time && !itemAttendance?.check_out_time)) presence = 'Có mặt';
+        else if (itemAttendance?.status === 'COMPLETED') presence = 'Đã checkout';
+        else presence = 'Có lịch';
+      }
+
       return {
         id: String(item._id),
         full_name: item.full_name,
@@ -360,8 +476,13 @@ async function getManagerStaff(req, res) {
         specialization: item.specialization || '',
         is_active: item.is_active,
         today_schedule: itemSchedules.length === 1 ? scheduleResponse(itemSchedules[0]) : itemSchedules.map(scheduleResponse),
+        on_duty: onDuty,
+        presence,
         attendance_status: itemAttendance?.status || null,
-        today_appointment_count: appointments.filter((appointment) => String(appointment.staff_id) === String(item._id)).length
+        in_progress_count: inProgressCount,
+        orders_received_count: dayOrders.length,
+        today_appointment_count: dayOrders.length,
+        workload_status: getWorkloadStatus(inProgressCount, dayOrders.length)
       };
     });
 
@@ -640,6 +761,13 @@ async function getAvailableStaff(req, res) {
       }));
     }
 
+    data.sort((a, b) => {
+      if (a.on_duty !== b.on_duty) return a.on_duty ? -1 : 1;
+      if (a.workload_status !== b.workload_status) return a.workload_status === 'ok' ? -1 : 1;
+      return (a.in_progress_count || 0) - (b.in_progress_count || 0)
+        || (a.orders_received_count || 0) - (b.orders_received_count || 0);
+    });
+
     return successResponse(res, 200, 'Lấy staff availability thành công', data);
   } catch (error) {
     console.error('Available staff error:', error);
@@ -660,8 +788,14 @@ async function getStaffAvailability(req, res) {
     });
 
     return successResponse(res, 200, 'Kiểm tra availability thành công', {
-      has_schedule: Boolean(result.schedule),
+      has_schedule: result.on_duty,
       is_available: result.available,
+      on_duty: result.on_duty,
+      presence: result.presence,
+      in_progress_count: result.in_progress_count,
+      orders_received_count: result.orders_received_count,
+      workload_status: result.workload_status,
+      warnings: result.warnings || [],
       attendance_status: result.attendance_status,
       appointment_count: result.appointment_count_today,
       busy_slots: result.busy_slots,
@@ -923,7 +1057,9 @@ async function assignAppointmentWithSchedule(req, res) {
       end_time: endTime,
       appointment_id: appointment._id
     });
-    if (!availability.available) return errorResponse(res, 409, availability.reason || 'Staff không khả dụng');
+    if (!availability.on_duty) {
+      return errorResponse(res, 409, availability.reason || 'Nhân viên không làm việc ngày này');
+    }
 
     const startAt = buildDateTime(appointment.appointment_date, startTime);
     const endAt = addMinutes(startAt, duration);
@@ -1001,6 +1137,7 @@ module.exports = {
   getStaffPerformanceById,
   getStaffPerformanceReport,
   getStaffWorkload,
+  getWeeklyStaffMatrix,
   updateAttendance,
   updateSchedule
 };

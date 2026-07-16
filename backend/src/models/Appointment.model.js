@@ -5,6 +5,22 @@ const {
   APPOINTMENT_STATUSES
 } = require('../constants/appointment.constants');
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Normalize Date / ISO / locale strings to YYYY-MM-DD (local calendar day). */
+function normalizeAppointmentDate(value) {
+  if (value == null || value === '') return value;
+  if (typeof value === 'string' && DATE_ONLY_RE.test(value)) return value;
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 const appointmentSchema = new mongoose.Schema({
   appointment_code: {
     type: String,
@@ -128,7 +144,8 @@ const appointmentSchema = new mongoose.Schema({
   appointment_date: {
     type: String,
     required: [true, 'Appointment date is required'],
-    match: [/^\d{4}-\d{2}-\d{2}$/, 'Appointment date must use YYYY-MM-DD format']
+    match: [DATE_ONLY_RE, 'Appointment date must use YYYY-MM-DD format'],
+    set: normalizeAppointmentDate
   },
   time_slot: {
     type: String,
@@ -254,6 +271,10 @@ appointmentSchema.index({ assignment_id: 1 });
 appointmentSchema.index({ estimated_end_time: 1 });
 
 appointmentSchema.pre('validate', function(next) {
+  if (this.appointment_date != null) {
+    this.appointment_date = normalizeAppointmentDate(this.appointment_date);
+  }
+
   if (!this.appointment_code) {
     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();

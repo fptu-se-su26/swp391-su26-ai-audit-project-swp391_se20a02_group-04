@@ -50,6 +50,13 @@ router.get('/staff/available',
   managerStaffController.getAvailableStaff
 );
 
+router.get('/staff/week-matrix',
+  ...managerOnly,
+  query('week_start').optional().isISO8601().withMessage('Invalid week_start'),
+  validate,
+  managerStaffController.getWeeklyStaffMatrix
+);
+
 router.get('/staff/:id/availability',
   ...managerOnly,
   mongoIdParam,

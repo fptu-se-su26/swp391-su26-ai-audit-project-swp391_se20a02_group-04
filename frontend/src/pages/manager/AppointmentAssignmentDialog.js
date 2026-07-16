@@ -90,12 +90,19 @@ export default function AppointmentAssignmentDialog({
   const [localError, setLocalError] = useState("");
   const { checkTechnician, checkRepairBay, loading: checking, error: availabilityError } = useAvailabilityCheck(appointmentId, availabilityParams);
 
+  const workingTechnicians = useMemo(
+    () => technicians.filter((tech) => tech.on_duty || tech.available || tech.selectable),
+    [technicians]
+  );
+
+  const displayTechnicians = workingTechnicians.length ? workingTechnicians : technicians;
+
   const isValid = useMemo(() => (
     selectedTechnician &&
     selectedBay &&
-    techAvailability?.available &&
+    (selectedTechnician.on_duty || selectedTechnician.available || selectedTechnician.selectable) &&
     bayAvailability?.available
-  ), [selectedTechnician, selectedBay, techAvailability, bayAvailability]);
+  ), [selectedTechnician, selectedBay, bayAvailability]);
 
   useEffect(() => {
     let active = true;
@@ -128,6 +135,7 @@ export default function AppointmentAssignmentDialog({
   }, [appointmentDate, appointmentId, availabilityParams]);
 
   const selectTechnician = async (technician) => {
+    if (!(technician.on_duty || technician.available || technician.selectable)) return;
     setSelectedTechnician(technician);
     setTechAvailability(null);
     const availability = await checkTechnician(technician._id);
@@ -173,11 +181,11 @@ export default function AppointmentAssignmentDialog({
 
   return (
     <div className="assignment-dialog-overlay" role="presentation">
-      <div className="assignment-dialog" role="dialog" aria-modal="true" aria-label="Assign appointment">
+      <div className="assignment-dialog assignment-dialog-wide" role="dialog" aria-modal="true" aria-label="Assign appointment">
         <div className="assignment-dialog-header">
           <div>
             <p>Điều phối lịch hẹn</p>
-            <h2>Phân công xử lý</h2>
+            <h2>Chọn nhân viên theo tải việc</h2>
           </div>
           <button className="assignment-close-btn" onClick={onClose} disabled={loading} aria-label="Close">
             <X size={20} />
@@ -187,7 +195,7 @@ export default function AppointmentAssignmentDialog({
         {initialLoading ? (
           <div className="assignment-loading">
             <Loader size={24} className="spinner" />
-            <span>Đang tải dữ liệu phân công...</span>
+            <span>Đang tải nhân viên làm việc ngày này...</span>
           </div>
         ) : (
           <>
@@ -216,32 +224,57 @@ export default function AppointmentAssignmentDialog({
 
               <div className="form-section">
                 <label className="form-label">
-                  <User size={16} /> Kỹ thuật viên
+                  <User size={16} /> Nhân viên đang làm ngày này
                 </label>
-                <div className="technician-list">
-                  {technicians.length === 0 ? (
-                    <p className="empty-message">Chưa có kỹ thuật viên đang hoạt động.</p>
-                  ) : technicians.map((technician) => (
-                    <button
-                      type="button"
-                      key={technician._id}
-                      className={`technician-item ${selectedTechnician?._id === technician._id ? "selected" : ""}`}
-                      onClick={() => selectTechnician(technician)}
-                      disabled={loading || checking || technician.available === false}
-                    >
-                      <div className="tech-info">
-                        <h4>{technician.full_name}</h4>
-                        <p>
-                          {technician.available === false
-                            ? (technician.reason || "Không khả dụng")
-                            : `${technician.specialization || technician.email || "Kỹ thuật viên"} - ${technician.appointment_count_today || 0} lịch hôm nay`}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
+                <p className="form-hint">
+                  Ưu tiên người rảnh (🟢). Vẫn có thể chọn người quá tải (🔴) nếu cần.
+                </p>
+                <div className="workload-assign-table">
+                  <div className="workload-assign-row head">
+                    <span>Nhân viên</span>
+                    <span>Hôm nay</span>
+                    <span>Xe đang sửa</span>
+                    <span>Đơn đã nhận</span>
+                    <span>Trạng thái</span>
+                  </div>
+                  {displayTechnicians.length === 0 ? (
+                    <p className="empty-message">Chưa có nhân viên làm việc ngày này. Hãy xếp lịch tuần trước.</p>
+                  ) : displayTechnicians.map((technician) => {
+                    const selectable = technician.on_duty || technician.available || technician.selectable;
+                    const busy = technician.workload_status === "busy";
+                    return (
+                      <button
+                        type="button"
+                        key={technician._id}
+                        className={`workload-assign-row ${selectedTechnician?._id === technician._id ? "selected" : ""} ${!selectable ? "disabled" : ""}`}
+                        onClick={() => selectTechnician(technician)}
+                        disabled={loading || checking || !selectable}
+                      >
+                        <span className="tech-info">
+                          <h4>{technician.full_name}</h4>
+                          <p>{technician.specialization || technician.email || "Kỹ thuật viên"}</p>
+                        </span>
+                        <span>{technician.presence || (selectable ? "Có lịch" : "Nghỉ")}</span>
+                        <span>{technician.in_progress_count || 0}</span>
+                        <span>{technician.orders_received_count ?? technician.appointment_count_today ?? 0}</span>
+                        <span className={`workload-dot ${busy ? "busy" : selectable ? "ok" : "off"}`}>
+                          {busy ? "🔴 Quá tải" : selectable ? "🟢 Ổn" : "Nghỉ"}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
+                {selectedTechnician?.warnings?.length > 0 && (
+                  <div className="assignment-warning">
+                    <AlertCircle size={16} />
+                    <span>{selectedTechnician.warnings.join(" · ")}</span>
+                  </div>
+                )}
                 {selectedTechnician && techAvailability && (
-                  <AvailabilityResult available={techAvailability.available} label="Kỹ thuật viên" />
+                  <AvailabilityResult
+                    available={techAvailability.available || selectedTechnician.on_duty}
+                    label="Nhân viên"
+                  />
                 )}
               </div>
 
@@ -320,7 +353,7 @@ function AvailabilityResult({ available, label }) {
   return (
     <div className={`availability-check ${available ? "available" : "conflict"}`}>
       {available ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-      <span>{label} {available ? "khả dụng" : "không khả dụng"}</span>
+      <span>{label} {available ? "có thể nhận việc" : "không khả dụng"}</span>
     </div>
   );
 }

@@ -70,7 +70,7 @@ const checkIn = async (req, res) => {
       staff_id: req.user.userId,
       work_date: workDate,
       check_in_time: new Date(),
-      status: 'CHECKED_IN'
+      status: 'IN_SHIFT'
     });
 
     await UserAudit.create({
@@ -108,11 +108,11 @@ const checkOut = async (req, res) => {
       return errorResponse(res, 400, 'You have not checked in today');
     }
 
-    if (attendance.status === 'CHECKED_OUT' || attendance.check_out_time) {
+    if (attendance.status === 'COMPLETED' || attendance.check_out_time) {
       return errorResponse(res, 409, 'You have already checked out today');
     }
 
-    if (attendance.status !== 'CHECKED_IN') {
+    if (attendance.status !== 'IN_SHIFT') {
       return errorResponse(res, 409, 'Attendance record is not ready for check-out');
     }
 
@@ -196,8 +196,8 @@ const getAttendanceSummary = async (req, res) => {
     });
 
     const totalHours = records.reduce((sum, record) => sum + (record.total_hours || 0), 0);
-    const checkedOutRecords = records.filter((record) => record.status === 'CHECKED_OUT').length;
-    const activeRecord = records.find((record) => record.status === 'CHECKED_IN') || null;
+    const checkedOutRecords = records.filter((record) => record.status === 'COMPLETED').length;
+    const activeRecord = records.find((record) => record.status === 'IN_SHIFT') || null;
 
     return successResponse(res, 200, 'Attendance summary retrieved successfully', {
       overview: {

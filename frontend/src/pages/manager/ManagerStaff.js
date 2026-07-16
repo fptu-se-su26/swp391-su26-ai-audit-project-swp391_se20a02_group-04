@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   CalendarDays,
-  CheckCircle2,
   Clock,
   Edit3,
   Plus,
@@ -17,6 +16,27 @@ import "../../styles/manager/ManagerStaff.css";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthNow = () => new Date().toISOString().slice(0, 7);
+
+function getMonday(dateStr = today()) {
+  const date = new Date(`${dateStr}T12:00:00`);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  return date.toISOString().slice(0, 10);
+}
+
+function shiftWeek(weekStart, deltaWeeks) {
+  const date = new Date(`${weekStart}T12:00:00`);
+  date.setDate(date.getDate() + deltaWeeks * 7);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatWeekRange(weekStart, weekEnd) {
+  const start = new Date(`${weekStart}T12:00:00`);
+  const end = new Date(`${(weekEnd || weekStart)}T12:00:00`);
+  const fmt = (d) => d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+  return `${fmt(start)} – ${fmt(end)}`;
+}
 
 const shiftLabels = {
   MORNING: "Ca sáng",
@@ -74,8 +94,10 @@ function getScheduleText(schedule) {
 }
 
 const ManagerStaff = () => {
-  const [activeTab, setActiveTab] = useState("staff");
+  const [activeTab, setActiveTab] = useState("week");
   const [staffData, setStaffData] = useState({ items: [], pagination: {} });
+  const [weekMatrix, setWeekMatrix] = useState(null);
+  const [weekStart, setWeekStart] = useState(getMonday());
   const [schedules, setSchedules] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [performance, setPerformance] = useState([]);
@@ -92,15 +114,22 @@ const ManagerStaff = () => {
 
   const staff = staffData.items || [];
   const activeStaff = useMemo(() => staff.filter((item) => item.is_active), [staff]);
-  const scheduledCount = useMemo(() => staff.filter((item) => {
-    const schedule = item.today_schedule;
-    return Array.isArray(schedule) ? schedule.length > 0 : Boolean(schedule);
-  }).length, [staff]);
-  const inShiftCount = useMemo(() => staff.filter((item) => item.attendance_status === "IN_SHIFT").length, [staff]);
+  const onDutyToday = useMemo(() => staff.filter((item) => item.on_duty).length, [staff]);
+  const presentCount = useMemo(() => staff.filter((item) => item.presence === "Có mặt").length, [staff]);
+  const busyCount = useMemo(() => staff.filter((item) => item.workload_status === "busy").length, [staff]);
+  const todayOrders = useMemo(
+    () => staff.reduce((sum, item) => sum + Number(item.orders_received_count || item.today_appointment_count || 0), 0),
+    [staff]
+  );
 
   const loadStaff = async () => {
     const data = await managerStaffApi.getStaff({ search, is_active: true, limit: 100 });
     setStaffData(data);
+  };
+
+  const loadWeekMatrix = async () => {
+    const data = await managerStaffApi.getWeeklyMatrix({ week_start: weekStart });
+    setWeekMatrix(data);
   };
 
   const loadSchedules = async () => {
@@ -123,6 +152,7 @@ const ManagerStaff = () => {
     setError("");
     try {
       await loadStaff();
+      if (activeTab === "week") await loadWeekMatrix();
       if (activeTab === "schedule") await loadSchedules();
       if (activeTab === "attendance") await loadAttendance();
       if (activeTab === "reports") await loadPerformance();
@@ -135,7 +165,7 @@ const ManagerStaff = () => {
 
   useEffect(() => {
     refresh();
-  }, [activeTab, date]);
+  }, [activeTab, date, weekStart]);
 
   const handleSearch = async (event) => {
     event.preventDefault();
@@ -185,9 +215,10 @@ const ManagerStaff = () => {
       }
       setScheduleDialog(null);
       await loadStaff();
+      await loadWeekMatrix();
       await loadSchedules();
     } catch (err) {
-      setError(err.message || "Không thể lưu ca làm việc");
+      setError(err.message || "Không thể lưu lịch làm việc");
     } finally {
       setLoading(false);
     }
@@ -213,9 +244,10 @@ const ManagerStaff = () => {
         note: bulkDialog.note,
       }));
       const result = await managerStaffApi.bulkCreateSchedules(schedulesPayload);
-      setNotice(`Đã tạo ${result.created?.length || 0} ca, bỏ qua ${result.skipped?.length || 0} ca`);
+      setNotice(`Đã tạo ${result.created?.length || 0} lịch, bỏ qua ${result.skipped?.length || 0}`);
       setBulkDialog(null);
       await loadStaff();
+      await loadWeekMatrix();
       await loadSchedules();
     } catch (err) {
       setError(err.message || "Không thể tạo lịch hàng loạt");
@@ -229,11 +261,12 @@ const ManagerStaff = () => {
     setError("");
     try {
       await managerStaffApi.cancelSchedule(scheduleId);
-      setNotice("Đã hủy ca làm việc");
+      setNotice("Đã hủy lịch làm việc");
       await loadStaff();
+      await loadWeekMatrix();
       await loadSchedules();
     } catch (err) {
-      setError(err.message || "Không thể hủy ca làm việc");
+      setError(err.message || "Không thể hủy lịch làm việc");
     } finally {
       setLoading(false);
     }
@@ -290,9 +323,9 @@ const ManagerStaff = () => {
     <div className="manager-staff-page">
       <div className="manager-staff-header">
         <div>
-          <p className="manager-staff-kicker">STAFF MANAGEMENT</p>
-          <h2>Quản lý nhân sự & ca làm việc</h2>
-          <p>Theo dõi staff, lịch làm việc, attendance và hiệu suất vận hành garage.</p>
+          <p className="manager-staff-kicker">NHÂN SỰ</p>
+          <h2>Quản lý nhân sự & phân công công việc</h2>
+          <p>Xem ai đi làm trong tuần, ai đang tải việc nhiều, rồi giao đơn cho đúng người.</p>
         </div>
         <div className="manager-staff-header-actions">
           <button className="staff-action-btn outline" onClick={refresh} disabled={loading}>
@@ -301,40 +334,52 @@ const ManagerStaff = () => {
           </button>
           <button className="staff-action-btn outline" onClick={() => setBulkDialog({ ...emptyScheduleForm, staff_ids: [] })}>
             <Users size={16} />
-            Tạo hàng loạt
+            Xếp lịch tuần
           </button>
           <button className="staff-action-btn primary" onClick={() => openScheduleDialog()}>
             <Plus size={16} />
-            Tạo ca
+            Thêm ngày làm
           </button>
         </div>
       </div>
 
       <div className="staff-metrics-grid">
-        <MetricCard icon={<Users />} label="Staff active" value={activeStaff.length} />
-        <MetricCard icon={<CalendarDays />} label="Có ca hôm nay" value={scheduledCount} />
-        <MetricCard icon={<Clock />} label="Đang check-in" value={inShiftCount} />
-        <MetricCard icon={<BarChart3 />} label="Lịch hẹn hôm nay" value={staff.reduce((sum, item) => sum + Number(item.today_appointment_count || 0), 0)} />
+        <MetricCard icon={<Users />} label="Nhân viên active" value={activeStaff.length} />
+        <MetricCard icon={<CalendarDays />} label="Đi làm hôm nay" value={onDutyToday} />
+        <MetricCard icon={<Clock />} label="Đang có mặt" value={presentCount} />
+        <MetricCard icon={<BarChart3 />} label="Đơn / đang quá tải" value={`${todayOrders} / ${busyCount}`} />
       </div>
 
       <div className="staff-toolbar">
         <div className="staff-tabs">
-          <button className={activeTab === "staff" ? "active" : ""} onClick={() => setActiveTab("staff")}>Staff list</button>
-          <button className={activeTab === "schedule" ? "active" : ""} onClick={() => setActiveTab("schedule")}>Lịch làm việc</button>
+          <button className={activeTab === "week" ? "active" : ""} onClick={() => setActiveTab("week")}>Lịch tuần</button>
+          <button className={activeTab === "workload" ? "active" : ""} onClick={() => setActiveTab("workload")}>Phân công hôm nay</button>
+          <button className={activeTab === "schedule" ? "active" : ""} onClick={() => setActiveTab("schedule")}>Chi tiết ngày</button>
           <button className={activeTab === "attendance" ? "active" : ""} onClick={() => setActiveTab("attendance")}>Attendance</button>
           <button className={activeTab === "reports" ? "active" : ""} onClick={() => setActiveTab("reports")}>Báo cáo</button>
         </div>
         <form className="staff-search" onSubmit={handleSearch}>
           <Search size={16} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm staff..." />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm nhân viên..." />
         </form>
       </div>
 
       {error && <div className="staff-alert error">{error}</div>}
       {notice && <div className="staff-alert success">{notice}</div>}
 
-      {activeTab === "staff" && (
-        <StaffList staff={staff} selectedStaff={selectedStaff} setSelectedStaff={setSelectedStaff} />
+      {activeTab === "week" && (
+        <WeeklyMatrixPanel
+          matrix={weekMatrix}
+          weekStart={weekStart}
+          onPrev={() => setWeekStart((prev) => shiftWeek(prev, -1))}
+          onNext={() => setWeekStart((prev) => shiftWeek(prev, 1))}
+          onToday={() => setWeekStart(getMonday())}
+          loading={loading}
+        />
+      )}
+
+      {activeTab === "workload" && (
+        <WorkloadBoard staff={staff} selectedStaff={selectedStaff} setSelectedStaff={setSelectedStaff} />
       )}
 
       {activeTab === "schedule" && (
@@ -492,25 +537,112 @@ function BulkScheduleDialog({ form, staff, loading, onClose, onChange, onToggleS
   );
 }
 
-function StaffList({ staff, selectedStaff, setSelectedStaff }) {
+function WeeklyMatrixPanel({ matrix, weekStart, onPrev, onNext, onToday, loading }) {
+  const dates = matrix?.dates || [];
+  const labels = matrix?.day_labels || ["T2", "T3", "T4", "T5", "T6", "T7"];
+  const rows = matrix?.rows || [];
+  const perDay = matrix?.technicians_per_day || [];
+
+  return (
+    <section className="staff-card">
+      <div className="staff-card-header week-header">
+        <div>
+          <h3>Lịch làm việc tuần</h3>
+          <span>Thứ 2 → Thứ 7 · Ai đi làm, ai nghỉ, bao nhiêu kỹ thuật viên mỗi ngày.</span>
+        </div>
+        <div className="week-nav">
+          <button type="button" className="staff-mini-btn" onClick={onPrev}>←</button>
+          <strong>{formatWeekRange(matrix?.week_start || weekStart, matrix?.week_end)}</strong>
+          <button type="button" className="staff-mini-btn" onClick={onNext}>→</button>
+          <button type="button" className="staff-mini-btn" onClick={onToday}>Tuần này</button>
+        </div>
+      </div>
+
+      {loading && !rows.length ? (
+        <EmptyState icon={<CalendarDays />} title="Đang tải lịch tuần..." text="" />
+      ) : (
+        <>
+          <div className="week-day-summary">
+            {perDay.map((day) => (
+              <div key={day.date} className="week-day-chip">
+                <span>{day.label}</span>
+                <strong>{day.working_count} KTV</strong>
+              </div>
+            ))}
+          </div>
+          <div className="week-matrix-wrap">
+            <table className="week-matrix-table">
+              <thead>
+                <tr>
+                  <th>Nhân viên</th>
+                  {dates.map((date, index) => (
+                    <th key={date}>
+                      <span>{labels[index]}</span>
+                      <small>{date.slice(8, 10)}/{date.slice(5, 7)}</small>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length ? rows.map((row) => (
+                  <tr key={row.staff_id}>
+                    <td>
+                      <strong>{row.full_name}</strong>
+                      <small>{row.specialization || row.email}</small>
+                    </td>
+                    {dates.map((date) => {
+                      const cell = row.days?.[date];
+                      const working = cell?.working;
+                      return (
+                        <td key={`${row.staff_id}-${date}`} className={working ? "working" : "off"}>
+                          {working ? "✓" : "Nghỉ"}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={7}>
+                      <EmptyState
+                        icon={<CalendarDays />}
+                        title="Chưa có lịch tuần"
+                        text="Dùng “Thêm ngày làm” hoặc “Xếp lịch tuần” để đánh dấu nhân viên đi làm."
+                      />
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function WorkloadBoard({ staff, selectedStaff, setSelectedStaff }) {
+  const workingStaff = staff.filter((item) => item.on_duty);
+  const rows = workingStaff.length ? workingStaff : staff;
+
   return (
     <div className="staff-content-grid">
       <section className="staff-card">
         <div className="staff-card-header">
-          <h3>Danh sách staff</h3>
-          <span>{staff.length} nhân sự</span>
+          <h3>Nhân viên & tải việc hôm nay</h3>
+          <span>{workingStaff.length ? `${workingStaff.length} đang làm` : `${staff.length} nhân sự`} — chọn người rảnh hơn để giao đơn</span>
         </div>
-        <div className="staff-table">
+        <div className="staff-table workload-table">
           <div className="staff-table-row head">
-            <span>Staff</span>
-            <span>Ca hôm nay</span>
-            <span>Attendance</span>
-            <span>Lịch hẹn</span>
+            <span>Nhân viên</span>
+            <span>Hôm nay</span>
+            <span>Xe đang sửa</span>
+            <span>Đơn đã nhận</span>
             <span>Trạng thái</span>
           </div>
-          {staff.map((item) => (
+          {rows.map((item) => (
             <button
               key={item.id}
+              type="button"
               className={`staff-table-row ${selectedStaff?.id === item.id ? "selected" : ""}`}
               onClick={() => setSelectedStaff(item)}
             >
@@ -521,12 +653,19 @@ function StaffList({ staff, selectedStaff, setSelectedStaff }) {
                   <small>{item.specialization || item.email}</small>
                 </span>
               </span>
-              <span>{getScheduleText(item.today_schedule)}</span>
-              <span><Badge tone={item.attendance_status === "IN_SHIFT" ? "green" : "gray"}>{statusLabels[item.attendance_status] || "Chưa check-in"}</Badge></span>
-              <span>{item.today_appointment_count || 0}</span>
-              <span><Badge tone={item.is_active ? "green" : "red"}>{item.is_active ? "Active" : "Inactive"}</Badge></span>
+              <span>{item.presence || (item.on_duty ? "Có lịch" : "Nghỉ")}</span>
+              <span>{item.in_progress_count || 0}</span>
+              <span>{item.orders_received_count ?? item.today_appointment_count ?? 0}</span>
+              <span>
+                <Badge tone={item.workload_status === "busy" ? "red" : item.on_duty ? "green" : "gray"}>
+                  {item.workload_status === "busy" ? "Quá tải" : item.on_duty ? "Ổn" : "Nghỉ"}
+                </Badge>
+              </span>
             </button>
           ))}
+          {!rows.length && (
+            <EmptyState icon={<Users />} title="Chưa có nhân viên" text="Thêm lịch làm trong tuần để bắt đầu phân công." />
+          )}
         </div>
       </section>
 
@@ -535,24 +674,30 @@ function StaffList({ staff, selectedStaff, setSelectedStaff }) {
           <>
             <div className="staff-detail-avatar"><UserRound size={28} /></div>
             <h3>{selectedStaff.full_name}</h3>
-            <p>{selectedStaff.specialization || "Chưa cập nhật chuyên môn"}</p>
+            <p>{selectedStaff.specialization || "Kỹ thuật viên"}</p>
             <div className="staff-detail-lines">
+              <span><strong>Hôm nay</strong>{selectedStaff.presence || "--"}</span>
+              <span><strong>Xe đang sửa</strong>{selectedStaff.in_progress_count || 0}</span>
+              <span><strong>Đơn đã nhận</strong>{selectedStaff.orders_received_count ?? selectedStaff.today_appointment_count ?? 0}</span>
+              <span><strong>Tải việc</strong>{selectedStaff.workload_status === "busy" ? "Quá tải" : "Ổn"}</span>
               <span><strong>Email</strong>{selectedStaff.email || "--"}</span>
-              <span><strong>Số điện thoại</strong>{selectedStaff.phone || "--"}</span>
-              <span><strong>Ca hôm nay</strong>{getScheduleText(selectedStaff.today_schedule)}</span>
-              <span><strong>Lịch hôm nay</strong>{selectedStaff.today_appointment_count || 0}</span>
+              <span><strong>Điện thoại</strong>{selectedStaff.phone || "--"}</span>
             </div>
           </>
         ) : (
           <div className="staff-empty-state">
             <Users size={42} />
-            <strong>Chọn một staff</strong>
-            <span>Xem nhanh thông tin liên hệ, ca làm và workload hôm nay.</span>
+            <strong>Chọn một nhân viên</strong>
+            <span>Xem tải việc hiện tại trước khi giao đơn từ trang Lịch hẹn.</span>
           </div>
         )}
       </aside>
     </div>
   );
+}
+
+function StaffList({ staff, selectedStaff, setSelectedStaff }) {
+  return <WorkloadBoard staff={staff} selectedStaff={selectedStaff} setSelectedStaff={setSelectedStaff} />;
 }
 
 function SchedulePanel({ date, setDate, schedules, onEdit, onCancel }) {
