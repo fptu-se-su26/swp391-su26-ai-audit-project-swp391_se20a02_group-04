@@ -9,7 +9,8 @@
 .manager-layout {
     display: flex;
     height: 100vh;
-    background-color: #FAF9F6; /* Màu nền kem nhã nhặn sang trọng */
+    background-color: #FAF9F6;
+    /* Màu nền kem nhã nhặn sang trọng */
     color: #334155;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     overflow: hidden;
@@ -18,8 +19,10 @@
 /* PREMIUM WHITE SIDEBAR FOR MANAGER MATCHING ADMIN STYLE */
 .manager-sidebar {
     width: 260px;
-    background-color: #ffffff; /* White background matching Admin */
-    border-right: 1px solid #e2e8f0; /* Light gray right border */
+    background-color: #ffffff;
+    /* White background matching Admin */
+    border-right: 1px solid #e2e8f0;
+    /* Light gray right border */
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -33,7 +36,8 @@
 }
 
 .manager-sidebar .sidebar-brand h1 {
-    color: #111827; /* Dark title matching Admin */
+    color: #111827;
+    /* Dark title matching Admin */
     font-size: 1.35rem;
     font-weight: 800;
     letter-spacing: 0.06em;
@@ -44,7 +48,8 @@
 }
 
 .manager-sidebar .sidebar-brand p {
-    color: #ff6b00; /* Brand orange */
+    color: #ff6b00;
+    /* Brand orange */
     font-size: 0.75rem;
     font-weight: 700;
     margin-top: 4px;
@@ -57,40 +62,49 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    padding: 0; /* Remove horizontal padding so active left border touches the left edge */
+    padding: 0;
+    /* Remove horizontal padding so active left border touches the left edge */
 }
 
 .manager-sidebar .nav-item {
     display: flex;
     align-items: center;
     padding: 12px 24px;
-    color: #4b5563; /* Dark gray text matching Admin */
+    color: #4b5563;
+    /* Dark gray text matching Admin */
     text-decoration: none;
     font-weight: 600;
     transition: all 0.2s ease;
-    border-left: 4px solid transparent; /* Left border placeholder */
+    border-left: 4px solid transparent;
+    /* Left border placeholder */
 }
 
 .manager-sidebar .nav-item:hover {
-    background-color: #f9fafb; /* Light hover background */
+    background-color: #f9fafb;
+    /* Light hover background */
     color: #111827;
 }
 
 .manager-sidebar .nav-item.active {
-    background-color: #fff7ed; /* Light cream background */
-    border-left: 4px solid #ff6b00; /* Orange left border */
-    color: #ff6b00; /* Orange text */
+    background-color: #fff7ed;
+    /* Light cream background */
+    border-left: 4px solid #ff6b00;
+    /* Orange left border */
+    color: #ff6b00;
+    /* Orange text */
 }
 
 .manager-sidebar .nav-icon {
     width: 20px;
     height: 20px;
     margin-right: 12px;
-    color: #6b7280; /* Gray icon */
+    color: #6b7280;
+    /* Gray icon */
 }
 
 .manager-sidebar .nav-item.active .nav-icon {
-    color: #ff6b00; /* Orange active icon */
+    color: #ff6b00;
+    /* Orange active icon */
 }
 
 .manager-sidebar .sidebar-footer {
@@ -154,7 +168,8 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    margin-left: 0 !important; /* Force reset global margin-left leaks from other views */
+    margin-left: 0 !important;
+    /* Force reset global margin-left leaks from other views */
 }
 
 /* HEADER */
@@ -323,10 +338,13 @@
 /* CUSTOM TOAST NOTIFICATIONS */
 .manager-layout .custom-toast {
     position: fixed;
-    top: 32px !important; /* Positioned nicely near the top right of the viewport */
-    bottom: auto !important; /* Overrule bottom placement */
+    top: 32px !important;
+    /* Positioned nicely near the top right of the viewport */
+    bottom: auto !important;
+    /* Overrule bottom placement */
     right: 32px;
-    height: auto !important; /* Overrule stretched height conflicts */
+    height: auto !important;
+    /* Overrule stretched height conflicts */
     width: auto !important;
     min-width: 320px;
     max-width: 450px;
@@ -347,10 +365,14 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    background: transparent !important; /* Reset leakages from StaffProfile.css */
-    border: none !important; /* Reset border leaks */
-    box-shadow: none !important; /* Reset shadow leaks */
-    backdrop-filter: none !important; /* Reset glassmorphism backdrop leaks */
+    background: transparent !important;
+    /* Reset leakages from StaffProfile.css */
+    border: none !important;
+    /* Reset border leaks */
+    box-shadow: none !important;
+    /* Reset shadow leaks */
+    backdrop-filter: none !important;
+    /* Reset glassmorphism backdrop leaks */
     -webkit-backdrop-filter: none !important;
     padding: 0 !important;
 }
@@ -390,7 +412,8 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(15, 23, 42, 0.3); /* Glass shade backdrop */
+    background-color: rgba(15, 23, 42, 0.3);
+    /* Glass shade backdrop */
     backdrop-filter: blur(4px);
     z-index: 1100;
     display: flex;
@@ -601,13 +624,25 @@
 
 /* ANIMATIONS */
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes slideUp {
-    from { transform: translateY(30px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 @keyframes slideIn {
@@ -615,6 +650,7 @@
         transform: translateY(100%) scale(0.9);
         opacity: 0;
     }
+
     to {
         transform: translateY(0) scale(1);
         opacity: 1;
@@ -626,6 +662,7 @@
         transform: translateX(120%) scale(0.95);
         opacity: 0;
     }
+
     to {
         transform: translateX(0) scale(1);
         opacity: 1;
@@ -659,4 +696,192 @@
     .manager-sidebar .sidebar-footer {
         display: none;
     }
+}
+
+/* FLOATING NOTIFICATION BELL BUTTON WIDGET */
+.manager-layout .floating-notif-wrapper {
+    position: fixed;
+    top: 24px;
+    right: 32px;
+    z-index: 1050;
+    display: inline-block;
+}
+
+.manager-layout .floating-notif-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    color: #dc2626;
+    border: 2px solid #fecaca;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(220, 38, 38, 0.12);
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+}
+
+.manager-layout .floating-notif-btn:hover {
+    transform: scale(1.08);
+    background-color: #fef2f2;
+    border-color: #f87171;
+    color: #b91c1c;
+    box-shadow: 0 6px 24px rgba(220, 38, 38, 0.22);
+}
+
+.manager-layout .floating-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background-color: #dc2626;
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 999px;
+    border: 2px solid #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(220, 38, 38, 0.2);
+}
+
+.manager-layout .floating-notif-dropdown {
+    position: absolute;
+    top: 54px; /* Opens below the top floating button */
+    right: 0;
+    width: 380px;
+    background-color: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: slideDownFloating 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideDownFloating {
+    from {
+        transform: translateY(-10px) scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+.manager-layout .dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.manager-layout .dropdown-header h3 {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+}
+
+.manager-layout .mark-all-btn {
+    background: none;
+    border: none;
+    color: #dc2626;
+    font-size: 0.75rem;
+    font-weight: 750;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.manager-layout .mark-all-btn:hover {
+    color: #b91c1c;
+}
+
+.manager-layout .dropdown-divider {
+    height: 1px;
+    background-color: #f1f5f9;
+}
+
+.manager-layout .notifications-list {
+    max-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px;
+}
+
+.manager-layout .no-notifications {
+    text-align: center;
+    color: #64748b;
+    font-size: 0.85rem;
+    padding: 24px 0;
+}
+
+.manager-layout .notification-item-card {
+    padding: 12px;
+    border-radius: 10px;
+    background-color: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+}
+
+.manager-layout .notification-item-card:hover {
+    background-color: #f8fafc;
+}
+
+.manager-layout .notification-item-card.unread {
+    background-color: #fff5f5;
+    border-color: #fee2e2;
+}
+
+.manager-layout .notification-item-card.unread:hover {
+    background-color: #fef2f2;
+}
+
+.manager-layout .notif-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.manager-layout .notif-title {
+    font-size: 0.85rem;
+    font-weight: 750;
+    color: #1e293b;
+}
+
+.manager-layout .unread-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #dc2626;
+    flex-shrink: 0;
+}
+
+.manager-layout .notif-message {
+    font-size: 0.8rem;
+    color: #475569;
+    line-height: 1.45;
+    margin: 0;
+}
+
+.manager-layout .notif-time {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    margin-top: 2px;
+    font-weight: 500;
 }

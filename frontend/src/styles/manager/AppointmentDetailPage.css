@@ -485,7 +485,7 @@
 
 :where(.manager-layout, .appointment-detail-scope) .record-activity li {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
+  grid-template-columns: 130px minmax(0, 1fr);
   gap: 8px 10px;
   align-items: start;
   color: var(--appointment-foreground);
@@ -495,6 +495,7 @@
 :where(.manager-layout, .appointment-detail-scope) .record-activity time {
   color: var(--appointment-brand-red);
   font-weight: 900;
+  white-space: nowrap;
 }
 
 :where(.manager-layout, .appointment-detail-scope) .record-activity p {

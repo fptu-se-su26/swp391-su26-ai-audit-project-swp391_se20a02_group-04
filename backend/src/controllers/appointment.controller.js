@@ -1,5 +1,8 @@
 const Appointment = require('../models/Appointment.model');
 const User = require('../models/User.model');
+const Notification = require('../models/Notification.model');
+const Role = require('../models/Role.model');
+const UserRole = require('../models/UserRole.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const {
   ACTIVE_APPOINTMENT_STATUSES,
@@ -141,6 +144,55 @@ const createAppointment = async (req, res) => {
       appointment_start_at: appointmentStartAt,
       customer_note: note
     });
+
+    // Create notification for Customer
+    try {
+      await Notification.create({
+        user_id: userId,
+        appointment_id: appointment._id,
+        type: 'SYSTEM',
+        title: 'Đặt lịch thành công',
+        message: `Lịch hẹn dịch vụ ${appointment.service.name} cho xe ${appointment.vehicle.brand} ${appointment.vehicle.model} (${appointment.vehicle.license_plate}) đã được tạo thành công và đang chờ xác nhận.`,
+        metadata: {
+          appointment_code: appointment.appointment_code,
+          appointment_date: appointment.appointment_date,
+          time_slot: appointment.time_slot
+        }
+      });
+    } catch (customerNotifErr) {
+      console.error('Failed to notify customer:', customerNotifErr);
+    }
+
+    // Find and notify all Managers and Admins
+    try {
+      const targetRoles = await Role.find({ role_name: { $in: ['MANAGER', 'ADMIN'] } });
+      const roleIds = targetRoles.map(r => r._id);
+      
+      if (roleIds.length > 0) {
+        const staffUserRoles = await UserRole.find({ role_id: { $in: roleIds } }).select('user_id');
+        const staffUserIds = [...new Set(staffUserRoles.map(ur => String(ur.user_id)))];
+        
+        const staffNotifications = staffUserIds.map(staffId => ({
+          user_id: staffId,
+          appointment_id: appointment._id,
+          type: 'SYSTEM',
+          title: 'Lịch hẹn mới từ khách hàng',
+          message: `Khách hàng ${user.full_name} đã đặt lịch mới cho xe ${appointment.vehicle.brand} ${appointment.vehicle.model} (${appointment.vehicle.license_plate}) vào lúc ${appointment.time_slot} ngày ${appointment.appointment_date}.`,
+          metadata: {
+            appointment_code: appointment.appointment_code,
+            appointment_date: appointment.appointment_date,
+            time_slot: appointment.time_slot
+          }
+        }));
+        
+        if (staffNotifications.length > 0) {
+          await Notification.insertMany(staffNotifications);
+        }
+      }
+    } catch (notifError) {
+      console.error('Failed to notify managers and admins:', notifError);
+    }
+
 
     return successResponse(res, 201, 'Appointment created successfully', {
       appointment: appointment.toSafeObject()

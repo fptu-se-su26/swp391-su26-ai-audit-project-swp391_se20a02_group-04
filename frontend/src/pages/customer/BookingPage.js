@@ -3,6 +3,7 @@ import { createAppointment } from "../../services/appointmentApi";
 import "../../styles/customer/BookingPage.css";
 import { clearAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
+import { getNotifications, markAsRead as markNotificationAsRead, markAllAsRead as markAllNotificationsAsRead } from "../../services/notificationApi";
 
 const washPackages = [
   {
@@ -136,6 +137,81 @@ export default function BookingPage() {
   const [daySession, setDaySession] = useState("morning"); 
   const [timeSlot, setTimeSlot] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
+
+  // Notification States
+  const [notificationsList, setNotificationsList] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
+
+  // Fetch notifications
+  const loadNotifications = async () => {
+    try {
+      const res = await getNotifications({ limit: 15 });
+      if (res && res.success && res.data) {
+        setNotificationsList(res.data.notifications || []);
+        setUnreadCount(res.data.unreadCount || 0);
+      }
+    } catch (err) {
+      console.log("Not logged in or offline, skipping notifications load");
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllNotificationsAsRead();
+      setUnreadCount(0);
+      setNotificationsList(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (err) {
+      console.error("Failed to mark all as read:", err);
+    }
+  };
+
+  const handleNotificationClick = async (notif) => {
+    try {
+      if (!notif.is_read) {
+        await markNotificationAsRead(notif._id);
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        setNotificationsList(prev => prev.map(n => n._id === notif._id ? { ...n, is_read: true } : n));
+      }
+      setShowNotificationsMenu(false);
+    } catch (err) {
+      console.error("Failed to handle notification click:", err);
+    }
+  };
+
+  // Close customer notifications dropdown when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (showNotificationsMenu && !event.target.closest(".customer-notif-wrapper")) {
+        setShowNotificationsMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [showNotificationsMenu]);
+
+  // Load and poll notifications
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatTimeElapsed = (dateStr) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return "Vừa xong";
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    return `${diffDays} ngày trước`;
+  };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
   const [submitError, setSubmitError] = useState("");
@@ -221,7 +297,7 @@ export default function BookingPage() {
       return;
     }
 
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -287,7 +363,8 @@ export default function BookingPage() {
       setSubmitResult(appointment);
       formElement.reset();
       setAppointmentDate(getTomorrowDateValue());
-      setTimeSlot(timeSlots[1]);
+      setTimeSlot("");
+      loadNotifications(); // Reload immediately so the new notification is fetched
     } catch (error) {
       setSubmitError(error.message);
     } finally {
@@ -300,7 +377,7 @@ export default function BookingPage() {
     setShowUserMenu(false);
   };
 
-  const handleCancelAppointment = () => {};
+  const handleCancelAppointment = () => { };
 
   return (
     <div className="booking-page">
@@ -323,6 +400,94 @@ export default function BookingPage() {
           <a className="booking-contact-button" href="/home">
             Liên hệ ngay
           </a>
+
+          {/* Notification Bell Button */}
+          <div className="customer-notif-wrapper" style={{ position: "relative", display: "inline-block" }}>
+            <button 
+              className="icon-button" 
+              type="button" 
+              aria-label="Thông báo" 
+              onClick={() => setShowNotificationsMenu(!showNotificationsMenu)}
+              style={{ position: "relative" }}
+            >
+              <MaterialIcon>notifications</MaterialIcon>
+              {unreadCount > 0 && (
+                <span className="notif-badge-dot" style={{
+                  position: "absolute",
+                  top: "2px",
+                  right: "2px",
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  backgroundColor: "#ff6d1f",
+                  border: "1.5px solid #ffffff"
+                }} />
+              )}
+            </button>
+
+            {showNotificationsMenu && (
+              <div className="customer-notif-dropdown" style={{
+                position: "absolute",
+                top: "100%",
+                right: "0",
+                width: "320px",
+                backgroundColor: "#ffffff",
+                borderRadius: "12px",
+                boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+                padding: "16px",
+                zIndex: "100",
+                marginTop: "8px",
+                border: "1px solid #f1f5f9"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <h3 style={{ fontSize: "0.95rem", fontWeight: "800", color: "#0f172a", margin: 0 }}>Thông báo</h3>
+                  {unreadCount > 0 && (
+                    <button 
+                      onClick={handleMarkAllAsRead} 
+                      style={{ background: "none", border: "none", color: "#ff6d1f", fontSize: "0.75rem", fontWeight: "750", cursor: "pointer" }}
+                    >
+                      Đọc tất cả
+                    </button>
+                  )}
+                </div>
+                <div style={{ height: "1px", backgroundColor: "#f1f5f9", marginBottom: "12px" }} />
+                <div className="customer-notif-list" style={{ maxHeight: "250px", overflowY: "auto" }}>
+                  {notificationsList.length === 0 ? (
+                    <p style={{ textAlign: "center", fontSize: "0.85rem", color: "#64748b", margin: "16px 0" }}>Chưa có thông báo nào.</p>
+                  ) : (
+                    notificationsList.map((notif) => (
+                      <div 
+                        key={notif._id} 
+                        onClick={() => handleNotificationClick(notif)}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          marginBottom: "8px",
+                          cursor: "pointer",
+                          backgroundColor: notif.is_read ? "transparent" : "#fff7ed",
+                          border: notif.is_read ? "1px solid transparent" : "1px solid #ffedd5",
+                          transition: "all 0.2s ease",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px"
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = notif.is_read ? "#f8fafc" : "#fff2e2"}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = notif.is_read ? "transparent" : "#fff7ed"}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                          <span style={{ fontSize: "0.85rem", fontWeight: "750", color: "#1e293b" }}>{notif.title}</span>
+                          {!notif.is_read && <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#ff6d1f", marginTop: "4px" }} />}
+                        </div>
+                        <p style={{ fontSize: "0.8rem", color: "#475569", margin: 0, lineHeight: "1.4" }}>{notif.message}</p>
+                        <small style={{ fontSize: "0.7rem", color: "#94a3b8", marginTop: "2px" }}>{formatTimeElapsed(notif.created_at)}</small>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button className="user-menu-trigger" type="button" aria-label="Menu" onClick={() => setShowUserMenu(!showUserMenu)}>
             <MaterialIcon>menu</MaterialIcon>
           </button>
@@ -536,7 +701,7 @@ export default function BookingPage() {
                   value={appointmentDate}
                 />
               </label>
-              
+
               <label>
                 Chọn Buổi
                 <select value={daySession} onChange={(event) => setDaySession(event.target.value)}>

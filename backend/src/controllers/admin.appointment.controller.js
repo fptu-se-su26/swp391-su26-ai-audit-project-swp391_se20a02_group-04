@@ -287,13 +287,15 @@ const updateAppointmentStatus = async (req, res) => {
       .populate('acknowledged_by', 'full_name email')
       .populate('cancelled_by', 'full_name email');
 
+    const customerId = populatedAppointment.customer_id?._id || populatedAppointment.customer_id || appointment.customer_id;
+    const appointmentCode = populatedAppointment.appointment_code || populatedAppointment._id;
+
     if (transition.target === 'CONFIRMED') {
       const customer = populatedAppointment.customer_id || populatedAppointment.customer_snapshot || {};
       const service = populatedAppointment.service_id || populatedAppointment.service || {};
-      const appointmentCode = populatedAppointment.appointment_code || populatedAppointment._id;
 
       await Notification.create({
-        user_id: populatedAppointment.customer_id?._id || populatedAppointment.customer_id || appointment.customer_id,
+        user_id: customerId,
         appointment_id: populatedAppointment._id,
         type: 'APPOINTMENT_CONFIRMED',
         title: 'Lịch hẹn đã được xác nhận',
@@ -313,6 +315,42 @@ const updateAppointmentStatus = async (req, res) => {
         vehicle: populatedAppointment.vehicle || populatedAppointment.vehicle_info
       }).catch((emailError) => {
         console.error('Failed to send appointment confirmation email:', emailError);
+      });
+    } else if (transition.target === 'IN_PROGRESS') {
+      await Notification.create({
+        user_id: customerId,
+        appointment_id: populatedAppointment._id,
+        type: 'APPOINTMENT_UPDATED',
+        title: 'Xe của bạn đang được sửa chữa',
+        message: `Lịch hẹn ${appointmentCode} của bạn đã bắt đầu được xử lý. Kỹ thuật viên đang tiến hành sửa chữa/bảo dưỡng.`,
+        metadata: {
+          appointment_code: appointmentCode,
+          status: 'IN_PROGRESS'
+        }
+      });
+    } else if (transition.target === 'COMPLETED') {
+      await Notification.create({
+        user_id: customerId,
+        appointment_id: populatedAppointment._id,
+        type: 'APPOINTMENT_UPDATED',
+        title: 'Dịch vụ hoàn thành',
+        message: `Xe của bạn cho lịch hẹn ${appointmentCode} đã hoàn tất sửa chữa/bảo dưỡng. Bạn có thể đến garage nhận xe và thanh toán.`,
+        metadata: {
+          appointment_code: appointmentCode,
+          status: 'COMPLETED'
+        }
+      });
+    } else if (transition.target === 'CANCELLED') {
+      await Notification.create({
+        user_id: customerId,
+        appointment_id: populatedAppointment._id,
+        type: 'APPOINTMENT_UPDATED',
+        title: 'Lịch hẹn đã bị hủy',
+        message: `Lịch hẹn ${appointmentCode} đã bị hủy. Lý do: ${populatedAppointment.cancellation_reason || 'Hủy từ phía quản trị viên'}.`,
+        metadata: {
+          appointment_code: appointmentCode,
+          status: 'CANCELLED'
+        }
       });
     }
 
@@ -366,6 +404,24 @@ const cancelAppointment = async (req, res) => {
     appointment.cancelled_at = new Date();
 
     await appointment.save();
+
+    // Create notification for Customer
+    try {
+      const appointmentCode = appointment.appointment_code || appointment._id;
+      await Notification.create({
+        user_id: appointment.customer_id,
+        appointment_id: appointment._id,
+        type: 'APPOINTMENT_UPDATED',
+        title: 'Lịch hẹn đã bị hủy',
+        message: `Lịch hẹn ${appointmentCode} đã bị hủy. Lý do: ${appointment.cancellation_reason}.`,
+        metadata: {
+          appointment_code: appointmentCode,
+          status: 'CANCELLED'
+        }
+      });
+    } catch (notifErr) {
+      console.error('Failed to create cancellation notification:', notifErr);
+    }
 
     // Log audit
     await UserAudit.create({
@@ -528,6 +584,24 @@ const startAppointmentHandler = async (req, res) => {
     const { id } = req.params;
     const appointment = await startAppointment(id, req.user.userId);
 
+    try {
+      const appointmentCode = appointment.appointment_code || appointment._id;
+      const customerId = getDocumentId(appointment.customer_id);
+      await Notification.create({
+        user_id: customerId,
+        appointment_id: appointment._id,
+        type: 'APPOINTMENT_UPDATED',
+        title: 'Xe của bạn đang được sửa chữa',
+        message: `Lịch hẹn ${appointmentCode} của bạn đã bắt đầu được xử lý. Kỹ thuật viên đang tiến hành sửa chữa/bảo dưỡng.`,
+        metadata: {
+          appointment_code: appointmentCode,
+          status: 'IN_PROGRESS'
+        }
+      });
+    } catch (notifErr) {
+      console.error('Failed to create start work notification:', notifErr);
+    }
+
     await UserAudit.create({
       user_id: getDocumentId(appointment.customer_id),
       action: 'APPOINTMENT_STARTED',
@@ -561,6 +635,24 @@ const completeAppointmentHandler = async (req, res) => {
       finalCost: final_cost,
       completionNotes: completion_notes
     });
+
+    try {
+      const appointmentCode = appointment.appointment_code || appointment._id;
+      const customerId = getDocumentId(appointment.customer_id);
+      await Notification.create({
+        user_id: customerId,
+        appointment_id: appointment._id,
+        type: 'APPOINTMENT_UPDATED',
+        title: 'Dịch vụ hoàn thành',
+        message: `Xe của bạn cho lịch hẹn ${appointmentCode} đã hoàn tất sửa chữa/bảo dưỡng. Bạn có thể đến garage nhận xe và thanh toán.`,
+        metadata: {
+          appointment_code: appointmentCode,
+          status: 'COMPLETED'
+        }
+      });
+    } catch (notifErr) {
+      console.error('Failed to create completion notification:', notifErr);
+    }
 
     await UserAudit.create({
       user_id: getDocumentId(appointment.customer_id),
