@@ -21,16 +21,56 @@ export const INVENTORY_STATUS = {
   },
 };
 
-// File: inventoryStatus.js
-// File: inventoryStatus.js
-// File: inventoryStatus.js
+// Danh mục vật tư của cửa hàng sửa xe máy: [mã, nhãn ngắn, ví dụ].
+// Nhãn ngắn hiển thị ở bảng/badge; ví dụ hiển thị trong dropdown khi tạo sản phẩm.
 export const INVENTORY_CATEGORIES = [
-  ["", "tất cả"],
-  ["SPARE_PARTS", "spare parts"],
-  ["TOOLS", "tools"],
-  ["CONSUMABLES", "consumables"],
-  ["ACCESSORIES", "accessories"],
-  ["OTHER", "other"],
+  ["ENGINE_PARTS", "Phụ tùng động cơ", "piston, xupap, bộ nồi, bạc đạn"],
+  ["BRAKE_SYSTEM", "Hệ thống phanh", "má phanh, đĩa phanh, dầu thắng"],
+  ["TIRES_TUBES", "Lốp & săm", "lốp Michelin, IRC, Dunlop, ruột xe"],
+  ["LUBRICANTS", "Dầu nhớt", "nhớt Honda, Motul, Castrol, nước làm mát"],
+  ["FILTERS", "Lọc", "lọc gió, lọc nhớt, lọc xăng"],
+  ["ELECTRICAL", "Điện & ắc quy", "bugi, ắc quy, IC, còi, dây điện"],
+  ["LIGHTS_MIRRORS", "Đèn & gương", "đèn pha, xi nhan, gương chiếu hậu"],
+  ["TRANSMISSION", "Truyền động", "nhông sên dĩa, dây curoa, láp"],
+  ["SUSPENSION", "Giảm xóc & càng", "phuộc trước/sau, bạc đạn cổ"],
+  ["BODY_PARTS", "Dàn áo & vỏ nhựa", "ốp sườn, mặt nạ, chắn bùn, yên xe"],
+  ["ACCESSORIES", "Phụ kiện", "baga, kính chắn gió, giá đỡ điện thoại"],
+  ["CONSUMABLES", "Vật tư tiêu hao", "ốc vít, keo, dây rút, giẻ lau"],
+  ["TOOLS_EQUIPMENT", "Dụng cụ & thiết bị", "máy nén khí, kích nâng, đồ nghề"],
+  ["SPARE_PARTS", "Phụ tùng khác", ""],
+  ["TOOLS", "Dụng cụ khác", ""],
+  ["OTHER", "Khác", ""],
+];
+
+export const INVENTORY_QUALITIES = [
+  ["OEM", "Chính hãng (OEM)"],
+  ["PREMIUM", "Cao cấp"],
+  ["STANDARD", "Tiêu chuẩn"],
+  ["BUDGET", "Giá rẻ"],
+];
+
+export const VEHICLE_MODELS = [
+  "Honda Vision",
+  "Honda Wave Alpha",
+  "Honda Wave RSX",
+  "Honda Air Blade",
+  "Honda Lead",
+  "Honda SH",
+  "Honda SH Mode",
+  "Honda Winner X",
+  "Honda Future",
+  "Honda Blade",
+  "Yamaha Sirius",
+  "Yamaha Jupiter",
+  "Yamaha Exciter",
+  "Yamaha Grande",
+  "Yamaha Janus",
+  "Yamaha NVX",
+  "Suzuki Raider",
+  "Piaggio Vespa",
+  "Piaggio Liberty",
+  "SYM Attila",
+  "Dùng chung mọi xe",
 ];
 
 export const TRANSACTION_TYPES = [
@@ -42,6 +82,14 @@ export const TRANSACTION_TYPES = [
   ["DAMAGE", "Hỏng hóc"],
   ["TRANSFER", "Chuyển kho"],
 ];
+
+export function getCategoryLabel(category) {
+  return INVENTORY_CATEGORIES.find(([value]) => value === category)?.[1] || category || "Khác";
+}
+
+export function getQualityLabel(quality) {
+  return INVENTORY_QUALITIES.find(([value]) => value === quality)?.[1] || quality || "--";
+}
 
 export function getInventoryStatusMeta(status) {
   return INVENTORY_STATUS[status] || {

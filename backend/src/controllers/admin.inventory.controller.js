@@ -3,6 +3,44 @@ const InventoryTransaction = require('../models/InventoryTransaction.model');
 const UserAudit = require('../models/UserAudit.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 
+const SORTABLE_FIELDS = ['item_name', 'product_name', 'item_code', 'quantity', 'unit_price', 'cost_price', 'created_at', 'updated_at'];
+
+// Dịch stock_status (vốn là virtual) thành điều kiện $expr để lọc ngay tại DB,
+// giữ pagination/total chính xác thay vì lọc sau khi phân trang.
+function buildStockStatusExpr(status) {
+  switch (status) {
+    case 'OUT_OF_STOCK':
+      return { $eq: ['$quantity', 0] };
+    case 'LOW_STOCK':
+      return { $and: [{ $gt: ['$quantity', 0] }, { $lte: ['$quantity', '$reorder_point'] }] };
+    case 'BELOW_MIN':
+      return {
+        $and: [
+          { $gt: ['$quantity', '$reorder_point'] },
+          { $lte: ['$quantity', '$min_stock_level'] }
+        ]
+      };
+    case 'OVERSTOCK':
+      return {
+        $and: [
+          { $gt: ['$quantity', '$reorder_point'] },
+          { $gt: ['$quantity', '$min_stock_level'] },
+          { $gte: ['$quantity', '$max_stock_level'] }
+        ]
+      };
+    case 'IN_STOCK':
+      return {
+        $and: [
+          { $gt: ['$quantity', '$reorder_point'] },
+          { $gt: ['$quantity', '$min_stock_level'] },
+          { $lt: ['$quantity', '$max_stock_level'] }
+        ]
+      };
+    default:
+      return null;
+  }
+}
+
 /**
  * Get all inventory items with filters
  * GET /api/admin/inventory
@@ -14,8 +52,14 @@ const getAllInventoryItems = async (req, res) => {
       limit = 20,
       search = '',
       category = '',
+      brand = '',
+      car_model = '',
+      quality = '',
+      supplier = '',
       is_active = '',
       stock_status = '',
+      price_min = '',
+      price_max = '',
       sort_by = 'item_name',
       sort_order = 'asc'
     } = req.query;
@@ -23,11 +67,14 @@ const getAllInventoryItems = async (req, res) => {
     // Build query
     const query = {};
 
-    // Search by item name or item code
+    // Search by product name, variant, item name, item code or barcode
     if (search) {
       query.$or = [
         { item_name: { $regex: search, $options: 'i' } },
-        { item_code: { $regex: search, $options: 'i' } }
+        { product_name: { $regex: search, $options: 'i' } },
+        { variant_name: { $regex: search, $options: 'i' } },
+        { item_code: { $regex: search, $options: 'i' } },
+        { barcode: { $regex: search, $options: 'i' } }
       ];
     }
 
@@ -35,32 +82,63 @@ const getAllInventoryItems = async (req, res) => {
       query.category = category.toUpperCase();
     }
 
+    if (brand) {
+      query.brand = { $regex: `^${brand}$`, $options: 'i' };
+    }
+
+    if (car_model) {
+      query.car_model = { $regex: car_model, $options: 'i' };
+    }
+
+    if (quality) {
+      query.quality = quality.toUpperCase();
+    }
+
+    if (supplier) {
+      query.supplier_name = { $regex: supplier, $options: 'i' };
+    }
+
     if (is_active !== '') {
       query.is_active = is_active === 'true';
     }
 
+    const priceConditions = {};
+    if (price_min !== '' && !Number.isNaN(Number(price_min))) {
+      priceConditions.$gte = Number(price_min);
+    }
+    if (price_max !== '' && !Number.isNaN(Number(price_max))) {
+      priceConditions.$lte = Number(price_max);
+    }
+    if (Object.keys(priceConditions).length) {
+      query.unit_price = priceConditions;
+    }
+
+    if (stock_status) {
+      const statusExpr = buildStockStatusExpr(stock_status.toUpperCase());
+      if (statusExpr) {
+        query.$expr = statusExpr;
+      }
+    }
+
     const skip = (page - 1) * limit;
+    const sortField = SORTABLE_FIELDS.includes(sort_by) ? sort_by : 'item_name';
     const sortOrder = sort_order === 'asc' ? 1 : -1;
 
-    let items = await InventoryItem.find(query)
-      .sort({ [sort_by]: sortOrder })
-      .limit(parseInt(limit))
-      .skip(skip);
-
-    const total = await InventoryItem.countDocuments(query);
-
-    // Filter by stock status if specified
-    if (stock_status) {
-      items = items.filter(item => item.stock_status === stock_status.toUpperCase());
-    }
+    const [items, total] = await Promise.all([
+      InventoryItem.find(query)
+        .sort({ [sortField]: sortOrder, _id: 1 })
+        .limit(parseInt(limit))
+        .skip(skip),
+      InventoryItem.countDocuments(query)
+    ]);
 
     return successResponse(res, 200, 'Inventory items retrieved successfully', {
       items,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: stock_status ? items.length : total,
-        pages: Math.ceil((stock_status ? items.length : total) / limit)
+        total,
+        pages: Math.ceil(total / limit)
       }
     });
 
@@ -85,52 +163,24 @@ const getInventoryItemById = async (req, res) => {
     }
 
     // Get recent transactions
-    const recentTransactions = await InventoryTransaction.find({ inventory_item_id: id })
-      .populate('performed_by', 'full_name email')
-      .sort({ created_at: -1 })
-      .limit(10);
+    const [recentTransactions, transactionCount] = await Promise.all([
+      InventoryTransaction.find({ inventory_item_id: id })
+        .populate('performed_by', 'full_name email')
+        .sort({ created_at: -1 })
+        .limit(10),
+      InventoryTransaction.countDocuments({ inventory_item_id: id })
+    ]);
 
     return successResponse(res, 200, 'Inventory item retrieved successfully', {
       item,
-      recent_transactions: recentTransactions
+      recent_transactions: recentTransactions,
+      has_transactions: transactionCount > 0,
+      can_delete_permanently: transactionCount === 0 && Number(item.quantity) === 0
     });
 
   } catch (error) {
     console.error('Get inventory item by ID error:', error);
     return errorResponse(res, 500, 'Failed to retrieve inventory item');
-  }
-};
-
-// Trong hàm xử lý API GET danh sách vật tư:
-const getInventoryItems = async (req, res) => {
-  try {
-    const { category, car_model, brand, quality, price_range } = req.query;
-    
-    // Khởi tạo query object
-    let query = {};
-
-    // Gắn các bộ lọc nếu có truyền từ Frontend lên
-    if (category) query.category = category;
-    if (car_model) query.car_model = car_model;
-    if (brand) query.brand = brand;
-    if (quality) query.quality = quality;
-
-    // Xử lý bộ lọc khoảng giá nếu có
-    if (price_range) {
-      if (price_range === '0-500') {
-        query.unit_price = { $lt: 500000 };
-      } else if (price_range === '500-1000') {
-        query.unit_price = { $gte: 500000, $lte: 1000000 };
-      } else if (price_range === '1000+') {
-        query.unit_price = { $gt: 1000000 };
-      }
-    }
-
-    // Thực hiện tìm kiếm trong Database
-    const items = await InventoryItem.find(query);
-    res.status(200).json({ success: true, items });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -143,8 +193,14 @@ const createInventoryItem = async (req, res) => {
     const {
       item_name,
       item_code,
+      product_name,
+      variant_name,
+      barcode,
       description,
       category,
+      brand,
+      car_model,
+      quality,
       unit,
       unit_price,
       cost_price,
@@ -167,8 +223,14 @@ const createInventoryItem = async (req, res) => {
     const item = await InventoryItem.create({
       item_name,
       item_code: item_code.toUpperCase(),
+      product_name: product_name || item_name,
+      variant_name,
+      barcode,
       description,
       category,
+      brand,
+      car_model,
+      quality,
       unit,
       unit_price,
       cost_price,
@@ -229,8 +291,14 @@ const updateInventoryItem = async (req, res) => {
     const { id } = req.params;
     const {
       item_name,
+      product_name,
+      variant_name,
+      barcode,
       description,
       category,
+      brand,
+      car_model,
+      quality,
       unit,
       unit_price,
       cost_price,
@@ -258,8 +326,14 @@ const updateInventoryItem = async (req, res) => {
 
     // Update fields (quantity is updated via stock-in/stock-out)
     if (item_name !== undefined) item.item_name = item_name;
+    if (product_name !== undefined) item.product_name = product_name;
+    if (variant_name !== undefined) item.variant_name = variant_name;
+    if (barcode !== undefined) item.barcode = barcode;
     if (description !== undefined) item.description = description;
     if (category !== undefined) item.category = category;
+    if (brand !== undefined) item.brand = brand;
+    if (car_model !== undefined) item.car_model = car_model;
+    if (quality !== undefined) item.quality = quality;
     if (unit !== undefined) item.unit = unit;
     if (unit_price !== undefined) item.unit_price = unit_price;
     if (cost_price !== undefined) item.cost_price = cost_price;
@@ -318,26 +392,20 @@ const deleteInventoryItem = async (req, res) => {
       return errorResponse(res, 404, 'Inventory item not found');
     }
 
-    if (Number(item.quantity) > 0) {
-      return errorResponse(
-        res,
-        422,
-        permanent === 'true'
-          ? 'Không thể xoá vĩnh viễn vật tư khi còn tồn kho'
-          : 'Không thể vô hiệu hoá vật tư khi còn tồn kho. Vui lòng xuất kho hết trước'
-      );
-    }
+    const transactionCount = await InventoryTransaction.countDocuments({ inventory_item_id: id });
 
     if (permanent === 'true') {
-      const transactionCount = await InventoryTransaction.countDocuments({ inventory_item_id: id });
+      // Chỉ xóa cứng khi chưa phát sinh giao dịch và không còn tồn kho.
       if (transactionCount > 0) {
-        return errorResponse(res, 422, 'Không thể xoá vĩnh viễn vật tư đã có lịch sử giao dịch');
+        return errorResponse(res, 422, 'Không thể xoá Variant đã phát sinh giao dịch. Chỉ được phép khóa để ngừng sử dụng.');
       }
 
-      // Permanent deletion
+      if (Number(item.quantity) > 0) {
+        return errorResponse(res, 422, 'Không thể xoá Variant khi còn tồn kho. Vui lòng xuất/điều chỉnh về 0 hoặc khóa Variant.');
+      }
+
       await InventoryItem.findByIdAndDelete(id);
 
-      // Log audit
       await UserAudit.create({
         user_id: req.user.userId,
         action: 'INVENTORY_DELETED',
@@ -352,26 +420,34 @@ const deleteInventoryItem = async (req, res) => {
       });
 
       return successResponse(res, 200, 'Inventory item permanently deleted');
-    } else {
-      // Soft delete
-      item.is_active = false;
-      await item.save();
-
-      // Log audit
-      await UserAudit.create({
-        user_id: req.user.userId,
-        action: 'INVENTORY_DEACTIVATED',
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-        status: 'SUCCESS',
-        metadata: {
-          item_id: id,
-          item_code: item.item_code
-        }
-      });
-
-      return successResponse(res, 200, 'Inventory item deactivated successfully');
     }
+
+    // Khóa (soft lock): cho phép ngay cả khi còn tồn kho — chỉ ngừng sử dụng, không xóa dữ liệu.
+    item.is_active = false;
+    await item.save();
+
+    await UserAudit.create({
+      user_id: req.user.userId,
+      action: 'INVENTORY_DEACTIVATED',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        item_id: id,
+        item_code: item.item_code,
+        quantity: item.quantity,
+        had_transactions: transactionCount > 0
+      }
+    });
+
+    return successResponse(res, 200, 'Inventory item deactivated successfully', {
+      item: {
+        _id: item._id,
+        item_code: item.item_code,
+        is_active: item.is_active,
+        can_delete_permanently: transactionCount === 0 && Number(item.quantity) === 0
+      }
+    });
 
   } catch (error) {
     console.error('Delete inventory item error:', error);
@@ -452,7 +528,7 @@ const stockIn = async (req, res) => {
 
     return successResponse(res, 200, 'Stock added successfully', {
       item: {
-        _id: updatedItem._id,
+        _id: item._id,
         item_code: item.item_code,
         item_name: item.item_name,
         quantity: item.quantity,
@@ -529,7 +605,7 @@ const stockOut = async (req, res) => {
 
     return successResponse(res, 200, 'Stock removed successfully', {
       item: {
-        _id: item._id,
+        _id: updatedItem._id,
         item_code: updatedItem.item_code,
         item_name: updatedItem.item_name,
         quantity: updatedItem.quantity,
@@ -540,6 +616,80 @@ const stockOut = async (req, res) => {
   } catch (error) {
     console.error('Stock out error:', error);
     return errorResponse(res, 500, error.message || 'Failed to remove stock');
+  }
+};
+
+/**
+ * Adjust stock to an exact quantity (stock take / correction)
+ * POST /api/admin/inventory/:id/adjust
+ */
+const adjustStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { new_quantity, notes } = req.body;
+
+    const numericQuantity = Number(new_quantity);
+    if (!Number.isInteger(numericQuantity) || numericQuantity < 0) {
+      return errorResponse(res, 400, 'Valid new_quantity is required');
+    }
+
+    const item = await InventoryItem.findById(id);
+    if (!item) {
+      return errorResponse(res, 404, 'Inventory item not found');
+    }
+
+    const quantityBefore = item.quantity;
+    const change = numericQuantity - quantityBefore;
+
+    if (change === 0) {
+      return errorResponse(res, 422, 'Số lượng mới trùng với tồn kho hiện tại, không có gì để điều chỉnh');
+    }
+
+    item.quantity = numericQuantity;
+    if (change > 0) {
+      item.last_restocked_at = new Date();
+    }
+    await item.save();
+
+    await InventoryTransaction.create({
+      inventory_item_id: id,
+      transaction_type: 'ADJUSTMENT',
+      quantity_change: change,
+      quantity_before: quantityBefore,
+      quantity_after: numericQuantity,
+      unit_cost: item.cost_price || item.unit_price,
+      performed_by: req.user.userId,
+      notes: notes || 'Điều chỉnh tồn kho',
+      reference_type: 'MANUAL'
+    });
+
+    await UserAudit.create({
+      user_id: req.user.userId,
+      action: 'STOCK_ADJUSTED',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: {
+        item_id: id,
+        item_code: item.item_code,
+        quantity_before: quantityBefore,
+        quantity_after: numericQuantity
+      }
+    });
+
+    return successResponse(res, 200, 'Stock adjusted successfully', {
+      item: {
+        _id: item._id,
+        item_code: item.item_code,
+        item_name: item.item_name,
+        quantity: item.quantity,
+        stock_status: item.stock_status
+      }
+    });
+
+  } catch (error) {
+    console.error('Adjust stock error:', error);
+    return errorResponse(res, 500, error.message || 'Failed to adjust stock');
   }
 };
 
@@ -656,27 +806,76 @@ const getInventoryStatistics = async (req, res) => {
     const daysAgo = new Date();
     daysAgo.setDate(daysAgo.getDate() - parseInt(period));
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     // Overall statistics
     const [
-      totalItems,
-      activeItems,
+      totalVariants,
+      activeVariants,
       lowStockItems,
       outOfStockItems,
-      recentTransactions
+      recentTransactions,
+      suppliers,
+      todayMovements,
+      productCountRows
     ] = await Promise.all([
       InventoryItem.countDocuments(),
       InventoryItem.countDocuments({ is_active: true }),
       InventoryItem.countDocuments({
         is_active: true,
+        quantity: { $gt: 0 },
         $expr: { $lte: ['$quantity', '$reorder_point'] }
       }),
       InventoryItem.countDocuments({ quantity: 0, is_active: true }),
-      InventoryTransaction.countDocuments({ created_at: { $gte: daysAgo } })
+      InventoryTransaction.countDocuments({ created_at: { $gte: daysAgo } }),
+      InventoryItem.distinct('supplier_name', { is_active: true, supplier_name: { $nin: [null, ''] } }),
+      InventoryTransaction.aggregate([
+        { $match: { created_at: { $gte: todayStart } } },
+        {
+          $group: {
+            _id: '$transaction_type',
+            count: { $sum: 1 },
+            total_quantity: { $sum: { $abs: '$quantity_change' } }
+          }
+        }
+      ]),
+      // Đếm Product: nhóm theo product_name, fallback item_name nếu dữ liệu cũ chưa có product_name.
+      InventoryItem.aggregate([
+        { $match: { is_active: true } },
+        {
+          $group: {
+            _id: {
+              $toLower: {
+                $trim: {
+                  input: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $ne: [{ $ifNull: ['$product_name', ''] }, ''] }
+                        ]
+                      },
+                      '$product_name',
+                      '$item_name'
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        { $count: 'total' }
+      ])
     ]);
 
-    // Calculate total stock value
+    const todayImport = todayMovements.find((row) => row._id === 'STOCK_IN') || {};
+    const todayExport = todayMovements.find((row) => row._id === 'STOCK_OUT') || {};
+    const totalProducts = productCountRows[0]?.total || 0;
+
+    // Calculate total stock value and total stock quantity
     const items = await InventoryItem.find({ is_active: true });
     const totalStockValue = items.reduce((sum, item) => sum + item.stock_value, 0);
+    const totalStockQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
 
     // Items by category
     const itemsByCategory = await InventoryItem.aggregate([
@@ -723,12 +922,18 @@ const getInventoryStatistics = async (req, res) => {
 
     return successResponse(res, 200, 'Inventory statistics retrieved successfully', {
       overview: {
-        total_items: totalItems,
-        active_items: activeItems,
+        total_items: totalVariants,
+        active_items: activeVariants,
+        total_products: totalProducts,
+        total_variants: activeVariants,
         low_stock_items: lowStockItems,
         out_of_stock_items: outOfStockItems,
         total_stock_value: totalStockValue.toFixed(2),
-        recent_transactions: recentTransactions
+        total_stock_quantity: totalStockQuantity,
+        recent_transactions: recentTransactions,
+        supplier_count: suppliers.length,
+        today_import: { count: todayImport.count || 0, quantity: todayImport.total_quantity || 0 },
+        today_export: { count: todayExport.count || 0, quantity: todayExport.total_quantity || 0 }
       },
       charts: {
         items_by_category: itemsByCategory,
@@ -752,6 +957,7 @@ module.exports = {
   deleteInventoryItem,
   stockIn,
   stockOut,
+  adjustStock,
   getLowStockItems,
   getInventoryTransactions,
   getInventoryStatistics
