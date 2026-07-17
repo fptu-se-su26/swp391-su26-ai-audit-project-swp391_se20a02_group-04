@@ -13,6 +13,9 @@
     "seed:roles": "node src/scripts/seedRoles.js",
     "seed:data": "node src/scripts/seedData.js",
     "seed:staff": "node src/scripts/seedStaffTestData.js",
+    "seed:inventory": "node src/scripts/seedMotorcycleInventory.js",
+    "seed:inventory-images": "node src/scripts/updateInventoryImages.js",
+    "seed:services": "node src/scripts/seedGarageServices.js",
     "migrate:appointments": "node src/scripts/migrateAppointmentManagement.js"
   },
   "keywords": [

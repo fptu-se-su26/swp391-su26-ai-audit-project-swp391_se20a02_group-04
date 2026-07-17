@@ -1,15 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  LayoutDashboard,
-  Calendar,
-  Wrench,
-  Users,
-  BarChart2,
-  Shield,
   Plus,
-  HelpCircle,
-  Package,
-  User,
   Search,
   Eye,
   Pencil,
@@ -24,109 +15,119 @@ import {
   CheckCircle2,
   PauseCircle,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import "../../styles/admin/AdminDashboard.css";
 import "../../styles/admin/AdminServices.css";
 import AdminSidebar from "../../components/AdminSidebar";
+import {
+  getAdminServices,
+  createService,
+  updateService,
+  toggleServiceStatus,
+  deleteServicePermanently,
+} from "../../services/adminServiceApi";
 
-const categoryLabels = {
-  all: "Tất cả danh mục",
-  wash: "Rửa xe",
-  repair: "Sửa chữa",
-  maintenance: "Bảo dưỡng",
+const CATEGORY_LABELS = {
+  WASH_CARE: "Rửa & chăm sóc xe",
+  MAINTENANCE: "Bảo dưỡng định kỳ",
+  LUBRICANT: "Dầu nhớt & dung dịch",
+  TIRE_WHEEL: "Lốp & bánh xe",
+  BRAKE: "Hệ thống phanh",
+  ELECTRICAL: "Điện & ắc quy",
+  ENGINE_TRANSMISSION: "Động cơ & truyền động",
+  SUSPENSION_FRAME: "Khung, phuộc & tay lái",
+  ACCESSORY: "Phụ kiện & nâng cấp",
+  INSPECTION: "Kiểm tra & chẩn đoán",
+  EMERGENCY: "Cứu hộ",
+  REPAIR: "Sửa chữa chung",
+  CUSTOMIZATION: "Độ xe",
+  OTHER: "Khác",
 };
 
-const statusLabels = {
+const PRICE_TYPE_LABELS = {
+  FIXED: "Giá cố định",
+  FROM: "Giá từ",
+  QUOTE: "Kiểm tra & báo giá",
+};
+
+const VEHICLE_TYPE_LABELS = {
+  ALL: "Mọi loại xe",
+  SCOOTER: "Xe tay ga",
+  MANUAL: "Xe số",
+  CLUTCH: "Xe côn tay",
+};
+
+const STATUS_LABELS = {
   all: "Tất cả trạng thái",
   active: "Đang hoạt động",
   inactive: "Tạm ngưng",
 };
 
-const initialServices = [
-  {
-    code: "SVC-WASH-001",
-    name: "Rửa xe cao cấp",
-    category: "wash",
-    shortDescription: "Rửa bọt tuyết, vệ sinh mâm, chăm sóc nhựa nhám.",
-    detailedDescription: "Quy trình rửa xe cao cấp gồm rửa sơ bộ, phun bọt tuyết, vệ sinh mâm, làm khô và dưỡng nhựa nhám.",
-    basePrice: 80000,
-    duration: 45,
-    bookings: 186,
-    status: "active",
-    image: "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=900&q=80",
-    reminderEnabled: false,
-    reminderDays: 0,
-    reminderMileage: 0,
-  },
-  {
-    code: "SVC-MAIN-014",
-    name: "Bảo dưỡng định kỳ 10.000km",
-    category: "maintenance",
-    shortDescription: "Kiểm tra tổng thể, thay dầu, siết lực và đọc lỗi cơ bản.",
-    detailedDescription: "Dịch vụ dành cho xe đã vận hành 10.000km, bao gồm thay dầu, kiểm tra lọc gió, phanh, sên, điện và cập nhật nhắc bảo dưỡng.",
-    basePrice: 450000,
-    duration: 120,
-    bookings: 142,
-    status: "active",
-    image: "https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=900&q=80",
-    reminderEnabled: true,
-    reminderDays: 120,
-    reminderMileage: 5000,
-  },
-  {
-    code: "SVC-REP-022",
-    name: "Thay lốp và cân vành",
-    category: "repair",
-    shortDescription: "Thay lốp, kiểm tra áp suất, cân chỉnh và test vận hành.",
-    detailedDescription: "Kỹ thuật viên kiểm tra tình trạng lốp, tư vấn thay thế, cân chỉnh và chạy thử trước khi bàn giao.",
-    basePrice: 250000,
-    duration: 75,
-    bookings: 96,
-    status: "active",
-    image: "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=900&q=80",
-    reminderEnabled: true,
-    reminderDays: 180,
-    reminderMileage: 8000,
-  },
-  {
-    code: "SVC-REP-031",
-    name: "Vệ sinh buồng đốt",
-    category: "repair",
-    shortDescription: "Làm sạch muội carbon, hỗ trợ xe nổ đều và bốc hơn.",
-    detailedDescription: "Dịch vụ đang tạm ngưng để cập nhật quy trình hóa chất và tiêu chuẩn an toàn mới.",
-    basePrice: 320000,
-    duration: 90,
-    bookings: 0,
-    status: "inactive",
-    image: "",
-    reminderEnabled: false,
-    reminderDays: 0,
-    reminderMileage: 0,
-  },
-];
-
-const emptyForm = {
-  code: "",
-  name: "",
-  category: "wash",
-  shortDescription: "",
-  detailedDescription: "",
-  basePrice: 0,
-  duration: 30,
-  bookings: 0,
-  status: "active",
-  image: "",
-  reminderEnabled: false,
-  reminderDays: 0,
-  reminderMileage: 0,
+const EMPTY_FORM = {
+  service_name: "",
+  category: "WASH_CARE",
+  description: "",
+  base_price: "",
+  price_type: "FIXED",
+  vehicle_type: "ALL",
+  estimated_duration: 30,
+  image_url: "",
+  allow_booking: true,
+  reminder_enabled: false,
+  reminder_days: 0,
+  reminder_mileage: 0,
+  is_active: true,
 };
 
 const formatCurrency = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 
+const formatPrice = (service) => {
+  if (service.price_type === "QUOTE") return "Kiểm tra & báo giá";
+  if (service.price_type === "FROM") return `Từ ${formatCurrency(service.base_price)}`;
+  return formatCurrency(service.base_price);
+};
 
+const formToPayload = (form) => ({
+  service_name: form.service_name.trim(),
+  category: form.category,
+  description: form.description.trim(),
+  base_price: Number(form.base_price || 0),
+  price_type: form.price_type,
+  vehicle_type: form.vehicle_type,
+  estimated_duration: Number(form.estimated_duration || 0),
+  image_url: form.image_url.trim(),
+  allow_booking: !!form.allow_booking,
+  reminder_enabled: !!form.reminder_enabled,
+  reminder_days: Number(form.reminder_days || 0),
+  reminder_mileage: Number(form.reminder_mileage || 0),
+  is_active: !!form.is_active,
+});
+
+const serviceToForm = (service) => ({
+  service_name: service.service_name || "",
+  category: service.category || "OTHER",
+  description: service.description || "",
+  base_price: service.base_price ?? "",
+  price_type: service.price_type || "FIXED",
+  vehicle_type: service.vehicle_type || "ALL",
+  estimated_duration: service.estimated_duration ?? 30,
+  image_url: service.image_url || "",
+  allow_booking: service.allow_booking !== false,
+  reminder_enabled: !!service.reminder_enabled,
+  reminder_days: service.reminder_days || 0,
+  reminder_mileage: service.reminder_mileage || 0,
+  is_active: service.is_active !== false,
+});
 
 export default function AdminServices({ onViewChange }) {
-  const [services, setServices] = useState(initialServices);
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(null);
+
   const [filters, setFilters] = useState({
     search: "",
     category: "all",
@@ -134,21 +135,56 @@ export default function AdminServices({ onViewChange }) {
     minPrice: "",
     maxPrice: "",
   });
+
   const [modalMode, setModalMode] = useState(null);
   const [selectedService, setSelectedService] = useState(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  const showToast = useCallback((type, message) => {
+    setToast({ type, message });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
+  const loadServices = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const payload = await getAdminServices({
+        limit: 100,
+        sort_by: "created_at",
+        sort_order: "desc",
+      });
+      setServices(payload.data?.services || []);
+    } catch (error) {
+      setLoadError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadServices();
+  }, [loadServices]);
 
   const kpis = useMemo(() => {
     const total = services.length;
-    const active = services.filter((item) => item.status === "active").length;
+    const active = services.filter((item) => item.is_active).length;
     const inactive = total - active;
-    const mostBooked = services.reduce((best, item) => (item.bookings > best.bookings ? item : best), services[0]);
+    const mostBooked = services.reduce(
+      (best, item) => ((item.total_bookings || 0) > (best?.total_bookings || 0) ? item : best),
+      services[0]
+    );
 
     return [
       ["Tổng dịch vụ", total, ClipboardList, "neutral"],
       ["Đang hoạt động", active, CheckCircle2, "success"],
       ["Tạm ngưng", inactive, PauseCircle, "warning"],
-      ["Đặt nhiều nhất", mostBooked?.name || "-", Sparkles, "primary"],
+      ["Đặt nhiều nhất", mostBooked?.service_name || "—", Sparkles, "primary"],
     ];
   }, [services]);
 
@@ -160,11 +196,14 @@ export default function AdminServices({ onViewChange }) {
     return services.filter((service) => {
       const matchesSearch =
         !searchValue ||
-        service.name.toLowerCase().includes(searchValue) ||
-        service.code.toLowerCase().includes(searchValue);
+        (service.service_name || "").toLowerCase().includes(searchValue) ||
+        (service.service_code || "").toLowerCase().includes(searchValue);
       const matchesCategory = filters.category === "all" || service.category === filters.category;
-      const matchesStatus = filters.status === "all" || service.status === filters.status;
-      const matchesPrice = service.basePrice >= minPrice && service.basePrice <= maxPrice;
+      const matchesStatus =
+        filters.status === "all" ||
+        (filters.status === "active" ? service.is_active : !service.is_active);
+      const price = Number(service.base_price || 0);
+      const matchesPrice = price >= minPrice && price <= maxPrice;
 
       return matchesSearch && matchesCategory && matchesStatus && matchesPrice;
     });
@@ -173,51 +212,85 @@ export default function AdminServices({ onViewChange }) {
   const openModal = (mode, service = null) => {
     setModalMode(mode);
     setSelectedService(service);
-    setForm(service ? { ...service } : { ...emptyForm, code: `SVC-${Date.now().toString().slice(-5)}` });
+    setForm(service ? serviceToForm(service) : { ...EMPTY_FORM });
   };
 
   const closeModal = () => {
     setModalMode(null);
     setSelectedService(null);
-    setForm(emptyForm);
+    setForm(EMPTY_FORM);
   };
 
   const updateForm = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
-  const saveService = (event) => {
+  const saveService = async (event) => {
     event.preventDefault();
-    const normalized = {
-      ...form,
-      basePrice: Number(form.basePrice),
-      duration: Number(form.duration),
-      reminderDays: Number(form.reminderDays),
-      reminderMileage: Number(form.reminderMileage),
-    };
+    if (modalMode === "view") return;
 
-    setServices((current) => {
-      if (modalMode === "edit") {
-        return current.map((item) => (item.code === selectedService.code ? normalized : item));
+    const payload = formToPayload(form);
+
+    if (payload.service_name.length < 2) {
+      showToast("error", "Tên dịch vụ phải có ít nhất 2 ký tự.");
+      return;
+    }
+    if (payload.description.length < 10) {
+      showToast("error", "Mô tả dịch vụ phải có ít nhất 10 ký tự.");
+      return;
+    }
+    if (payload.estimated_duration < 15 || payload.estimated_duration > 480) {
+      showToast("error", "Thời lượng ước tính phải từ 15 đến 480 phút.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (modalMode === "edit" && selectedService) {
+        await updateService(selectedService._id, payload);
+        showToast("success", "Đã cập nhật dịch vụ.");
+      } else {
+        await createService(payload);
+        showToast("success", "Đã thêm dịch vụ mới.");
       }
-      return [normalized, ...current];
-    });
-    closeModal();
+      closeModal();
+      await loadServices();
+    } catch (error) {
+      showToast("error", error.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const toggleStatus = (service) => {
-    setServices((current) =>
-      current.map((item) =>
-        item.code === service.code
-          ? { ...item, status: item.status === "active" ? "inactive" : "active" }
-          : item
-      )
+  const handleToggleStatus = async (service) => {
+    try {
+      await toggleServiceStatus(service._id);
+      showToast(
+        "success",
+        service.is_active
+          ? `Đã tạm ngưng "${service.service_name}".`
+          : `Đã kích hoạt "${service.service_name}".`
+      );
+      await loadServices();
+    } catch (error) {
+      showToast("error", error.message);
+    }
+  };
+
+  const handleDelete = async (service) => {
+    if ((service.total_bookings || 0) > 0) return;
+    const confirmed = window.confirm(
+      `Xóa vĩnh viễn dịch vụ "${service.service_name}"? Thao tác này không thể hoàn tác.`
     );
-  };
+    if (!confirmed) return;
 
-  const deleteService = (service) => {
-    if (service.bookings > 0) return;
-    setServices((current) => current.filter((item) => item.code !== service.code));
+    try {
+      await deleteServicePermanently(service._id);
+      showToast("success", "Đã xóa dịch vụ.");
+      await loadServices();
+    } catch (error) {
+      showToast("error", error.message);
+    }
   };
 
   const isReadonly = modalMode === "view";
@@ -265,7 +338,8 @@ export default function AdminServices({ onViewChange }) {
               value={filters.category}
               onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value }))}
             >
-              {Object.entries(categoryLabels).map(([value, label]) => (
+              <option value="all">Tất cả danh mục</option>
+              {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
@@ -274,7 +348,7 @@ export default function AdminServices({ onViewChange }) {
               value={filters.status}
               onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
             >
-              {Object.entries(statusLabels).map(([value, label]) => (
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
@@ -300,7 +374,7 @@ export default function AdminServices({ onViewChange }) {
               <span>Mã DV</span>
               <span>Tên dịch vụ</span>
               <span>Danh mục</span>
-              <span>Giá cơ bản</span>
+              <span>Giá dịch vụ</span>
               <span>Thời lượng</span>
               <span>Lượt đặt</span>
               <span>Trạng thái</span>
@@ -308,24 +382,45 @@ export default function AdminServices({ onViewChange }) {
             </div>
 
             <div className="service-table-body">
-              {filteredServices.map((service) => (
-                <article className="service-table-row" key={service.code}>
-                  <strong className="service-code">{service.code}</strong>
+              {loading && (
+                <div className="service-table-note">Đang tải danh sách dịch vụ...</div>
+              )}
+
+              {!loading && loadError && (
+                <div className="service-table-note error">
+                  <p>{loadError}</p>
+                  <button type="button" onClick={loadServices}>
+                    <RefreshCw size={15} /> Thử lại
+                  </button>
+                </div>
+              )}
+
+              {!loading && !loadError && filteredServices.length === 0 && (
+                <div className="service-table-note">
+                  {services.length === 0
+                    ? "Chưa có dịch vụ nào. Bấm \"Thêm dịch vụ\" để tạo dịch vụ đầu tiên."
+                    : "Không có dịch vụ nào khớp với bộ lọc hiện tại."}
+                </div>
+              )}
+
+              {!loading && !loadError && filteredServices.map((service) => (
+                <article className="service-table-row" key={service._id}>
+                  <strong className="service-code">{service.service_code || "—"}</strong>
                   <div className="service-name-cell">
                     <div className="service-thumb">
-                      {service.image ? <img src={service.image} alt="" /> : <Image size={18} />}
+                      {service.image_url ? <img src={service.image_url} alt="" /> : <Image size={18} />}
                     </div>
                     <div>
-                      <strong>{service.name}</strong>
-                      <p>{service.shortDescription}</p>
+                      <strong>{service.service_name}</strong>
+                      <p>{VEHICLE_TYPE_LABELS[service.vehicle_type] || "Mọi loại xe"} · {service.description}</p>
                     </div>
                   </div>
-                  <span>{categoryLabels[service.category]}</span>
-                  <span className="service-price">{formatCurrency(service.basePrice)}</span>
-                  <span>{service.duration} phút</span>
-                  <span>{service.bookings}</span>
-                  <span className={`service-status ${service.status}`}>
-                    {service.status === "active" ? "Đang hoạt động" : "Tạm ngưng"}
+                  <span>{CATEGORY_LABELS[service.category] || service.category}</span>
+                  <span className="service-price">{formatPrice(service)}</span>
+                  <span>{service.estimated_duration} phút</span>
+                  <span>{service.total_bookings || 0}</span>
+                  <span className={`service-status ${service.is_active ? "active" : "inactive"}`}>
+                    {service.is_active ? "Đang hoạt động" : "Tạm ngưng"}
                   </span>
                   <div className="service-actions">
                     <button type="button" title="Xem chi tiết" onClick={() => openModal("view", service)}>
@@ -334,15 +429,17 @@ export default function AdminServices({ onViewChange }) {
                     <button type="button" title="Chỉnh sửa" onClick={() => openModal("edit", service)}>
                       <Pencil size={16} />
                     </button>
-                    <button type="button" title="Bật/tắt dịch vụ" onClick={() => toggleStatus(service)}>
+                    <button type="button" title="Bật/tắt dịch vụ" onClick={() => handleToggleStatus(service)}>
                       <Power size={16} />
                     </button>
                     <button
                       className="danger"
-                      disabled={service.bookings > 0}
+                      disabled={(service.total_bookings || 0) > 0}
                       type="button"
-                      title={service.bookings > 0 ? "Chỉ xóa dịch vụ chưa phát sinh lượt đặt" : "Xóa dịch vụ"}
-                      onClick={() => deleteService(service)}
+                      title={(service.total_bookings || 0) > 0
+                        ? "Chỉ xóa được dịch vụ chưa phát sinh lượt đặt"
+                        : "Xóa dịch vụ"}
+                      onClick={() => handleDelete(service)}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -359,8 +456,10 @@ export default function AdminServices({ onViewChange }) {
           <form className="service-modal" onSubmit={saveService}>
             <div className="service-modal-head">
               <div>
-                <span>{modalMode === "view" ? "Chi tiết dịch vụ" : modalMode === "edit" ? "Cập nhật dịch vụ" : "Dịch vụ mới"}</span>
-                <h3>{modalMode === "add" ? "Thêm dịch vụ" : form.name}</h3>
+                <span>
+                  {modalMode === "view" ? "Chi tiết dịch vụ" : modalMode === "edit" ? "Cập nhật dịch vụ" : "Dịch vụ mới"}
+                </span>
+                <h3>{modalMode === "add" ? "Thêm dịch vụ" : form.service_name}</h3>
               </div>
               <button type="button" onClick={closeModal} aria-label="Đóng">
                 <X size={20} />
@@ -370,78 +469,146 @@ export default function AdminServices({ onViewChange }) {
             <div className="service-form-grid">
               <label>
                 Tên dịch vụ
-                <input disabled={isReadonly} required value={form.name} onChange={(event) => updateForm("name", event.target.value)} />
+                <input
+                  disabled={isReadonly}
+                  required
+                  value={form.service_name}
+                  onChange={(event) => updateForm("service_name", event.target.value)}
+                  placeholder="VD: Thay nhớt & lọc nhớt"
+                />
               </label>
 
               <label>
                 Danh mục
                 <select disabled={isReadonly} value={form.category} onChange={(event) => updateForm("category", event.target.value)}>
-                  <option value="wash">Rửa xe</option>
-                  <option value="repair">Sửa chữa</option>
-                  <option value="maintenance">Bảo dưỡng</option>
+                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
                 </select>
               </label>
 
               <label>
-                Mô tả ngắn
-                <input disabled={isReadonly} value={form.shortDescription} onChange={(event) => updateForm("shortDescription", event.target.value)} />
+                Kiểu giá
+                <select disabled={isReadonly} value={form.price_type} onChange={(event) => updateForm("price_type", event.target.value)}>
+                  {Object.entries(PRICE_TYPE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
               </label>
 
               <label>
-                Giá cơ bản
-                <input disabled={isReadonly} min="0" required type="number" value={form.basePrice} onChange={(event) => updateForm("basePrice", event.target.value)} />
+                {form.price_type === "QUOTE" ? "Phí kiểm tra (đ)" : "Giá công cơ bản (đ)"}
+                <input
+                  disabled={isReadonly}
+                  min="0"
+                  required
+                  type="number"
+                  value={form.base_price}
+                  onChange={(event) => updateForm("base_price", event.target.value)}
+                />
               </label>
 
               <label>
-                Thời lượng ước tính
-                <input disabled={isReadonly} min="1" required type="number" value={form.duration} onChange={(event) => updateForm("duration", event.target.value)} />
+                Loại xe áp dụng
+                <select disabled={isReadonly} value={form.vehicle_type} onChange={(event) => updateForm("vehicle_type", event.target.value)}>
+                  {Object.entries(VEHICLE_TYPE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
               </label>
 
               <label>
-                Ảnh dịch vụ
-                <input disabled={isReadonly} value={form.image} onChange={(event) => updateForm("image", event.target.value)} placeholder="URL ảnh dịch vụ" />
+                Thời lượng ước tính (phút)
+                <input
+                  disabled={isReadonly}
+                  min="15"
+                  max="480"
+                  required
+                  type="number"
+                  value={form.estimated_duration}
+                  onChange={(event) => updateForm("estimated_duration", event.target.value)}
+                />
               </label>
 
               <label className="service-form-wide">
-                Mô tả chi tiết
-                <textarea disabled={isReadonly} rows="4" value={form.detailedDescription} onChange={(event) => updateForm("detailedDescription", event.target.value)} />
+                Ảnh dịch vụ
+                <input
+                  disabled={isReadonly}
+                  value={form.image_url}
+                  onChange={(event) => updateForm("image_url", event.target.value)}
+                  placeholder="URL ảnh dịch vụ (không bắt buộc)"
+                />
+              </label>
+
+              <label className="service-form-wide">
+                Mô tả dịch vụ
+                <textarea
+                  disabled={isReadonly}
+                  rows="4"
+                  required
+                  value={form.description}
+                  onChange={(event) => updateForm("description", event.target.value)}
+                  placeholder="Mô tả nội dung công việc, lưu ý cho khách (tối thiểu 10 ký tự). Giá chưa gồm phụ tùng thay thế nếu có."
+                />
               </label>
 
               <label className="service-switch">
                 <input
-                  checked={form.status === "active"}
+                  checked={form.allow_booking}
                   disabled={isReadonly}
                   type="checkbox"
-                  onChange={(event) => updateForm("status", event.target.checked ? "active" : "inactive")}
+                  onChange={(event) => updateForm("allow_booking", event.target.checked)}
+                />
+                <span>Cho phép khách đặt lịch online</span>
+              </label>
+
+              <label className="service-switch">
+                <input
+                  checked={form.is_active}
+                  disabled={isReadonly || modalMode === "add"}
+                  type="checkbox"
+                  onChange={(event) => updateForm("is_active", event.target.checked)}
                 />
                 <span>Dịch vụ đang hoạt động</span>
               </label>
 
               <label className="service-switch">
                 <input
-                  checked={form.reminderEnabled}
+                  checked={form.reminder_enabled}
                   disabled={isReadonly}
                   type="checkbox"
-                  onChange={(event) => updateForm("reminderEnabled", event.target.checked)}
+                  onChange={(event) => updateForm("reminder_enabled", event.target.checked)}
                 />
-                <span>Bật nhắc bảo dưỡng</span>
+                <span>Bật nhắc bảo dưỡng định kỳ</span>
               </label>
 
               <label>
                 Chu kỳ nhắc theo ngày
-                <input disabled={isReadonly || !form.reminderEnabled} min="0" type="number" value={form.reminderDays} onChange={(event) => updateForm("reminderDays", event.target.value)} />
+                <input
+                  disabled={isReadonly || !form.reminder_enabled}
+                  min="0"
+                  type="number"
+                  value={form.reminder_days}
+                  onChange={(event) => updateForm("reminder_days", event.target.value)}
+                />
               </label>
 
               <label>
                 Chu kỳ nhắc theo km
-                <input disabled={isReadonly || !form.reminderEnabled} min="0" type="number" value={form.reminderMileage} onChange={(event) => updateForm("reminderMileage", event.target.value)} />
+                <input
+                  disabled={isReadonly || !form.reminder_enabled}
+                  min="0"
+                  type="number"
+                  value={form.reminder_mileage}
+                  onChange={(event) => updateForm("reminder_mileage", event.target.value)}
+                />
               </label>
             </div>
 
             <div className="service-modal-summary">
-              <span><Banknote size={15} /> {formatCurrency(form.basePrice)}</span>
-              <span><Clock size={15} /> {form.duration || 0} phút</span>
-              <span><ClipboardList size={15} /> {form.bookings || 0} lượt đặt</span>
+              <span><Banknote size={15} /> {formatPrice(formToPayload(form))}</span>
+              <span><Clock size={15} /> {form.estimated_duration || 0} phút</span>
+              <span><ClipboardList size={15} /> {selectedService?.total_bookings || 0} lượt đặt</span>
             </div>
 
             <div className="service-modal-actions">
@@ -449,12 +616,18 @@ export default function AdminServices({ onViewChange }) {
                 Đóng
               </button>
               {!isReadonly && (
-                <button className="modal-primary-btn" type="submit">
-                  <Save size={17} /> Lưu dịch vụ
+                <button className="modal-primary-btn" disabled={saving} type="submit">
+                  <Save size={17} /> {saving ? "Đang lưu..." : "Lưu dịch vụ"}
                 </button>
               )}
             </div>
           </form>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`service-toast ${toast.type}`} role="status">
+          {toast.message}
         </div>
       )}
     </div>

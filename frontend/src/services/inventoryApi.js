@@ -16,7 +16,7 @@ async function inventoryRequest(path, options = {}) {
       ...options,
     });
   } catch {
-    throw new Error(`Khong ket noi duoc backend tai ${API_BASE_URL}.`);
+    throw new Error(`Không kết nối được máy chủ tại ${API_BASE_URL}.`);
   }
 
   const payload = await response.json().catch(() => ({}));
@@ -25,7 +25,7 @@ async function inventoryRequest(path, options = {}) {
     const validationMessage = Array.isArray(payload.errors)
       ? payload.errors.map((error) => error.msg || error.message).join(" ")
       : "";
-    throw new Error(validationMessage || payload.message || "Khong the tai du lieu kho.");
+    throw new Error(validationMessage || payload.message || "Không thể tải dữ liệu kho.");
   }
 
   return payload;
@@ -76,6 +76,12 @@ export function deactivateInventoryItem(id) {
   });
 }
 
+export function deleteInventoryItemPermanently(id) {
+  return inventoryRequest(`/admin/inventory/${id}?permanent=true`, {
+    method: "DELETE",
+  });
+}
+
 export function activateInventoryItem(id) {
   return updateInventoryItem(id, { is_active: true });
 }
@@ -89,6 +95,13 @@ export function stockInItem(id, payload) {
 
 export function stockOutItem(id, payload) {
   return inventoryRequest(`/admin/inventory/${id}/stock-out`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function adjustStockItem(id, payload) {
+  return inventoryRequest(`/admin/inventory/${id}/adjust`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

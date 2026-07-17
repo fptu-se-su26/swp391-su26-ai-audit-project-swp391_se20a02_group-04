@@ -52,6 +52,7 @@ const userAuditSchema = new mongoose.Schema({
       'INVENTORY_DEACTIVATED',
       'STOCK_IN',
       'STOCK_OUT',
+      'STOCK_ADJUSTED',
       'SERVICE_CREATED',
       'SERVICE_UPDATED',
       'SERVICE_DELETED',

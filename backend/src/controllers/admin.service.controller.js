@@ -3,6 +3,36 @@ const Appointment = require('../models/Appointment.model');
 const UserAudit = require('../models/UserAudit.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 
+// Tiền tố mã dịch vụ theo danh mục, dùng khi tự sinh service_code.
+const CODE_PREFIXES = {
+  WASH_CARE: 'WASH',
+  MAINTENANCE: 'MAIN',
+  LUBRICANT: 'LUBE',
+  TIRE_WHEEL: 'TIRE',
+  BRAKE: 'BRAKE',
+  ELECTRICAL: 'ELEC',
+  ENGINE_TRANSMISSION: 'ENG',
+  SUSPENSION_FRAME: 'SUSP',
+  ACCESSORY: 'ACC',
+  INSPECTION: 'INSP',
+  EMERGENCY: 'SOS',
+  REPAIR: 'REP',
+  CUSTOMIZATION: 'CUS',
+  OTHER: 'SVC'
+};
+
+const generateServiceCode = async (category) => {
+  const prefix = CODE_PREFIXES[category] || 'SVC';
+  // Thử tối đa 5 lần để tránh trùng mã (unique sparse index).
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const code = `SVC-${prefix}-${Math.floor(100 + Math.random() * 900)}`;
+    // eslint-disable-next-line no-await-in-loop
+    const exists = await Service.findOne({ service_code: code }).select('_id');
+    if (!exists) return code;
+  }
+  return `SVC-${prefix}-${Date.now().toString().slice(-6)}`;
+};
+
 /**
  * Get all services (including inactive)
  * GET /api/admin/services
@@ -33,6 +63,7 @@ const getAllServices = async (req, res) => {
     if (search) {
       query.$or = [
         { service_name: { $regex: search, $options: 'i' } },
+        { service_code: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } }
       ];
     }
@@ -108,11 +139,18 @@ const createService = async (req, res) => {
   try {
     const {
       service_name,
+      service_code,
       description,
       category,
       base_price,
+      price_type,
+      vehicle_type,
       estimated_duration,
-      image_url
+      image_url,
+      allow_booking,
+      reminder_enabled,
+      reminder_days,
+      reminder_mileage
     } = req.body;
 
     // Check if service name already exists
@@ -121,16 +159,28 @@ const createService = async (req, res) => {
     });
 
     if (existingService) {
-      return errorResponse(res, 409, 'Service with this name already exists');
+      return errorResponse(res, 409, 'Dịch vụ với tên này đã tồn tại');
     }
+
+    const normalizedCategory = category ? category.toUpperCase() : 'OTHER';
+    const code = service_code
+      ? String(service_code).toUpperCase().trim()
+      : await generateServiceCode(normalizedCategory);
 
     const service = await Service.create({
       service_name,
+      service_code: code,
       description,
-      category: category ? category.toUpperCase() : 'OTHER',
+      category: normalizedCategory,
       base_price,
+      price_type: price_type || 'FIXED',
+      vehicle_type: vehicle_type || 'ALL',
       estimated_duration,
       image_url,
+      allow_booking: allow_booking !== undefined ? allow_booking : true,
+      reminder_enabled: reminder_enabled || false,
+      reminder_days: reminder_days || 0,
+      reminder_mileage: reminder_mileage || 0,
       is_active: true
     });
 
@@ -171,8 +221,14 @@ const updateService = async (req, res) => {
       description,
       category,
       base_price,
+      price_type,
+      vehicle_type,
       estimated_duration,
       image_url,
+      allow_booking,
+      reminder_enabled,
+      reminder_days,
+      reminder_mileage,
       is_active
     } = req.body;
 
@@ -190,7 +246,7 @@ const updateService = async (req, res) => {
       });
 
       if (existingService) {
-        return errorResponse(res, 409, 'Service with this name already exists');
+        return errorResponse(res, 409, 'Dịch vụ với tên này đã tồn tại');
       }
     }
 
@@ -207,9 +263,20 @@ const updateService = async (req, res) => {
     if (description !== undefined) service.description = description;
     if (category !== undefined) service.category = category.toUpperCase();
     if (base_price !== undefined) service.base_price = base_price;
+    if (price_type !== undefined) service.price_type = price_type;
+    if (vehicle_type !== undefined) service.vehicle_type = vehicle_type;
     if (estimated_duration !== undefined) service.estimated_duration = estimated_duration;
     if (image_url !== undefined) service.image_url = image_url;
+    if (allow_booking !== undefined) service.allow_booking = allow_booking;
+    if (reminder_enabled !== undefined) service.reminder_enabled = reminder_enabled;
+    if (reminder_days !== undefined) service.reminder_days = reminder_days;
+    if (reminder_mileage !== undefined) service.reminder_mileage = reminder_mileage;
     if (is_active !== undefined) service.is_active = is_active;
+
+    // Dịch vụ cũ chưa có mã thì sinh bổ sung.
+    if (!service.service_code) {
+      service.service_code = await generateServiceCode(service.category);
+    }
 
     await service.save();
 
@@ -258,14 +325,11 @@ const deleteService = async (req, res) => {
       return errorResponse(res, 404, 'Service not found');
     }
 
-    // Check if service has active appointments
-    const activeAppointments = await Appointment.countDocuments({
-      service_id: id,
-      status: { $in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] }
-    });
+    // Đã phát sinh lượt đặt thì không cho xóa vĩnh viễn, chỉ cho ngừng hoạt động.
+    const totalAppointments = await Appointment.countDocuments({ service_id: id });
 
-    if (activeAppointments > 0 && permanent === 'true') {
-      return errorResponse(res, 400, 'Cannot permanently delete service with active appointments. Deactivate instead.');
+    if (totalAppointments > 0 && permanent === 'true') {
+      return errorResponse(res, 400, 'Dịch vụ đã phát sinh lượt đặt, chỉ có thể ngừng hoạt động thay vì xóa.');
     }
 
     if (permanent === 'true') {

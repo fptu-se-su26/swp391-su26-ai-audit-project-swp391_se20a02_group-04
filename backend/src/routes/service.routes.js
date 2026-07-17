@@ -32,8 +32,14 @@ router.get('/popular',
  * @desc    Get services by category
  * @access  Public
  */
+const SERVICE_CATEGORIES = [
+  'WASH_CARE', 'MAINTENANCE', 'LUBRICANT', 'TIRE_WHEEL', 'BRAKE',
+  'ELECTRICAL', 'ENGINE_TRANSMISSION', 'SUSPENSION_FRAME', 'ACCESSORY',
+  'INSPECTION', 'EMERGENCY', 'REPAIR', 'CUSTOMIZATION', 'OTHER'
+];
+
 router.get('/category/:category',
-  param('category').isIn(['MAINTENANCE', 'REPAIR', 'INSPECTION', 'CUSTOMIZATION', 'EMERGENCY', 'OTHER'])
+  param('category').isIn(SERVICE_CATEGORIES)
     .withMessage('Invalid category'),
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
@@ -60,7 +66,7 @@ router.get('/:id',
 router.get('/',
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
-  query('category').optional().isIn(['MAINTENANCE', 'REPAIR', 'INSPECTION', 'CUSTOMIZATION', 'EMERGENCY', 'OTHER']),
+  query('category').optional().isIn(SERVICE_CATEGORIES),
   validate,
   serviceController.getAllServices
 );

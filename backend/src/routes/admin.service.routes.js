@@ -17,37 +17,64 @@ const validate = (req, res, next) => {
   next();
 };
 
+// Danh mục dịch vụ garage (đồng bộ với Service.model)
+const SERVICE_CATEGORIES = [
+  'WASH_CARE', 'MAINTENANCE', 'LUBRICANT', 'TIRE_WHEEL', 'BRAKE',
+  'ELECTRICAL', 'ENGINE_TRANSMISSION', 'SUSPENSION_FRAME', 'ACCESSORY',
+  'INSPECTION', 'EMERGENCY', 'REPAIR', 'CUSTOMIZATION', 'OTHER'
+];
+const SERVICE_PRICE_TYPES = ['FIXED', 'FROM', 'QUOTE'];
+const SERVICE_VEHICLE_TYPES = ['ALL', 'SCOOTER', 'MANUAL', 'CLUTCH'];
+
 // Validation rules
 const createServiceValidation = [
   body('service_name').notEmpty().trim().isLength({ min: 2, max: 100 })
-    .withMessage('Service name must be between 2 and 100 characters'),
-  body('description').notEmpty().trim().isLength({ min: 10, max: 1000 })
-    .withMessage('Description must be between 10 and 1000 characters'),
-  body('category').notEmpty().isIn(['MAINTENANCE', 'REPAIR', 'INSPECTION', 'UPGRADE', 'OTHER'])
-    .withMessage('Category must be one of: MAINTENANCE, REPAIR, INSPECTION, UPGRADE, OTHER'),
+    .withMessage('Tên dịch vụ phải từ 2 đến 100 ký tự'),
+  body('service_code').optional().trim().isLength({ min: 2, max: 30 })
+    .withMessage('Mã dịch vụ phải từ 2 đến 30 ký tự'),
+  body('description').notEmpty().trim().isLength({ min: 10, max: 2000 })
+    .withMessage('Mô tả phải từ 10 đến 2000 ký tự'),
+  body('category').notEmpty().isIn(SERVICE_CATEGORIES)
+    .withMessage('Danh mục dịch vụ không hợp lệ'),
   body('base_price').notEmpty().isFloat({ min: 0 })
-    .withMessage('Base price must be a positive number'),
+    .withMessage('Giá dịch vụ phải là số dương'),
+  body('price_type').optional().isIn(SERVICE_PRICE_TYPES)
+    .withMessage('Kiểu giá không hợp lệ'),
+  body('vehicle_type').optional().isIn(SERVICE_VEHICLE_TYPES)
+    .withMessage('Loại xe áp dụng không hợp lệ'),
   body('estimated_duration').notEmpty().isInt({ min: 15, max: 480 })
-    .withMessage('Estimated duration must be between 15 and 480 minutes'),
-  body('image_url').optional().isURL()
-    .withMessage('Image URL must be a valid URL')
+    .withMessage('Thời lượng ước tính từ 15 đến 480 phút'),
+  body('image_url').optional({ checkFalsy: true }).isURL()
+    .withMessage('URL ảnh không hợp lệ'),
+  body('allow_booking').optional().isBoolean(),
+  body('reminder_enabled').optional().isBoolean(),
+  body('reminder_days').optional().isInt({ min: 0 }),
+  body('reminder_mileage').optional().isInt({ min: 0 })
 ];
 
 const updateServiceValidation = [
   body('service_name').optional().trim().isLength({ min: 2, max: 100 })
-    .withMessage('Service name must be between 2 and 100 characters'),
-  body('description').optional().trim().isLength({ min: 10, max: 1000 })
-    .withMessage('Description must be between 10 and 1000 characters'),
-  body('category').optional().isIn(['MAINTENANCE', 'REPAIR', 'INSPECTION', 'UPGRADE', 'OTHER'])
-    .withMessage('Category must be one of: MAINTENANCE, REPAIR, INSPECTION, UPGRADE, OTHER'),
+    .withMessage('Tên dịch vụ phải từ 2 đến 100 ký tự'),
+  body('description').optional().trim().isLength({ min: 10, max: 2000 })
+    .withMessage('Mô tả phải từ 10 đến 2000 ký tự'),
+  body('category').optional().isIn(SERVICE_CATEGORIES)
+    .withMessage('Danh mục dịch vụ không hợp lệ'),
   body('base_price').optional().isFloat({ min: 0 })
-    .withMessage('Base price must be a positive number'),
+    .withMessage('Giá dịch vụ phải là số dương'),
+  body('price_type').optional().isIn(SERVICE_PRICE_TYPES)
+    .withMessage('Kiểu giá không hợp lệ'),
+  body('vehicle_type').optional().isIn(SERVICE_VEHICLE_TYPES)
+    .withMessage('Loại xe áp dụng không hợp lệ'),
   body('estimated_duration').optional().isInt({ min: 15, max: 480 })
-    .withMessage('Estimated duration must be between 15 and 480 minutes'),
-  body('image_url').optional().isURL()
-    .withMessage('Image URL must be a valid URL'),
+    .withMessage('Thời lượng ước tính từ 15 đến 480 phút'),
+  body('image_url').optional({ checkFalsy: true }).isURL()
+    .withMessage('URL ảnh không hợp lệ'),
+  body('allow_booking').optional().isBoolean(),
+  body('reminder_enabled').optional().isBoolean(),
+  body('reminder_days').optional().isInt({ min: 0 }),
+  body('reminder_mileage').optional().isInt({ min: 0 }),
   body('is_active').optional().isBoolean()
-    .withMessage('is_active must be a boolean value')
+    .withMessage('is_active phải là true hoặc false')
 ];
 
 /**
@@ -73,10 +100,10 @@ router.get('/services',
   authorize('ADMIN', 'MANAGER'),
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
-  query('category').optional().isIn(['MAINTENANCE', 'REPAIR', 'INSPECTION', 'UPGRADE', 'OTHER']),
+  query('category').optional().isIn(SERVICE_CATEGORIES),
   query('is_active').optional().isIn(['true', 'false']),
   query('search').optional().trim(),
-  query('sort_by').optional().isIn(['service_name', 'category', 'base_price', 'created_at', 'total_bookings']),
+  query('sort_by').optional().isIn(['service_name', 'category', 'base_price', 'created_at', 'total_bookings', 'estimated_duration']),
   query('sort_order').optional().isIn(['asc', 'desc']),
   validate,
   adminServiceController.getAllServices

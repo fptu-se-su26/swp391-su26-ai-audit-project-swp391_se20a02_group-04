@@ -1,6 +1,43 @@
 const mongoose = require('mongoose');
 
+// Danh mục lớn của cửa hàng sửa xe máy. Giữ lại các giá trị cũ
+// (SPARE_PARTS, TOOLS) để dữ liệu hiện có không bị invalid khi save lại.
+const INVENTORY_CATEGORIES = [
+  'ENGINE_PARTS',
+  'BRAKE_SYSTEM',
+  'TIRES_TUBES',
+  'LUBRICANTS',
+  'FILTERS',
+  'ELECTRICAL',
+  'LIGHTS_MIRRORS',
+  'TRANSMISSION',
+  'SUSPENSION',
+  'BODY_PARTS',
+  'ACCESSORIES',
+  'CONSUMABLES',
+  'TOOLS_EQUIPMENT',
+  'SPARE_PARTS',
+  'TOOLS',
+  'OTHER'
+];
+
+const INVENTORY_QUALITIES = ['OEM', 'PREMIUM', 'STANDARD', 'BUDGET', ''];
+
 const inventoryItemSchema = new mongoose.Schema({
+  // Tên nhóm sản phẩm. Nhiều variant (mỗi variant = 1 document) dùng chung product_name.
+  product_name: {
+    type: String,
+    trim: true,
+    maxlength: [200, 'Product name cannot exceed 200 characters'],
+    default: ''
+  },
+  // Tên variant, ví dụ "70/90-17", "1L 10W30", "Màu đen".
+  variant_name: {
+    type: String,
+    trim: true,
+    maxlength: [120, 'Variant name cannot exceed 120 characters'],
+    default: ''
+  },
   item_name: {
     type: String,
     required: [true, 'Item name is required'],
@@ -14,6 +51,12 @@ const inventoryItemSchema = new mongoose.Schema({
     uppercase: true,
     trim: true
   },
+  barcode: {
+    type: String,
+    trim: true,
+    maxlength: [64, 'Barcode cannot exceed 64 characters'],
+    default: ''
+  },
   description: {
     type: String,
     trim: true,
@@ -21,27 +64,23 @@ const inventoryItemSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['SPARE_PARTS', 'TOOLS', 'CONSUMABLES', 'ACCESSORIES', 'OTHER'],
+    enum: INVENTORY_CATEGORIES,
     default: 'SPARE_PARTS'
   },
-  // --- THÊM DÒNG XE Ở ĐÂY ---
+  // Dòng xe tương thích (free text để không giới hạn danh sách xe).
   car_model: {
     type: String,
     trim: true,
-    enum: ['vision', 'sh', 'wave', 'exciter', 'winner', ''], // Các value tương ứng với bộ lọc Frontend
     default: ''
   },
-  // --- THÊM THƯƠNG HIỆU Ở ĐÂY ---
   brand: {
     type: String,
     trim: true,
-    enum: ['michelin', 'castrol', 'motul', 'irc', ''], // Các value tương ứng với bộ lọc Frontend
     default: ''
   },
-  // --- THÊM PHÂN LOẠI CHẤT LƯỢNG (PREMIUM / STANDARD) ---
   quality: {
     type: String,
-    enum: ['PREMIUM', 'STANDARD', ''],
+    enum: INVENTORY_QUALITIES,
     default: 'STANDARD'
   },
   unit: {
@@ -128,6 +167,7 @@ const inventoryItemSchema = new mongoose.Schema({
 
 // Indexes
 inventoryItemSchema.index({ item_name: 1 });
+inventoryItemSchema.index({ product_name: 1 });
 inventoryItemSchema.index({ category: 1 });
 inventoryItemSchema.index({ quantity: 1 });
 inventoryItemSchema.index({ is_active: 1 });
@@ -170,3 +210,5 @@ inventoryItemSchema.set('toObject', { virtuals: true });
 const InventoryItem = mongoose.model('InventoryItem', inventoryItemSchema, 'inventory_items');
 
 module.exports = InventoryItem;
+module.exports.INVENTORY_CATEGORIES = INVENTORY_CATEGORIES;
+module.exports.INVENTORY_QUALITIES = INVENTORY_QUALITIES;

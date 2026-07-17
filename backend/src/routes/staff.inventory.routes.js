@@ -21,7 +21,11 @@ const inventoryQueryValidation = [
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('search').optional().trim().isLength({ max: 100 }),
-  query('category').optional().isIn(['SPARE_PARTS', 'TOOLS', 'CONSUMABLES', 'ACCESSORIES', 'OTHER']),
+  query('category').optional().isIn([
+    'ENGINE_PARTS', 'BRAKE_SYSTEM', 'TIRES_TUBES', 'LUBRICANTS', 'FILTERS',
+    'ELECTRICAL', 'LIGHTS_MIRRORS', 'TRANSMISSION', 'SUSPENSION', 'BODY_PARTS',
+    'ACCESSORIES', 'CONSUMABLES', 'TOOLS_EQUIPMENT', 'SPARE_PARTS', 'TOOLS', 'OTHER'
+  ]),
   query('stock_status').optional().isIn(['OUT_OF_STOCK', 'LOW_STOCK', 'BELOW_MIN', 'IN_STOCK', 'OVERSTOCK']),
   query('sort_by').optional().isIn(['item_name', 'item_code', 'quantity', 'category', 'unit_price']),
   query('sort_order').optional().isIn(['asc', 'desc'])

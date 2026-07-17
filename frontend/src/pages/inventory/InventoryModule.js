@@ -1,33 +1,41 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
-  ArrowLeft,
-  BarChart3,
+  ArrowDownToLine,
+  ArrowUpFromLine,
   Boxes,
+  Building2,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
+  Copy,
   Edit3,
   Eye,
   Filter,
+  History,
+  Lock,
+  LockOpen,
   Package,
+  PackageX,
   Plus,
   RefreshCcw,
+  Scale,
   Search,
+  SlidersHorizontal,
   Trash2,
   TrendingDown,
-  Upload,
+  X,
 } from "lucide-react";
 import {
   activateInventoryItem,
+  adjustStockItem,
   createInventoryItem,
   deactivateInventoryItem,
+  deleteInventoryItemPermanently,
   getInventoryItemById,
   getInventoryItems,
   getInventoryStatistics,
   getInventoryTransactions,
-  getLowStockItems,
-  getStaffInventoryItemById,
-  getStaffInventoryItems,
   stockInItem,
   stockOutItem,
   updateInventoryItem,
@@ -37,53 +45,54 @@ import {
   formatDateTime,
   formatQuantity,
   formatVND,
-  getStockProgress,
 } from "../../utils/inventoryFormatters";
 import {
+  getCategoryLabel,
   getInventoryStatusMeta,
+  getQualityLabel,
   getTransactionMeta,
   INVENTORY_CATEGORIES,
-  TRANSACTION_TYPES,
+  INVENTORY_QUALITIES,
+  VEHICLE_MODELS,
 } from "../../utils/inventoryStatus";
 import "../../styles/inventory/Inventory.css";
 
 const DEFAULT_FILTERS = {
   search: "",
   category: "",
+  brand: "",
+  supplier: "",
+  car_model: "",
+  quality: "",
   stock_status: "",
   is_active: "",
-  page: 1,
-  limit: 20,
-  sort_by: "item_name",
-  sort_order: "asc",
+  price_range: "",
 };
 
-const EMPTY_FORM = {
-  item_name: "",
+const PRICE_RANGES = [
+  ["", "Tất cả mức giá"],
+  ["0-200000", "Dưới 200.000đ"],
+  ["200000-500000", "200.000đ - 500.000đ"],
+  ["500000-1000000", "500.000đ - 1.000.000đ"],
+  ["1000000-", "Trên 1.000.000đ"],
+];
+
+const EMPTY_VARIANT = {
   item_code: "",
-  description: "",
-  category: "SPARE_PARTS",
-  unit: "cai",
+  variant_name: "",
+  barcode: "",
+  car_model: "",
+  quality: "STANDARD",
+  unit: "cái",
   unit_price: "",
-  cost_price: "",
   quantity: "0",
-  min_stock_level: "10",
-  max_stock_level: "1000",
-  reorder_point: "20",
-  supplier_name: "",
-  supplier_contact: "",
-  warehouse: "Kho chính",
-  shelf: "",
-  bin: "",
-  is_active: true,
+  min_stock_level: "5",
+  max_stock_level: "500",
+  reorder_point: "10",
 };
 
 function getItemId(item) {
   return item?._id || item?.id;
-}
-
-function normalizeItemResponse(payload) {
-  return payload?.data?.item || payload?.item || null;
 }
 
 function normalizeItemsResponse(payload) {
@@ -95,64 +104,8 @@ function normalizeItemsResponse(payload) {
 
 function normalizeTransactionsResponse(payload) {
   return {
-    transactions: payload?.data?.transactions || payload?.transactions || payload?.data?.recent_transactions || [],
+    transactions: payload?.data?.transactions || payload?.transactions || [],
     pagination: payload?.data?.pagination || payload?.pagination || {},
-  };
-}
-
-function toNumberOrUndefined(value) {
-  if (value === "" || value === null || value === undefined) return undefined;
-  return Number(value);
-}
-
-function buildPayload(form, mode) {
-  const payload = {
-    item_name: form.item_name.trim(),
-    description: form.description.trim(),
-    category: form.category,
-    unit: form.unit.trim(),
-    unit_price: Number(form.unit_price || 0),
-    cost_price: toNumberOrUndefined(form.cost_price),
-    min_stock_level: toNumberOrUndefined(form.min_stock_level),
-    max_stock_level: toNumberOrUndefined(form.max_stock_level),
-    reorder_point: toNumberOrUndefined(form.reorder_point),
-    supplier_name: form.supplier_name.trim(),
-    supplier_contact: form.supplier_contact.trim(),
-    location: {
-      warehouse: form.warehouse.trim(),
-      shelf: form.shelf.trim(),
-      bin: form.bin.trim(),
-    },
-    is_active: Boolean(form.is_active),
-  };
-
-  if (mode === "create") {
-    payload.item_code = form.item_code.trim().toUpperCase();
-    payload.quantity = Number(form.quantity || 0);
-  }
-
-  return payload;
-}
-
-function itemToForm(item) {
-  return {
-    ...EMPTY_FORM,
-    item_name: item.item_name || "",
-    item_code: item.item_code || "",
-    description: item.description || "",
-    category: item.category || "SPARE_PARTS",
-    unit: item.unit || "cai",
-    unit_price: item.unit_price ?? "",
-    cost_price: item.cost_price ?? "",
-    min_stock_level: item.min_stock_level ?? "10",
-    max_stock_level: item.max_stock_level ?? "1000",
-    reorder_point: item.reorder_point ?? "20",
-    supplier_name: item.supplier_name || "",
-    supplier_contact: item.supplier_contact || "",
-    warehouse: item.location?.warehouse || "Kho chính",
-    shelf: item.location?.shelf || "",
-    bin: item.location?.bin || "",
-    is_active: item.is_active !== false,
   };
 }
 
@@ -171,18 +124,81 @@ function fieldId(label) {
   return `inventory-${String(label).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 }
 
-function getInlineValidation(form, mode) {
-  const errors = {};
-  if (form.item_name.trim().length < 2) errors.item_name = "Tên vật tư phải có ít nhất 2 ký tự.";
-  if (mode === "create" && !form.item_code.trim()) errors.item_code = "Mã vật tư là bắt buộc.";
-  if (!form.unit.trim()) errors.unit = "Đơn vị là bắt buộc.";
-  if (form.unit_price === "" || Number(form.unit_price) < 0) errors.unit_price = "Đơn giá bán phải >= 0.";
-  if (form.cost_price !== "" && Number(form.cost_price) < 0) errors.cost_price = "Giá vốn phải >= 0.";
-  if (mode === "create" && Number(form.quantity) < 0) errors.quantity = "Số lượng phải >= 0.";
-  if (form.min_stock_level !== "" && Number(form.min_stock_level) < 0) errors.min_stock_level = "Tồn tối thiểu phải >= 0.";
-  if (form.max_stock_level !== "" && Number(form.max_stock_level) < 0) errors.max_stock_level = "Tồn tối đa phải >= 0.";
-  if (form.reorder_point !== "" && Number(form.reorder_point) < 0) errors.reorder_point = "Điểm đặt lại phải >= 0.";
-  return errors;
+function priceRangeToParams(range) {
+  if (!range) return {};
+  const [min, max] = range.split("-");
+  const params = {};
+  if (min) params.price_min = min;
+  if (max) params.price_max = max;
+  return params;
+}
+
+/**
+ * Gộp danh sách item (mỗi item = 1 variant/SKU) thành sản phẩm theo product_name.
+ * Dữ liệu cũ chưa có product_name thì mỗi item là 1 sản phẩm có 1 variant.
+ */
+function groupProducts(items) {
+  const map = new Map();
+
+  items.forEach((item) => {
+    const name = (item.product_name || item.item_name || "").trim() || item.item_code;
+    const key = name.toLowerCase();
+    if (!map.has(key)) {
+      map.set(key, { key, name, variants: [] });
+    }
+    map.get(key).variants.push(item);
+  });
+
+  return Array.from(map.values()).map((product) => {
+    const { variants } = product;
+    const first = variants[0] || {};
+    const totalStock = variants.reduce((sum, v) => sum + Number(v.quantity || 0), 0);
+    const totalValue = variants.reduce(
+      (sum, v) => sum + calculateInventoryValue(v.quantity, v.cost_price, v.unit_price),
+      0
+    );
+    const vehicles = [...new Set(variants.map((v) => v.car_model).filter(Boolean))];
+    const suppliers = [...new Set(variants.map((v) => v.supplier_name).filter(Boolean))];
+    const brands = [...new Set(variants.map((v) => v.brand).filter(Boolean))];
+    const statuses = variants.map((v) => v.stock_status);
+    const status = statuses.every((s) => s === "OUT_OF_STOCK")
+      ? "OUT_OF_STOCK"
+      : statuses.some((s) => s === "OUT_OF_STOCK" || s === "LOW_STOCK")
+        ? "LOW_STOCK"
+        : statuses.some((s) => s === "BELOW_MIN")
+          ? "BELOW_MIN"
+          : statuses.some((s) => s === "OVERSTOCK")
+            ? "OVERSTOCK"
+            : "IN_STOCK";
+
+    const sellPrices = variants.map((v) => Number(v.unit_price || 0)).filter((n) => n > 0);
+
+    return {
+      ...product,
+      category: first.category,
+      brand: brands[0] || "",
+      brands,
+      supplier: suppliers[0] || "",
+      suppliers,
+      vehicles,
+      image_url: variants.find((v) => v.image_url)?.image_url || "",
+      description: first.description || "",
+      totalStock,
+      totalValue,
+      status,
+      unit: first.unit,
+      sellRange: sellPrices.length ? [Math.min(...sellPrices), Math.max(...sellPrices)] : null,
+      skuPrefix: first.item_code ? String(first.item_code).replace(/[0-9]+$/, "") : "",
+      allInactive: variants.every((v) => v.is_active === false),
+      anyActive: variants.some((v) => v.is_active !== false),
+    };
+  });
+}
+
+function formatPriceRange(range) {
+  if (!range) return "--";
+  const [min, max] = range;
+  return min === max ? formatVND(min) : `${formatVND(min)} - ${formatVND(max)}`;
 }
 
 function InventoryStatusBadge({ status }) {
@@ -221,811 +237,17 @@ function StateCard({ type = "empty", title, message, onRetry }) {
   );
 }
 
-function InventorySkeleton() {
+function InventorySkeleton({ rows = 6 }) {
   return (
     <div className="inventory-skeleton-grid">
-      {Array.from({ length: 6 }).map((_, index) => (
+      {Array.from({ length: rows }).map((_, index) => (
         <div className="inventory-skeleton" key={index} />
       ))}
     </div>
   );
 }
 
-function InventoryHeader({ title, subtitle, children }) {
-  return (
-    <div className="inventory-page-head">
-      <div>
-        <span>QUẢN LÝ KHO</span>
-        <h2>{title}</h2>
-        <p>{subtitle}</p>
-      </div>
-      {children && <div className="inventory-head-actions">{children}</div>}
-    </div>
-  );
-}
-
-function DashboardView({ basePath, go, notify, readOnly }) {
-  const [state, setState] = useState({ loading: true, error: "", stats: null, lowStock: [], transactions: [] });
-
-  const loadData = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: "" }));
-    try {
-      const [statsResponse, lowResponse, txResponse] = await Promise.all([
-        getInventoryStatistics({ period: 30 }),
-        getLowStockItems({ limit: 5 }),
-        getInventoryTransactions({ limit: 10 }),
-      ]);
-
-      setState({
-        loading: false,
-        error: "",
-        stats: statsResponse.data,
-        lowStock: normalizeItemsResponse(lowResponse).items,
-        transactions: normalizeTransactionsResponse(txResponse).transactions,
-      });
-    } catch (error) {
-      setState({ loading: false, error: error.message, stats: null, lowStock: [], transactions: [] });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!readOnly) loadData();
-  }, [loadData, readOnly]);
-
-  if (readOnly) {
-    return <ListView basePath={basePath} readOnly />;
-  }
-
-  const overview = state.stats?.overview || {};
-  const charts = state.stats?.charts || {};
-
-  return (
-    <>
-      <InventoryHeader title="Kho vật tư" subtitle="Theo dõi tồn kho, cảnh báo và giao dịch nhập xuất.">
-        <button className="inventory-btn secondary" onClick={() => go(`${basePath}/transactions`)} type="button">
-          <ClipboardList size={18} />
-          Lịch sử giao dịch
-        </button>
-        <button className="inventory-btn primary" onClick={() => go(`${basePath}/items/new`)} type="button">
-          <Plus size={18} />
-          Thêm vật tư
-        </button>
-      </InventoryHeader>
-
-      {state.loading ? (
-        <InventorySkeleton />
-      ) : state.error ? (
-        <StateCard type="error" title="Không tải được dashboard kho" message={state.error} onRetry={loadData} />
-      ) : (
-        <div className="inventory-dashboard">
-          <div className="inventory-stat-grid">
-            <StatCard icon={Boxes} label="Vật tư đang hoạt động" value={overview.active_items || 0} />
-            <StatCard icon={TrendingDown} label="Sắp hết / hết hàng" value={(overview.low_stock_items || 0) + (overview.out_of_stock_items || 0)} tone="warning" />
-            <StatCard icon={BarChart3} label="Tổng giá trị tồn" value={formatVND(overview.total_stock_value)} tone="success" />
-            <StatCard icon={ClipboardList} label="Giao dịch 30 ngày" value={overview.recent_transactions || 0} tone="info" />
-          </div>
-
-          <div className="inventory-two-col">
-            <section className="inventory-panel">
-              <div className="inventory-panel-head">
-                <h3>Cần đặt thêm</h3>
-                <button className="inventory-link-btn" onClick={() => go(`${basePath}/items?stock_status=LOW_STOCK`)} type="button">
-                  Xem tất cả
-                </button>
-              </div>
-              {state.lowStock.length ? state.lowStock.map((item) => (
-                <ItemMiniRow item={item} key={getItemId(item)} onClick={() => go(`${basePath}/items/${getItemId(item)}`)} />
-              )) : <StateCard title="Kho ổn định" message="Chưa có vật tư chạm ngưỡng đặt thêm." />}
-            </section>
-
-            <section className="inventory-panel">
-              <div className="inventory-panel-head">
-                <h3>Top giá trị tồn kho</h3>
-              </div>
-              {(charts.top_items_by_value || []).slice(0, 10).map((item) => (
-                <div className="inventory-value-row" key={item.item_code}>
-                  <div>
-                    <strong>{item.item_name}</strong>
-                    <span>{item.item_code} - {formatQuantity(item.quantity)}</span>
-                  </div>
-                  <b>{formatVND(item.stock_value)}</b>
-                </div>
-              ))}
-            </section>
-          </div>
-
-          <div className="inventory-two-col">
-            <section className="inventory-panel">
-              <div className="inventory-panel-head">
-                <h3>Phân bổ theo danh mục</h3>
-              </div>
-              <SimpleBars data={(charts.items_by_category || []).map((row) => ({ label: row._id, value: row.count }))} />
-            </section>
-            <section className="inventory-panel">
-              <div className="inventory-panel-head">
-                <h3>Nhập / xuất 7 ngày</h3>
-              </div>
-              <SimpleBars data={(charts.stock_movements || []).map((row) => ({ label: `${row._id?.date} ${row._id?.type === "STOCK_IN" ? "IN" : "OUT"}`, value: row.total_quantity }))} />
-            </section>
-          </div>
-
-          <ListView basePath={basePath} embedded go={go} notify={notify} readOnly={readOnly} />
-        </div>
-      )}
-    </>
-  );
-}
-
-function StatCard({ icon: Icon, label, value, tone = "" }) {
-  return (
-    <article className={`inventory-stat-card ${tone}`}>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-      <Icon />
-    </article>
-  );
-}
-
-function SimpleBars({ data = [] }) {
-  const max = Math.max(...data.map((item) => Number(item.value || 0)), 1);
-  if (!data.length) return <StateCard title="Chưa có dữ liệu" message="Dữ liệu biểu đồ sẽ hiển thị khi có giao dịch." />;
-
-  return (
-    <div className="inventory-bars">
-      {data.slice(0, 10).map((item, index) => (
-        <div className="inventory-bar-row" key={`${item.label}-${index}`}>
-          <span>{item.label || "Khác"}</span>
-          <div><i style={{ width: `${Math.max(8, (Number(item.value || 0) / max) * 100)}%` }} /></div>
-          <b>{item.value}</b>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ItemMiniRow({ item, onClick }) {
-  return (
-    <button className="inventory-mini-row" onClick={onClick} type="button">
-      <div>
-        <strong>{item.item_name}</strong>
-        <span>{item.item_code}</span>
-      </div>
-      <div>
-        <InventoryStatusBadge status={item.stock_status} />
-        <b>{formatQuantity(item.quantity, item.unit)}</b>
-      </div>
-    </button>
-  );
-}
-
-function ListView({ basePath, embedded = false, go: externalGo, notify, readOnly }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const initialStatus = new URLSearchParams(location.search).get("stock_status") || "";
-  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS, stock_status: initialStatus });
-  const [draftSearch, setDraftSearch] = useState(filters.search);
-  const [state, setState] = useState({ loading: true, error: "", items: [], pagination: {} });
-  const debouncedSearch = useDebouncedValue(draftSearch, 300);
-  const go = externalGo || navigate;
-
-  const loadItems = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: "" }));
-    try {
-      const params = { ...filters, search: debouncedSearch };
-      const response = readOnly ? await getStaffInventoryItems(params) : await getInventoryItems(params);
-      const data = normalizeItemsResponse(response);
-      setState({ loading: false, error: "", items: data.items, pagination: data.pagination });
-    } catch (error) {
-      setState({ loading: false, error: error.message, items: [], pagination: {} });
-    }
-  }, [debouncedSearch, filters, readOnly]);
-
-  useEffect(() => {
-    loadItems();
-  }, [loadItems]);
-
-  const updateFilter = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value, page: key === "page" ? value : 1 }));
-  };
-
-  const toggleSort = (sortBy) => {
-    setFilters((prev) => ({
-      ...prev,
-      sort_by: sortBy,
-      sort_order: prev.sort_by === sortBy && prev.sort_order === "asc" ? "desc" : "asc",
-      page: 1,
-    }));
-  };
-
-  const CAR_MODELS = [
-  { value: 'vision', label: 'Honda Vision' },
-  { value: 'sh', label: 'Honda SH' },
-  { value: 'wave', label: 'Honda Wave' },
-  { value: 'exciter', label: 'Yamaha Exciter' },
-  { value: 'winner', label: 'Honda Winner' }
-];
-
-const BRANDS = [
-  { value: 'michelin', label: 'Michelin' },
-  { value: 'castrol', label: 'Castrol' },
-  { value: 'motul', label: 'Motul' },
-  { value: 'irc', label: 'IRC' }
-];
-// --- LOGIC LỌC KHOẢNG GIÁ Ở FRONTEND ---
-const getFilteredItems = () => {
-  if (!state.items) return [];
-  
-  const range = filters.price_range;
-  if (!range) return state.items; // Nếu chọn "Tất cả" thì không lọc giá
-
-  return state.items.filter((item) => {
-    // Ép giá bán (unit_price) về kiểu số nguyên để so sánh chính xác
-    const price = parseInt(item.unit_price, 10) || 0;
-
-    switch (range) {
-      case "0-500":
-        return price < 500000;
-      case "500-1000":
-        return price >= 500000 && price <= 1000000;
-      case "1000+":
-        return price > 1000000;
-      default:
-        return true;
-    }
-  });
-};
-
-// Gọi danh sách vật tư đã được lọc theo khoảng giá
-const displayedItems = getFilteredItems();
-
-
-
-return (
-  <section className={`inventory-panel inventory-list-panel ${embedded ? "embedded" : ""}`}>
-    {!embedded && (
-      <InventoryHeader 
-        title={readOnly ? "Kho vật tư" : "Danh sách vật tư"} 
-        subtitle={readOnly ? "Tra cứu tồn kho vật tư đang hoạt động." : "Tìm kiếm, lọc và quản lý vật tư trong garage."}
-      >
-        {!readOnly && (
-          <>
-            <button className="inventory-btn secondary" onClick={() => go(`${basePath}/transactions`)} type="button">
-              <ClipboardList size={18} />
-              Giao dịch
-            </button>
-            <button className="inventory-btn primary" onClick={() => go(`${basePath}/items/new`)} type="button">
-              <Plus size={18} />
-              Thêm mới
-            </button>
-          </>
-        )}
-      </InventoryHeader>
-    )}
-
-    {/* --- THANH TÌM KIẾM --- */}
-    <div className="inventory-search-wrap" style={{ marginBottom: '16px' }}>
-      <label className="inventory-search" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-        <Search size={18} />
-        <input
-          onChange={(event) => {
-            setDraftSearch(event.target.value);
-            setFilters((prev) => ({ ...prev, page: 1 }));
-          }}
-          placeholder="Tìm theo mã hoặc tên vật tư..."
-          value={draftSearch}
-          style={{ width: '100%', border: 'none', outline: 'none' }}
-        />
-      </label>
-    </div>
-
-    {/* --- BỘ LỌC THÔNG MINH --- */}
-    <div className="smart-filter-container" style={{ background: '#fff', padding: '16px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-      <div className="smart-filter-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontWeight: 'bold', fontSize: '16px', color: '#1a1a1a' }}>
-        <Search size={18} /> 
-        <span>Bộ lọc thông minh</span>
-      </div>
-
-      <div className="smart-filter-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '12px' }}>
-        {/* DANH MỤC */}
-        <div className="filter-group">
-          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-            Danh mục
-          </label>
-          <select 
-            onChange={(event) => updateFilter("category", event.target.value)} 
-            value={filters.category}
-            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
-          >
-            {INVENTORY_CATEGORIES.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* DÒNG XE */}
-        <div className="filter-group" style={{ display: 'flex', flexDirection: 'column' }}>
-          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-            Dòng xe
-          </label>
-          <select 
-            onChange={(event) => updateFilter("car_model", event.target.value)} 
-            value={filters.car_model || ""}
-            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
-          >
-            <option value="">Tất cả</option>
-            {CAR_MODELS.map((item) => (
-              <option key={item.value} value={item.value}>{item.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* THƯƠNG HIỆU */}
-        <div className="filter-group" style={{ display: 'flex', flexDirection: 'column' }}>
-          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-            Thương hiệu
-          </label>
-          <select 
-            onChange={(event) => updateFilter("brand", event.target.value)} 
-            value={filters.brand || ""}
-            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
-          >
-            <option value="">Tất cả</option>
-            {BRANDS.map((item) => (
-              <option key={item.value} value={item.value}>{item.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* CHẤT LƯỢNG */}
-        <div className="filter-group">
-          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Chất lượng</label>
-          <select 
-            onChange={(event) => updateFilter("quality", event.target.value)} 
-            value={filters.quality || ""}
-            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
-          >
-            <option value="">Tất cả</option>
-            <option value="PREMIUM">Premium</option>
-            <option value="STANDARD">Standard</option>
-          </select>
-        </div>
-
-        {/* TRẠNG THÁI */}
-        <div className="filter-group">
-          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Trạng thái</label>
-          <select 
-            onChange={(event) => updateFilter("stock_status", event.target.value)} 
-            value={filters.stock_status}
-            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
-          >
-            <option value="">Tất cả</option>
-            <option value="OUT_OF_STOCK">Hết hàng</option>
-            <option value="LOW_STOCK">Sắp hết</option>
-            <option value="BELOW_MIN">Dưới mức tối thiểu</option>
-            <option value="IN_STOCK">Còn hàng</option>
-            <option value="OVERSTOCK">Tồn kho cao</option>
-          </select>
-        </div>
-
-        {/* KHOẢNG GIÁ */}
-        <div className="filter-group">
-          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#8c8c8c', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Khoảng giá</label>
-          <select 
-            onChange={(event) => updateFilter("price_range", event.target.value)} 
-            value={filters.price_range || ""}
-            style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f7fa' }}
-          >
-            <option value="">Tất cả</option>
-            <option value="0-500">Dưới 500,000đ</option>
-            <option value="500-1000">500,000đ - 1,000,000đ</option>
-            <option value="1000+">Trên 1,000,000đ</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    {/* --- DANH SÁCH BẢNG SẢN PHẨM --- */}
-    {state.loading ? <InventorySkeleton /> : state.error ? (
-      <StateCard type="error" title="Không tải được danh sách kho" message={state.error} onRetry={loadItems} />
-    ) : !displayedItems.length ? ( // Sử dụng displayedItems thay thế state.items
-      <StateCard title="Không có vật tư phù hợp" message="Thử đổi từ khóa tìm kiếm hoặc bộ lọc." />
-    ) : (
-      <>
-        <div className="inventory-table-wrap">
-          <table className="inventory-table">
-            <thead>
-              <tr>
-                <th onClick={() => toggleSort("item_name")}>Sản phẩm</th>
-                <th>Thông tin</th>
-                <th>Phân loại</th>
-                <th onClick={() => toggleSort("purchase_price")}>Giá nhập</th>
-                <th onClick={() => toggleSort("unit_price")}>Giá bán</th>
-                <th onClick={() => toggleSort("quantity")}>Tồn kho</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedItems.map((item) => ( // Sử dụng displayedItems thay thế state.items
-                <InventoryRow
-                  basePath={basePath}
-                  item={item}
-                  key={getItemId(item)}
-                  notify={notify}
-                  onChanged={loadItems}
-                  readOnly={readOnly}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <Pagination filters={filters} pagination={state.pagination} updateFilter={updateFilter} />
-      </>
-    )}
-  </section>
-);
-}
-
-function InventoryRow({ basePath, item, readOnly, notify, onChanged }) {
-  const navigate = useNavigate();
-  const [stockModal, setStockModal] = useState(null);
-  const id = getItemId(item);
-
-  const handleDeactivate = async (event) => {
-    event.stopPropagation();
-    const confirmText = item.is_active === false ? "Mở khóa vật tư này?" : "Khóa vật tư này? UI sẽ không xóa cứng dữ liệu.";
-    if (!window.confirm(confirmText)) return;
-    try {
-      if (item.is_active === false) await activateInventoryItem(id);
-      else await deactivateInventoryItem(id);
-      notify?.(item.is_active === false ? "Đã mở khóa vật tư." : "Đã khóa vật tư.");
-      onChanged?.();
-    } catch (error) {
-      notify?.(error.message || "Không thể cập nhật trạng thái vật tư.", "error");
-    }
-  };
-
-  return (
-    <>
-      <tr className={!item.is_active ? "inactive" : ""} onClick={() => navigate(`${basePath}/items/${id}`)}>
-        <td className="inventory-code-cell"><strong title={item.item_code}>{item.item_code}</strong></td>
-        <td className="inventory-name-cell"><span title={item.item_name}>{item.item_name}</span></td>
-        <td><span title={item.category}>{item.category}</span></td>
-        <td>{formatQuantity(item.quantity, item.unit)}</td>
-        <td><InventoryStatusBadge status={item.stock_status} /></td>
-        <td className="inventory-money-cell">{formatVND(item.unit_price)}</td>
-        <td className="inventory-supplier-cell"><span title={item.supplier_name || "--"}>{item.supplier_name || "--"}</span></td>
-        {!readOnly && <td><span className={`inventory-badge ${item.is_active === false ? "muted" : "success"}`}>{item.is_active === false ? "Đã khóa" : "Đang hoạt động"}</span></td>}
-        <td onClick={(event) => event.stopPropagation()}>
-          <div className="inventory-row-actions">
-            <button aria-label="Xem chi tiết" onClick={() => navigate(`${basePath}/items/${id}`)} type="button"><Eye size={16} /></button>
-            {!readOnly && (
-              <>
-                <button aria-label="Nhập kho" onClick={() => setStockModal("in")} type="button"><Upload size={16} /></button>
-                <button aria-label="Xuất kho" onClick={() => setStockModal("out")} type="button"><TrendingDown size={16} /></button>
-                <button aria-label="Chỉnh sửa" onClick={() => navigate(`${basePath}/items/${id}/edit`)} type="button"><Edit3 size={16} /></button>
-                <button aria-label="Khóa hoặc mở khóa" onClick={handleDeactivate} type="button"><Trash2 size={16} /></button>
-              </>
-            )}
-          </div>
-        </td>
-      </tr>
-      {stockModal === "in" && <StockInModal item={item} onClose={() => setStockModal(null)} onSuccess={() => { setStockModal(null); notify?.("Nhập kho thành công."); onChanged?.(); }} />}
-      {stockModal === "out" && <StockOutModal item={item} onClose={() => setStockModal(null)} onSuccess={() => { setStockModal(null); notify?.("Xuất kho thành công."); onChanged?.(); }} />}
-    </>
-  );
-}
-
-function Pagination({ filters, pagination, updateFilter }) {
-  const page = Number(pagination.page || filters.page || 1);
-  const pages = Math.max(Number(pagination.pages || 1), 1);
-
-  return (
-    <div className="inventory-pagination">
-      <span>{Number(pagination.total || 0).toLocaleString("vi-VN")} vật tư</span>
-      <div>
-        <button disabled={page <= 1} onClick={() => updateFilter("page", page - 1)} type="button">Trước</button>
-        <strong>{page} / {pages}</strong>
-        <button disabled={page >= pages} onClick={() => updateFilter("page", page + 1)} type="button">Sau</button>
-      </div>
-    </div>
-  );
-}
-
-function DetailView({ basePath, itemId, notify, readOnly }) {
-  const navigate = useNavigate();
-  const [state, setState] = useState({ loading: true, error: "", item: null, transactions: [] });
-  const [stockModal, setStockModal] = useState(null);
-
-  const loadItem = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: "" }));
-    try {
-      const response = readOnly ? await getStaffInventoryItemById(itemId) : await getInventoryItemById(itemId);
-      setState({
-        loading: false,
-        error: "",
-        item: normalizeItemResponse(response),
-        transactions: response?.data?.recent_transactions || [],
-      });
-    } catch (error) {
-      setState({ loading: false, error: error.message, item: null, transactions: [] });
-    }
-  }, [itemId, readOnly]);
-
-  useEffect(() => {
-    loadItem();
-  }, [loadItem]);
-
-  if (state.loading) return <InventorySkeleton />;
-  if (state.error) return <StateCard type="error" title="Không tải được chi tiết vật tư" message={state.error} onRetry={loadItem} />;
-  if (!state.item) return <StateCard title="Không tìm thấy vật tư" message="Vật tư này không tồn tại hoặc đã bị xóa." />;
-
-  const item = state.item;
-  const progress = getStockProgress(item.quantity, item.min_stock_level, item.max_stock_level);
-  const inventoryValue = calculateInventoryValue(item.quantity, item.cost_price, item.unit_price);
-
-  return (
-    <>
-      <InventoryHeader title={item.item_name} subtitle={`${item.item_code} - ${item.category}`}>
-        <button className="inventory-btn secondary" onClick={() => navigate(basePath)} type="button">
-          <ArrowLeft size={18} />
-          Quay lại
-        </button>
-        {!readOnly && (
-          <>
-            <button className="inventory-btn secondary" onClick={() => setStockModal("in")} type="button">Nhập kho</button>
-            <button className="inventory-btn warning" onClick={() => setStockModal("out")} type="button">Xuất kho</button>
-            <button className="inventory-btn primary" onClick={() => navigate(`${basePath}/items/${itemId}/edit`)} type="button">Chỉnh sửa</button>
-          </>
-        )}
-      </InventoryHeader>
-
-      {item.stock_status === "OUT_OF_STOCK" && (
-        <div className="inventory-alert-banner">
-          <AlertTriangle size={18} />
-          Vật tư này đã hết hàng. Cần nhập kho trước khi sử dụng cho lịch hẹn.
-        </div>
-      )}
-
-      <div className="inventory-detail-grid">
-        <section className="inventory-panel">
-          <div className="inventory-panel-head"><h3>Thông tin cơ bản</h3><InventoryStatusBadge status={item.stock_status} /></div>
-          <InfoGrid rows={[
-            ["Mã vật tư", item.item_code],
-            ["Tên vật tư", item.item_name],
-            ["Mô tả", item.description || "--"],
-            ["Danh mục", item.category],
-            ["Đơn vị", item.unit],
-            ["Trạng thái", item.is_active === false ? "Đã khóa" : "Đang hoạt động"],
-          ]} />
-        </section>
-
-        <section className="inventory-panel">
-          <div className="inventory-panel-head"><h3>Tồn kho</h3></div>
-          <InfoGrid rows={[
-            ["Số lượng", formatQuantity(item.quantity, item.unit)],
-            ["Tối thiểu", formatQuantity(item.min_stock_level, item.unit)],
-            ["Tối đa", formatQuantity(item.max_stock_level, item.unit)],
-            ["Điểm đặt lại", formatQuantity(item.reorder_point, item.unit)],
-            ["Lần nhập gần nhất", formatDateTime(item.last_restocked_at)],
-          ]} />
-          <div className="inventory-progress"><i style={{ width: `${progress}%` }} /></div>
-        </section>
-
-        <section className="inventory-panel">
-          <div className="inventory-panel-head"><h3>Giá</h3></div>
-          <InfoGrid rows={[
-            ["Giá bán", formatVND(item.unit_price)],
-            ...(!readOnly ? [["Giá vốn", formatVND(item.cost_price)], ["Giá trị tồn", formatVND(inventoryValue)]] : []),
-          ]} />
-        </section>
-
-        <section className="inventory-panel">
-          <div className="inventory-panel-head"><h3>Nhà cung cấp và vị trí</h3></div>
-          <InfoGrid rows={[
-            ["Nhà cung cấp", item.supplier_name || "--"],
-            ["Liên hệ", item.supplier_contact || "--"],
-            ["Kho", item.location?.warehouse || "--"],
-            ["Kệ", item.location?.shelf || "--"],
-            ["Ngăn", item.location?.bin || "--"],
-          ]} />
-        </section>
-      </div>
-
-      <section className="inventory-panel">
-        <div className="inventory-panel-head">
-          <h3>Giao dịch gần nhất</h3>
-          {!readOnly && (
-            <button className="inventory-link-btn" onClick={() => navigate(`${basePath}/transactions?item_id=${itemId}`)} type="button">
-              Xem tất cả giao dịch
-            </button>
-          )}
-        </div>
-        <TransactionTable transactions={state.transactions} />
-      </section>
-
-      {stockModal === "in" && <StockInModal item={item} onClose={() => setStockModal(null)} onSuccess={() => { setStockModal(null); notify?.("Nhập kho thành công."); loadItem(); }} />}
-      {stockModal === "out" && <StockOutModal item={item} onClose={() => setStockModal(null)} onSuccess={() => { setStockModal(null); notify?.("Xuất kho thành công."); loadItem(); }} />}
-    </>
-  );
-}
-
-function InfoGrid({ rows }) {
-  return (
-    <div className="inventory-info-grid">
-      {rows.map(([label, value]) => (
-        <div key={label}>
-          <span>{label}</span>
-          <strong>{value}</strong>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function FormView({ basePath, itemId, mode }) {
-  const navigate = useNavigate();
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [state, setState] = useState({ loading: mode === "edit", saving: false, error: "", fieldError: "" });
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [dirty, setDirty] = useState(false);
-
-  useEffect(() => {
-    if (mode !== "edit") return;
-    let mounted = true;
-    setState((prev) => ({ ...prev, loading: true, error: "" }));
-    getInventoryItemById(itemId)
-      .then((response) => {
-        if (!mounted) return;
-        setForm(itemToForm(normalizeItemResponse(response) || {}));
-        setState((prev) => ({ ...prev, loading: false }));
-      })
-      .catch((error) => mounted && setState((prev) => ({ ...prev, loading: false, error: error.message })));
-    return () => { mounted = false; };
-  }, [itemId, mode]);
-
-  const update = (key, value) => {
-    setDirty(true);
-    setFieldErrors((prev) => ({ ...prev, [key]: "" }));
-    setForm((prev) => ({ ...prev, [key]: key === "item_code" ? value.toUpperCase() : value }));
-  };
-
-  const validate = () => {
-    const errors = getInlineValidation(form, mode);
-    setFieldErrors(errors);
-    return Object.values(errors)[0] || "";
-  };
-
-  useEffect(() => {
-    if (!dirty) return undefined;
-    const handleBeforeUnload = (event) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [dirty]);
-
-  const handleCancel = () => {
-    if (dirty && !window.confirm("Form đã thay đổi. Bạn có muốn hủy?")) return;
-    navigate(mode === "edit" ? `${basePath}/items/${itemId}` : basePath);
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    const validationError = validate();
-    if (validationError) {
-      setState((prev) => ({ ...prev, fieldError: validationError }));
-      return;
-    }
-
-    setState((prev) => ({ ...prev, saving: true, fieldError: "", error: "" }));
-    try {
-      const payload = buildPayload(form, mode);
-      const response = mode === "edit"
-        ? await updateInventoryItem(itemId, payload)
-        : await createInventoryItem(payload);
-      const item = normalizeItemResponse(response);
-      setDirty(false);
-      navigate(`${basePath}/items/${getItemId(item) || itemId}`, {
-        state: { inventoryNotice: { message: mode === "edit" ? "Đã cập nhật vật tư." : "Đã tạo vật tư mới.", type: "success" } },
-      });
-    } catch (error) {
-      setState((prev) => ({ ...prev, saving: false, fieldError: error.message }));
-    }
-  };
-
-  if (state.loading) return <InventorySkeleton />;
-  if (state.error) return <StateCard type="error" title="Không tải được form vật tư" message={state.error} />;
-
-  return (
-    <>
-      <InventoryHeader title={mode === "edit" ? "Chỉnh sửa vật tư" : "Thêm vật tư mới"} subtitle="Cập nhật thông tin vật tư, ngưỡng tồn và vị trí kho.">
-        <button className="inventory-btn secondary" onClick={handleCancel} type="button">
-          <ArrowLeft size={18} />
-          Hủy
-        </button>
-      </InventoryHeader>
-      <form className="inventory-form inventory-panel" onSubmit={handleSubmit}>
-        {state.fieldError && <div className="inventory-form-error">{state.fieldError}</div>}
-        <div className="inventory-form-grid">
-          <FormField error={fieldErrors.item_code} label="Mã vật tư">
-            <input disabled={mode === "edit"} onChange={(event) => update("item_code", event.target.value)} value={form.item_code} />
-          </FormField>
-          <FormField error={fieldErrors.item_name} label="Tên vật tư">
-            <input onChange={(event) => update("item_name", event.target.value)} value={form.item_name} />
-          </FormField>
-          <FormField label="Danh mục">
-            <select onChange={(event) => update("category", event.target.value)} value={form.category}>
-              {INVENTORY_CATEGORIES.filter(([value]) => value).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </FormField>
-          <FormField error={fieldErrors.unit} label="Đơn vị">
-            <input onChange={(event) => update("unit", event.target.value)} value={form.unit} />
-          </FormField>
-          {mode === "create" && (
-            <FormField error={fieldErrors.quantity} label="Số lượng ban đầu">
-              <input min="0" onChange={(event) => update("quantity", event.target.value)} type="number" value={form.quantity} />
-            </FormField>
-          )}
-          <FormField error={fieldErrors.unit_price} label="Giá bán">
-            <input min="0" onChange={(event) => update("unit_price", event.target.value)} type="number" value={form.unit_price} />
-          </FormField>
-          <FormField error={fieldErrors.cost_price} label="Giá vốn">
-            <input min="0" onChange={(event) => update("cost_price", event.target.value)} type="number" value={form.cost_price} />
-          </FormField>
-          <FormField error={fieldErrors.min_stock_level} label="Tồn tối thiểu">
-            <input min="0" onChange={(event) => update("min_stock_level", event.target.value)} type="number" value={form.min_stock_level} />
-          </FormField>
-          <FormField error={fieldErrors.max_stock_level} label="Tồn tối đa">
-            <input min="0" onChange={(event) => update("max_stock_level", event.target.value)} type="number" value={form.max_stock_level} />
-          </FormField>
-          <FormField error={fieldErrors.reorder_point} label="Điểm đặt lại">
-            <input min="0" onChange={(event) => update("reorder_point", event.target.value)} type="number" value={form.reorder_point} />
-          </FormField>
-          <FormField label="Nhà cung cấp">
-            <input onChange={(event) => update("supplier_name", event.target.value)} value={form.supplier_name} />
-          </FormField>
-          <FormField label="Liên hệ NCC">
-            <input onChange={(event) => update("supplier_contact", event.target.value)} value={form.supplier_contact} />
-          </FormField>
-          <FormField label="Kho">
-            <input onChange={(event) => update("warehouse", event.target.value)} value={form.warehouse} />
-          </FormField>
-          <FormField label="Kệ">
-            <input onChange={(event) => update("shelf", event.target.value)} value={form.shelf} />
-          </FormField>
-          <FormField label="Ngăn">
-            <input onChange={(event) => update("bin", event.target.value)} value={form.bin} />
-          </FormField>
-          {mode === "edit" && (
-            <FormField label="Trạng thái">
-              <select onChange={(event) => update("is_active", event.target.value === "true")} value={String(form.is_active)}>
-                <option value="true">Đang hoạt động</option>
-                <option value="false">Đã khóa</option>
-              </select>
-            </FormField>
-          )}
-        </div>
-        <FormField label="Mô tả">
-          <textarea maxLength={1000} onChange={(event) => update("description", event.target.value)} value={form.description} />
-        </FormField>
-        <div className="inventory-form-actions">
-          <button className="inventory-btn secondary" onClick={handleCancel} type="button">Hủy</button>
-          <button className="inventory-btn primary" disabled={state.saving} type="submit">
-            {state.saving ? "Đang lưu..." : "Lưu thay đổi"}
-          </button>
-        </div>
-      </form>
-    </>
-  );
-}
-
-function FormField({ label, error, children }) {
+function FormField({ label, error, children, hint }) {
   const id = fieldId(label);
   return (
     <label className={`inventory-field ${error ? "has-error" : ""}`} htmlFor={id}>
@@ -1035,66 +257,120 @@ function FormField({ label, error, children }) {
         "aria-invalid": error ? "true" : undefined,
         "aria-describedby": error ? `${id}-error` : undefined,
       })}
+      {hint && !error && <small className="inventory-field-hint">{hint}</small>}
       {error && <small id={`${id}-error`}>{error}</small>}
     </label>
   );
 }
 
-function StockInModal({ item, onClose, onSuccess }) {
+function KpiCard({ icon: Icon, label, value, sub, tone = "" }) {
   return (
-    <StockModal
-      actionLabel="Nhập kho"
-      fields={{ quantity: "1", unit_cost: "", supplier_name: item.supplier_name || "", invoice_number: "", notes: "" }}
-      item={item}
-      mode="in"
-      onClose={onClose}
-      onSubmit={(payload) => stockInItem(getItemId(item), payload)}
-      onSuccess={onSuccess}
-    />
+    <article className={`inventory-kpi-card ${tone}`}>
+      <div className="inventory-kpi-icon"><Icon size={22} /></div>
+      <div className="inventory-kpi-body">
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {sub && <small>{sub}</small>}
+      </div>
+    </article>
   );
 }
 
-function StockOutModal({ item, onClose, onSuccess }) {
-  return (
-    <StockModal
-      actionLabel="Xuất kho"
-      fields={{ quantity: "1", reference_type: "MANUAL", notes: "" }}
-      item={item}
-      mode="out"
-      onClose={onClose}
-      onSubmit={(payload) => stockOutItem(getItemId(item), payload)}
-      onSuccess={onSuccess}
-    />
-  );
+function ProductThumb({ product }) {
+  const [broken, setBroken] = useState(false);
+  const src = product.image_url;
+
+  if (src && !broken) {
+    return (
+      <img
+        alt={product.name}
+        className="inventory-thumb"
+        onError={() => setBroken(true)}
+        src={src}
+      />
+    );
+  }
+  return <div className="inventory-thumb placeholder"><Package size={18} /></div>;
 }
 
-function StockModal({ item, mode, fields, actionLabel, onClose, onSubmit, onSuccess }) {
-  const [form, setForm] = useState(fields);
+/* ------------------------------------------------------------------ */
+/* Quick stock modal: nhập / xuất / điều chỉnh                          */
+/* ------------------------------------------------------------------ */
+
+const STOCK_MODES = {
+  in: { title: "Nhập kho", tag: "NHẬP KHO", btn: "inventory-btn primary" },
+  out: { title: "Xuất kho", tag: "XUẤT KHO", btn: "inventory-btn warning" },
+  adjust: { title: "Điều chỉnh tồn kho", tag: "KIỂM KÊ / ĐIỀU CHỈNH", btn: "inventory-btn primary" },
+};
+
+function QuickStockModal({ mode, item: initialItem, items, onClose, onSuccess }) {
+  const [selectedId, setSelectedId] = useState(initialItem ? getItemId(initialItem) : "");
+  const [form, setForm] = useState({
+    quantity: "1",
+    new_quantity: "",
+    supplier_name: initialItem?.supplier_name || "",
+    invoice_number: "",
+    reference_type: "MANUAL",
+    notes: "",
+  });
   const [state, setState] = useState({ saving: false, error: "" });
+
+  const item = initialItem || items.find((candidate) => getItemId(candidate) === selectedId) || null;
+  const meta = STOCK_MODES[mode];
   const quantity = Number(form.quantity || 0);
-  const preview = mode === "in" ? Number(item.quantity || 0) + quantity : Number(item.quantity || 0) - quantity;
-  const invalidQuantity = !Number.isInteger(quantity) || quantity < 1 || (mode === "out" && quantity > Number(item.quantity || 0));
+  const newQuantity = Number(form.new_quantity);
+  const currentStock = Number(item?.quantity || 0);
+
+  const preview = !item
+    ? null
+    : mode === "in"
+      ? currentStock + quantity
+      : mode === "out"
+        ? currentStock - quantity
+        : Number.isNaN(newQuantity) ? currentStock : newQuantity;
+
+  const invalid = !item
+    || (mode !== "adjust" && (!Number.isInteger(quantity) || quantity < 1))
+    || (mode === "out" && quantity > currentStock)
+    || (mode === "adjust" && (!Number.isInteger(newQuantity) || newQuantity < 0 || newQuantity === currentStock));
+
+  const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!Number.isInteger(quantity) || quantity < 1) {
-      setState({ saving: false, error: "Số lượng phải là số nguyên >= 1." });
+    if (!item) {
+      setState({ saving: false, error: "Vui lòng chọn vật tư." });
       return;
     }
-    if (mode === "out" && quantity > Number(item.quantity || 0)) {
-      setState({ saving: false, error: "Không thể xuất quá số lượng hiện có." });
+    if (invalid) {
+      setState({ saving: false, error: "Số lượng không hợp lệ." });
       return;
     }
-    if (mode === "out" && !window.confirm("Xác nhận xuất kho thủ công?")) return;
+    if (mode === "out" && !window.confirm("Xác nhận xuất kho?")) return;
 
     setState({ saving: true, error: "" });
     try {
-      await onSubmit({
-        ...form,
-        quantity,
-        unit_cost: form.unit_cost === "" ? undefined : Number(form.unit_cost),
-      });
-      onSuccess?.();
+      const id = getItemId(item);
+      if (mode === "in") {
+        await stockInItem(id, {
+          quantity,
+          supplier_name: form.supplier_name || undefined,
+          invoice_number: form.invoice_number || undefined,
+          notes: form.notes || undefined,
+        });
+      } else if (mode === "out") {
+        await stockOutItem(id, {
+          quantity,
+          reference_type: form.reference_type,
+          notes: form.notes || undefined,
+        });
+      } else {
+        await adjustStockItem(id, {
+          new_quantity: newQuantity,
+          notes: form.notes || undefined,
+        });
+      }
+      onSuccess?.(meta.title + " thành công.");
     } catch (error) {
       setState({ saving: false, error: error.message });
     }
@@ -1105,59 +381,89 @@ function StockModal({ item, mode, fields, actionLabel, onClose, onSubmit, onSucc
       <form className="inventory-modal" onSubmit={handleSubmit}>
         <div className="inventory-modal-head">
           <div>
-            <span>{mode === "in" ? "NHẬP KHO" : "XUẤT KHO"}</span>
-            <h3>{actionLabel}</h3>
-            <p>{item.item_name} - {item.item_code}</p>
+            <span>{meta.tag}</span>
+            <h3>{meta.title}</h3>
+            <p>{item ? `${item.item_name} - ${item.item_code}` : "Chọn vật tư cần thao tác"}</p>
           </div>
           <button aria-label="Đóng modal" onClick={onClose} type="button">x</button>
         </div>
         <div className="inventory-modal-body">
           {state.error && <div className="inventory-form-error">{state.error}</div>}
+
+          {!initialItem && (
+            <FormField label="Vật tư cần thao tác">
+              <select onChange={(event) => setSelectedId(event.target.value)} value={selectedId}>
+                <option value="">-- Chọn vật tư --</option>
+                {items.map((candidate) => (
+                  <option key={getItemId(candidate)} value={getItemId(candidate)}>
+                    {candidate.item_code} - {candidate.item_name} (tồn: {candidate.quantity})
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
+
           {mode === "out" && (
             <div className="inventory-warning-box">
               <AlertTriangle size={18} />
-              Xuất kho sẽ trừ trực tiếp số lượng tồn. Hãy kiểm tra đúng vật tư, số lượng và lý do trước khi xác nhận.
+              Xuất kho sẽ trừ trực tiếp số lượng tồn. Kiểm tra kỹ vật tư, số lượng và lý do trước khi xác nhận.
             </div>
           )}
-          <div className="inventory-stock-preview">
-            <div><span>Hiện có</span><strong>{formatQuantity(item.quantity, item.unit)}</strong></div>
-            <div><span>Sau thao tác</span><strong className={preview < 0 ? "danger" : ""}>{formatQuantity(preview, item.unit)}</strong></div>
-          </div>
-          <FormField label="Số lượng">
-            <input min="1" onChange={(event) => setForm((prev) => ({ ...prev, quantity: event.target.value }))} type="number" value={form.quantity} />
-          </FormField>
-          {mode === "out" && quantity > Number(item.quantity || 0) && (
+
+          {item && (
+            <div className="inventory-stock-preview">
+              <div><span>Hiện có</span><strong>{formatQuantity(currentStock, item.unit)}</strong></div>
+              <div>
+                <span>Sau thao tác</span>
+                <strong className={preview < 0 ? "danger" : ""}>{formatQuantity(preview, item.unit)}</strong>
+              </div>
+            </div>
+          )}
+
+          {mode === "adjust" ? (
+            <FormField hint="Nhập số lượng thực tế sau kiểm kê." label="Số lượng thực tế">
+              <input min="0" onChange={(event) => update("new_quantity", event.target.value)} type="number" value={form.new_quantity} />
+            </FormField>
+          ) : (
+            <FormField label="Số lượng">
+              <input min="1" onChange={(event) => update("quantity", event.target.value)} type="number" value={form.quantity} />
+            </FormField>
+          )}
+
+          {mode === "out" && item && quantity > currentStock && (
             <p className="inventory-field-message danger">Số lượng xuất không được lớn hơn tồn kho hiện có.</p>
           )}
-          {mode === "in" ? (
+
+          {mode === "in" && (
             <>
-              <FormField label="Đơn giá nhập">
-                <input min="0" onChange={(event) => setForm((prev) => ({ ...prev, unit_cost: event.target.value }))} type="number" value={form.unit_cost} />
-              </FormField>
               <FormField label="Nhà cung cấp">
-                <input onChange={(event) => setForm((prev) => ({ ...prev, supplier_name: event.target.value }))} value={form.supplier_name} />
+                <input onChange={(event) => update("supplier_name", event.target.value)} value={form.supplier_name} />
               </FormField>
               <FormField label="Số hóa đơn">
-                <input onChange={(event) => setForm((prev) => ({ ...prev, invoice_number: event.target.value }))} value={form.invoice_number} />
+                <input onChange={(event) => update("invoice_number", event.target.value)} value={form.invoice_number} />
               </FormField>
             </>
-          ) : (
+          )}
+
+          {mode === "out" && (
             <FormField label="Lý do xuất">
-              <select onChange={(event) => setForm((prev) => ({ ...prev, reference_type: event.target.value }))} value={form.reference_type}>
-                <option value="MANUAL">Thủ công</option>
-                <option value="DAMAGE">Hỏng hóc</option>
+              <select onChange={(event) => update("reference_type", event.target.value)} value={form.reference_type}>
+                <option value="MANUAL">Bán lẻ</option>
+                <option value="APPOINTMENT">Sử dụng sửa chữa</option>
+                <option value="PURCHASE_ORDER">Trả hàng nhà cung cấp</option>
                 <option value="OTHER">Khác</option>
               </select>
             </FormField>
           )}
-          <FormField label="Ghi chú">
-            <textarea maxLength={500} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} value={form.notes} />
+
+          <FormField label={mode === "adjust" ? "Lý do điều chỉnh" : "Ghi chú"}>
+            <textarea maxLength={500} onChange={(event) => update("notes", event.target.value)} value={form.notes} />
           </FormField>
         </div>
         <div className="inventory-modal-footer">
           <button className="inventory-btn secondary" onClick={onClose} type="button">Hủy</button>
-          <button className={mode === "out" ? "inventory-btn warning" : "inventory-btn primary"} disabled={state.saving || invalidQuantity} type="submit">
-            {state.saving ? "Đang xử lý..." : actionLabel}
+          <button className={meta.btn} disabled={state.saving || invalid} type="submit">
+            {state.saving ? "Đang xử lý..." : meta.title}
           </button>
         </div>
       </form>
@@ -1165,163 +471,1283 @@ function StockModal({ item, mode, fields, actionLabel, onClose, onSubmit, onSucc
   );
 }
 
-function TransactionsView({ basePath }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [filters, setFilters] = useState({
-    item_id: new URLSearchParams(location.search).get("item_id") || "",
-    transaction_type: "",
-    date_from: "",
-    date_to: "",
-    page: 1,
-    limit: 50,
-  });
-  const [state, setState] = useState({ loading: true, error: "", transactions: [], pagination: {} });
+/* ------------------------------------------------------------------ */
+/* Variant modal: thêm / sửa 1 variant                                  */
+/* ------------------------------------------------------------------ */
 
-  const loadTransactions = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: "" }));
-    try {
-      const response = await getInventoryTransactions(filters);
-      const data = normalizeTransactionsResponse(response);
-      setState({ loading: false, error: "", transactions: data.transactions, pagination: data.pagination });
-    } catch (error) {
-      setState({ loading: false, error: error.message, transactions: [], pagination: {} });
-    }
-  }, [filters]);
-
-  useEffect(() => {
-    loadTransactions();
-  }, [loadTransactions]);
-
-  const updateFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value, page: key === "page" ? value : 1 }));
-
-  return (
-    <>
-      <InventoryHeader title="Lịch sử giao dịch kho" subtitle="Theo dõi nhập kho, xuất kho và điều chỉnh tồn.">
-        <button className="inventory-btn secondary" onClick={() => navigate(basePath)} type="button">
-          <ArrowLeft size={18} />
-          Quay lại
-        </button>
-      </InventoryHeader>
-      <section className="inventory-panel">
-        <div className="inventory-toolbar inventory-toolbar-sticky">
-          <span className="inventory-filter-label"><Filter size={16} /> Bộ lọc</span>
-          <select onChange={(event) => updateFilter("transaction_type", event.target.value)} value={filters.transaction_type}>
-            {TRANSACTION_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-          <input onChange={(event) => updateFilter("date_from", event.target.value)} type="date" value={filters.date_from} />
-          <input onChange={(event) => updateFilter("date_to", event.target.value)} type="date" value={filters.date_to} />
-          <select onChange={(event) => updateFilter("limit", Number(event.target.value))} value={filters.limit}>
-            <option value={50}>50 / trang</option>
-            <option value={100}>100 / trang</option>
-          </select>
-        </div>
-        {state.loading ? <InventorySkeleton /> : state.error ? (
-          <StateCard type="error" title="Không tải được giao dịch" message={state.error} onRetry={loadTransactions} />
-        ) : (
-          <>
-            <TransactionTable transactions={state.transactions} />
-            <Pagination filters={filters} pagination={state.pagination} updateFilter={updateFilter} />
-          </>
-        )}
-      </section>
-    </>
-  );
+function stripDiacritics(text) {
+  return String(text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D");
 }
 
-function TransactionTable({ transactions = [] }) {
-  if (!transactions.length) return <StateCard title="Chưa có giao dịch" message="Lịch sử nhập xuất sẽ hiển thị tại đây." />;
+/** Tự sinh mã hàng từ tên sản phẩm + tên loại hàng, kèm hậu tố số để tránh trùng. */
+function makeSku(productName, variantName) {
+  const initials = stripDiacritics(productName)
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 6) || "SP";
+  const variantPart = stripDiacritics(variantName)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 6);
+  const random = Math.floor(1000 + Math.random() * 9000);
+  return [initials, variantPart, String(random)].filter(Boolean).join("-");
+}
 
+function variantToForm(item) {
+  return {
+    ...EMPTY_VARIANT,
+    item_code: item.item_code || "",
+    variant_name: item.variant_name || "",
+    barcode: item.barcode || "",
+    car_model: item.car_model || "",
+    quality: item.quality || "STANDARD",
+    unit: item.unit || "cái",
+    unit_price: item.unit_price ?? "",
+    quantity: String(item.quantity ?? 0),
+    min_stock_level: String(item.min_stock_level ?? 5),
+    max_stock_level: String(item.max_stock_level ?? 500),
+    reorder_point: String(item.reorder_point ?? 10),
+  };
+}
+
+function validateVariant(form, isCreate) {
+  if (isCreate && form.item_code.trim() && form.item_code.trim().length < 2) {
+    return "Mã hàng (SKU) nếu nhập phải có ít nhất 2 ký tự (để trống sẽ tự tạo).";
+  }
+  if (!form.unit.trim()) return "Đơn vị là bắt buộc.";
+  if (form.unit_price === "" || Number(form.unit_price) < 0) return "Giá bán phải >= 0.";
+  if (isCreate && Number(form.quantity) < 0) return "Tồn kho ban đầu phải >= 0.";
+  return "";
+}
+
+function VariantFields({ form, onChange, isCreate, compact = false }) {
   return (
-    <div className="inventory-table-wrap">
-      <table className="inventory-table">
-        <thead>
-          <tr>
-            <th>Ngày giờ</th>
-            <th>Vật tư</th>
-            <th>Loại</th>
-            <th>Thay đổi</th>
-            <th>Trước</th>
-            <th>Sau</th>
-            <th>Người thực hiện</th>
-            <th>Ghi chú</th>
-          </tr>
-        </thead>
-        <tbody>
-          {transactions.map((tx) => {
-            const item = tx.inventory_item_id || {};
-            const performer = tx.performed_by || {};
-            return (
-              <tr key={tx._id || `${tx.created_at}-${tx.quantity_after}`}>
-                <td>{formatDateTime(tx.created_at)}</td>
-                <td>
-                  <strong>{item.item_name || "--"}</strong>
-                  <span className="inventory-muted">{item.item_code || ""}</span>
-                </td>
-                <td><TransactionBadge type={tx.transaction_type} /></td>
-                <td className={Number(tx.quantity_change) < 0 ? "inventory-danger-text" : "inventory-success-text"}>{tx.quantity_change}</td>
-                <td>{tx.quantity_before}</td>
-                <td>{tx.quantity_after}</td>
-                <td>{performer.full_name || performer.email || "--"}</td>
-                <td>{tx.notes || "--"}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className={`inventory-form-grid ${compact ? "compact" : ""}`}>
+      <FormField label="Tên loại hàng" hint="VD: 70/90-17, 1L 10W30, Màu đen">
+        <input onChange={(event) => onChange("variant_name", event.target.value)} value={form.variant_name} />
+      </FormField>
+      <FormField
+        hint={isCreate ? "Để trống — hệ thống tự tạo mã." : undefined}
+        label="Mã hàng (SKU)"
+      >
+        <input
+          disabled={!isCreate}
+          onChange={(event) => onChange("item_code", event.target.value.toUpperCase())}
+          placeholder={isCreate ? "Tự tạo nếu bỏ trống" : ""}
+          value={form.item_code}
+        />
+      </FormField>
+      <FormField label="Mã vạch">
+        <input onChange={(event) => onChange("barcode", event.target.value)} value={form.barcode} />
+      </FormField>
+      <FormField label="Dòng xe">
+        <input
+          list="inventory-vehicle-list"
+          onChange={(event) => onChange("car_model", event.target.value)}
+          placeholder="VD: Honda Vision"
+          value={form.car_model}
+        />
+      </FormField>
+      <FormField label="Chất lượng">
+        <select onChange={(event) => onChange("quality", event.target.value)} value={form.quality}>
+          {INVENTORY_QUALITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </FormField>
+      <FormField label="Đơn vị" hint="VD: cái, bộ, chai, lít">
+        <input onChange={(event) => onChange("unit", event.target.value)} value={form.unit} />
+      </FormField>
+      <FormField label="Giá bán (VNĐ)">
+        <input min="0" onChange={(event) => onChange("unit_price", event.target.value)} type="number" value={form.unit_price} />
+      </FormField>
+      {isCreate && (
+        <FormField label="Tồn ban đầu">
+          <input min="0" onChange={(event) => onChange("quantity", event.target.value)} type="number" value={form.quantity} />
+        </FormField>
+      )}
+      <FormField label="Tồn tối thiểu">
+        <input min="0" onChange={(event) => onChange("min_stock_level", event.target.value)} type="number" value={form.min_stock_level} />
+      </FormField>
+      <FormField label="Tồn tối đa">
+        <input min="0" onChange={(event) => onChange("max_stock_level", event.target.value)} type="number" value={form.max_stock_level} />
+      </FormField>
+      <FormField label="Điểm đặt lại">
+        <input min="0" onChange={(event) => onChange("reorder_point", event.target.value)} type="number" value={form.reorder_point} />
+      </FormField>
     </div>
   );
 }
 
-function getRouteState(pathname) {
-  if (pathname.includes("/transactions")) return { view: "transactions" };
-  if (pathname.endsWith("/items/new")) return { view: "form", mode: "create" };
+function variantPayload(form, shared, isCreate) {
+  const payload = {
+    item_name: shared.product_name.trim()
+      + (form.variant_name.trim() ? ` - ${form.variant_name.trim()}` : ""),
+    product_name: shared.product_name.trim(),
+    variant_name: form.variant_name.trim(),
+    barcode: form.barcode.trim(),
+    description: shared.description.trim(),
+    category: shared.category,
+    brand: shared.brand.trim(),
+    car_model: form.car_model.trim(),
+    quality: form.quality || undefined,
+    unit: form.unit.trim(),
+    unit_price: Number(form.unit_price || 0),
+    min_stock_level: form.min_stock_level === "" ? undefined : Number(form.min_stock_level),
+    max_stock_level: form.max_stock_level === "" ? undefined : Number(form.max_stock_level),
+    reorder_point: form.reorder_point === "" ? undefined : Number(form.reorder_point),
+    supplier_name: shared.supplier_name.trim(),
+    image_url: (shared.image_url || "").trim(),
+  };
 
-  const editMatch = pathname.match(/\/items\/([^/]+)\/edit$/);
-  if (editMatch) return { view: "form", mode: "edit", itemId: editMatch[1] };
+  if (isCreate) {
+    payload.item_code = (form.item_code.trim() || makeSku(shared.product_name, form.variant_name)).toUpperCase();
+    payload.quantity = Number(form.quantity || 0);
+  }
 
-  const detailMatch = pathname.match(/\/items\/([^/]+)$/) || pathname.match(/\/inventory\/([^/]+)$/);
-  if (detailMatch && detailMatch[1] !== "items") return { view: "detail", itemId: detailMatch[1] };
-
-  if (pathname.endsWith("/items")) return { view: "list" };
-  return { view: "dashboard" };
+  return payload;
 }
 
-export default function InventoryModule({ readOnly = false, basePath = "/manager/inventory" }) {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const routeState = useMemo(() => getRouteState(location.pathname), [location.pathname]);
-  const [notice, setNotice] = useState(location.state?.inventoryNotice || null);
+function VariantModal({ mode, item, productDefaults, onClose, onSuccess }) {
+  const isCreate = mode === "create" || mode === "duplicate";
+  const [form, setForm] = useState(() => {
+    if (mode === "duplicate" && item) {
+      return {
+        ...variantToForm(item),
+        item_code: `${item.item_code || "VAR"}-COPY`,
+        quantity: "0",
+      };
+    }
+    return isCreate ? { ...EMPTY_VARIANT } : variantToForm(item);
+  });
+  const [state, setState] = useState({ saving: false, error: "" });
+
+  const shared = {
+    product_name: productDefaults.product_name || "",
+    description: productDefaults.description || "",
+    category: productDefaults.category || "SPARE_PARTS",
+    brand: productDefaults.brand || "",
+    supplier_name: productDefaults.supplier_name || "",
+    image_url: productDefaults.image_url || "",
+  };
+
+  const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const error = validateVariant(form, isCreate);
+    if (error) {
+      setState({ saving: false, error });
+      return;
+    }
+
+    setState({ saving: true, error: "" });
+    try {
+      if (isCreate) {
+        await createInventoryItem(variantPayload(form, shared, true));
+      } else {
+        await updateInventoryItem(getItemId(item), variantPayload(form, shared, false));
+      }
+      onSuccess?.(
+        mode === "duplicate"
+          ? "Đã sao chép loại hàng."
+          : isCreate
+            ? "Đã thêm loại hàng mới."
+            : "Đã cập nhật loại hàng."
+      );
+    } catch (submitError) {
+      setState({ saving: false, error: submitError.message });
+    }
+  };
+
+  const titleMap = {
+    create: "THÊM LOẠI HÀNG",
+    edit: "SỬA LOẠI HÀNG",
+    duplicate: "SAO CHÉP LOẠI HÀNG",
+  };
+
+  return (
+    <div className="inventory-modal-backdrop" role="presentation">
+      <form className="inventory-modal wide" onSubmit={handleSubmit}>
+        <div className="inventory-modal-head">
+          <div>
+            <span>{titleMap[mode] || titleMap.create}</span>
+            <h3>{shared.product_name || "Loại hàng"}</h3>
+            <p>
+              {mode === "duplicate"
+                ? "Tạo loại hàng mới dựa trên loại hiện có. Mã hàng (SKU) phải khác."
+                : isCreate
+                  ? "Thêm loại hàng mới (kích thước, dung tích, chất lượng, dòng xe...)."
+                  : `Mã hàng: ${item.item_code}`}
+            </p>
+          </div>
+          <button aria-label="Đóng modal" onClick={onClose} type="button">x</button>
+        </div>
+        <div className="inventory-modal-body">
+          {state.error && <div className="inventory-form-error">{state.error}</div>}
+          <VariantFields form={form} isCreate={isCreate} onChange={update} />
+        </div>
+        <div className="inventory-modal-footer">
+          <button className="inventory-btn secondary" onClick={onClose} type="button">Hủy</button>
+          <button className="inventory-btn primary" disabled={state.saving} type="submit">
+            {state.saving ? "Đang lưu..." : mode === "duplicate" ? "Sao chép loại hàng" : "Lưu loại hàng"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Product modal: thêm sản phẩm nhiều variant / sửa thông tin chung    */
+/* ------------------------------------------------------------------ */
+
+function ProductModal({ mode, product, onClose, onSuccess }) {
+  const isCreate = mode === "create" || mode === "duplicate";
+  const [shared, setShared] = useState({
+    product_name: product?.name || "",
+    category: product?.category || "SPARE_PARTS",
+    brand: product?.brand || product?.variants?.[0]?.brand || "",
+    supplier_name: product?.supplier || product?.variants?.[0]?.supplier_name || "",
+    description: product?.description || "",
+    image_url: product?.image_url || product?.variants?.[0]?.image_url || "",
+  });
+  const [variants, setVariants] = useState(() => {
+    if (!isCreate || !product) return [{ ...EMPTY_VARIANT }];
+    return product.variants.map((variant) => ({
+      ...variantToForm(variant),
+      item_code: mode === "duplicate" ? `${variant.item_code}-COPY` : variant.item_code,
+      quantity: "0",
+    }));
+  });
+  const [state, setState] = useState({ saving: false, error: "" });
+
+  const updateShared = (key, value) => setShared((prev) => ({ ...prev, [key]: value }));
+  const updateVariant = (index, key, value) => {
+    setVariants((prev) => prev.map((variant, i) => (i === index ? { ...variant, [key]: value } : variant)));
+  };
+  const addVariant = () => setVariants((prev) => [...prev, { ...EMPTY_VARIANT, unit: prev[0]?.unit || "cái" }]);
+  const removeVariant = (index) => setVariants((prev) => prev.filter((_, i) => i !== index));
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (shared.product_name.trim().length < 2) {
+      setState({ saving: false, error: "Tên sản phẩm phải có ít nhất 2 ký tự." });
+      return;
+    }
+
+    if (isCreate) {
+      for (let i = 0; i < variants.length; i += 1) {
+        const error = validateVariant(variants[i], true);
+        if (error) {
+          setState({ saving: false, error: `Loại hàng ${i + 1}: ${error}` });
+          return;
+        }
+      }
+      const codes = variants.map((v) => v.item_code.trim().toUpperCase());
+      if (new Set(codes).size !== codes.length) {
+        setState({ saving: false, error: "Các loại hàng không được trùng mã hàng (SKU)." });
+        return;
+      }
+    }
+
+    setState({ saving: true, error: "" });
+    try {
+      if (isCreate) {
+        const created = [];
+        for (const variant of variants) {
+          // Tạo tuần tự để báo đúng variant lỗi (SKU trùng...) thay vì fail cả loạt.
+          // eslint-disable-next-line no-await-in-loop
+          await createInventoryItem(variantPayload(variant, shared, true));
+          created.push(variant.item_code);
+        }
+        onSuccess?.(`Đã tạo sản phẩm "${shared.product_name}" với ${created.length} loại hàng.`);
+      } else {
+        for (const variant of product.variants) {
+          // eslint-disable-next-line no-await-in-loop
+          await updateInventoryItem(getItemId(variant), {
+            product_name: shared.product_name.trim(),
+            category: shared.category,
+            brand: shared.brand.trim(),
+            supplier_name: shared.supplier_name.trim(),
+            description: shared.description.trim(),
+            image_url: shared.image_url.trim(),
+            item_name: shared.product_name.trim()
+              + (variant.variant_name ? ` - ${variant.variant_name}` : ""),
+          });
+        }
+        onSuccess?.("Đã cập nhật thông tin sản phẩm.");
+      }
+    } catch (error) {
+      setState({ saving: false, error: error.message });
+    }
+  };
+
+  return (
+    <div className="inventory-modal-backdrop" role="presentation">
+      <form className="inventory-modal wide" onSubmit={handleSubmit}>
+        <div className="inventory-modal-head">
+          <div>
+            <span>{isCreate ? "THÊM SẢN PHẨM" : "SỬA SẢN PHẨM"}</span>
+            <h3>{isCreate ? "Sản phẩm mới" : shared.product_name}</h3>
+            <p>
+              {isCreate
+                ? "Nhập thông tin chung, sau đó thêm các loại hàng (kích cỡ, dung tích, màu...)."
+                : "Thông tin chung áp dụng cho tất cả loại hàng của sản phẩm."}
+            </p>
+          </div>
+          <button aria-label="Đóng modal" onClick={onClose} type="button">x</button>
+        </div>
+        <div className="inventory-modal-body">
+          {state.error && <div className="inventory-form-error">{state.error}</div>}
+
+          <div className="inventory-form-section-title">Thông tin chung</div>
+          <div className="inventory-form-grid">
+            <FormField label="Tên sản phẩm">
+              <input onChange={(event) => updateShared("product_name", event.target.value)} placeholder="VD: Michelin City Grip" value={shared.product_name} />
+            </FormField>
+            <FormField label="Danh mục">
+              <select onChange={(event) => updateShared("category", event.target.value)} value={shared.category}>
+                {INVENTORY_CATEGORIES.map(([value, label, example]) => (
+                  <option key={value} value={value}>{example ? `${label} — ${example}` : label}</option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Thương hiệu">
+              <input onChange={(event) => updateShared("brand", event.target.value)} placeholder="VD: Michelin" value={shared.brand} />
+            </FormField>
+            <FormField label="Nhà cung cấp">
+              <input onChange={(event) => updateShared("supplier_name", event.target.value)} value={shared.supplier_name} />
+            </FormField>
+          </div>
+          <FormField hint="Dán đường dẫn ảnh (URL). Ảnh dùng chung cho cả sản phẩm." label="Hình ảnh sản phẩm">
+            <input
+              onChange={(event) => updateShared("image_url", event.target.value)}
+              placeholder="VD: https://example.com/lop-michelin.jpg"
+              type="url"
+              value={shared.image_url}
+            />
+          </FormField>
+          {shared.image_url.trim() && (
+            <div className="inventory-image-preview">
+              <img
+                alt="Xem trước sản phẩm"
+                onError={(event) => { event.currentTarget.style.display = "none"; }}
+                onLoad={(event) => { event.currentTarget.style.display = ""; }}
+                src={shared.image_url.trim()}
+              />
+              <span>Ảnh xem trước — nếu không hiện, kiểm tra lại đường dẫn.</span>
+            </div>
+          )}
+          <FormField label="Mô tả">
+            <textarea maxLength={1000} onChange={(event) => updateShared("description", event.target.value)} value={shared.description} />
+          </FormField>
+
+          {isCreate && (
+            <>
+              <div className="inventory-form-section-title">Các loại hàng ({variants.length})</div>
+              {variants.map((variant, index) => (
+                <div className="inventory-variant-form" key={index}>
+                  <div className="inventory-variant-form-head">
+                    <strong>Loại hàng {index + 1}</strong>
+                    {variants.length > 1 && (
+                      <button aria-label="Xóa loại hàng này" className="inventory-icon-btn danger" onClick={() => removeVariant(index)} type="button">
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                  <VariantFields
+                    compact
+                    form={variant}
+                    isCreate
+                    onChange={(key, value) => updateVariant(index, key, value)}
+                  />
+                </div>
+              ))}
+              <button className="inventory-btn secondary" onClick={addVariant} type="button">
+                <Plus size={16} />
+                Thêm loại hàng
+              </button>
+            </>
+          )}
+        </div>
+        <div className="inventory-modal-footer">
+          <button className="inventory-btn secondary" onClick={onClose} type="button">Hủy</button>
+          <button className="inventory-btn primary" disabled={state.saving} type="submit">
+            {state.saving ? "Đang lưu..." : isCreate ? `Tạo sản phẩm (${variants.length} loại hàng)` : "Lưu thay đổi"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Drawer chi tiết sản phẩm                                            */
+/* ------------------------------------------------------------------ */
+
+function ProductDrawer({ product, readOnly, onClose, onAction }) {
+  const [historyState, setHistoryState] = useState({ loading: false, error: "", itemId: "", transactions: [] });
+
+  const loadHistory = useCallback(async (itemId) => {
+    setHistoryState({ loading: true, error: "", itemId, transactions: [] });
+    try {
+      const response = await getInventoryTransactions({ item_id: itemId, limit: 20 });
+      setHistoryState({
+        loading: false,
+        error: "",
+        itemId,
+        transactions: normalizeTransactionsResponse(response).transactions,
+      });
+    } catch (error) {
+      setHistoryState({ loading: false, error: error.message, itemId, transactions: [] });
+    }
+  }, []);
 
   useEffect(() => {
-    if (location.state?.inventoryNotice) {
-      setNotice(location.state.inventoryNotice);
-      navigate(location.pathname + location.search, { replace: true, state: {} });
-    }
-  }, [location.pathname, location.search, location.state, navigate]);
+    const firstId = getItemId(product?.variants?.[0]);
+    if (firstId) loadHistory(firstId);
+  }, [loadHistory, product]);
+
+  if (!product) return null;
+
+  return (
+    <>
+      <div className="inventory-drawer-backdrop" onClick={onClose} role="presentation" />
+      <aside className="inventory-drawer" role="dialog" aria-label={`Chi tiết ${product.name}`}>
+        <div className="inventory-drawer-head">
+          <div className="inventory-drawer-title">
+            <ProductThumb product={product} />
+            <div>
+              <span>CHI TIẾT SẢN PHẨM</span>
+              <h3>{product.name}</h3>
+              <p>
+                {getCategoryLabel(product.category)}
+                {product.brand ? ` · ${product.brand}` : ""}
+                {product.skuPrefix ? ` · Mã hàng: ${product.skuPrefix}*` : ""}
+              </p>
+            </div>
+          </div>
+          <button aria-label="Đóng chi tiết" onClick={onClose} type="button"><X size={18} /></button>
+        </div>
+
+        <div className="inventory-drawer-body">
+          {!readOnly && (
+            <div className="inventory-drawer-actions">
+              <button className="inventory-btn secondary" onClick={() => onAction("edit-product", product)} type="button">
+                <Edit3 size={15} /> Chỉnh sửa
+              </button>
+              <button className="inventory-btn secondary" onClick={() => onAction("add-variant", product)} type="button">
+                <Plus size={15} /> Thêm loại hàng
+              </button>
+              <button className="inventory-btn secondary" onClick={() => onAction(product.allInactive ? "unlock-product" : "lock-product", product)} type="button">
+                {product.allInactive ? <LockOpen size={15} /> : <Lock size={15} />}
+                {product.allInactive ? "Mở khóa" : "Khóa"}
+              </button>
+              <button className="inventory-btn secondary" onClick={() => onAction("duplicate", product)} type="button">
+                <Copy size={15} /> Sao chép
+              </button>
+            </div>
+          )}
+
+          <section>
+            <div className="inventory-panel-head">
+              <h3>Thông tin chung</h3>
+              <span className={`inventory-badge ${product.allInactive ? "muted" : "success"}`}>
+                {product.allInactive ? "Đã khóa" : "Đang hoạt động"}
+              </span>
+            </div>
+            <div className="inventory-info-grid">
+              <div><span>Tên sản phẩm</span><strong>{product.name}</strong></div>
+              <div><span>Danh mục</span><strong>{getCategoryLabel(product.category)}</strong></div>
+              <div><span>Thương hiệu</span><strong>{product.brand || "--"}</strong></div>
+              <div><span>Nhà cung cấp</span><strong>{product.supplier || "--"}</strong></div>
+              <div><span>Dòng xe phù hợp</span><strong>{product.vehicles.join(", ") || "--"}</strong></div>
+              <div><span>Số loại hàng</span><strong>{product.variants.length}</strong></div>
+              <div><span>Mô tả</span><strong>{product.description || "--"}</strong></div>
+            </div>
+            <p className="inventory-drawer-note">
+              Giá bán và tồn kho được quản lý ở từng loại hàng, không gắn chung trên sản phẩm.
+            </p>
+          </section>
+
+          <section>
+            <div className="inventory-panel-head">
+              <h3>Giá & tồn kho (tổng hợp)</h3>
+              <InventoryStatusBadge status={product.status} />
+            </div>
+            <div className="inventory-info-grid">
+              <div><span>Giá bán</span><strong>{formatPriceRange(product.sellRange)}</strong></div>
+              <div><span>Tổng tồn kho</span><strong>{formatQuantity(product.totalStock, product.unit)}</strong></div>
+              <div><span>Giá trị tồn kho</span><strong>{formatVND(product.totalValue)}</strong></div>
+            </div>
+          </section>
+
+          <section>
+            <div className="inventory-panel-head">
+              <h3>Loại hàng ({product.variants.length})</h3>
+              {!readOnly && (
+                <button className="inventory-link-btn" onClick={() => onAction("add-variant", product)} type="button">
+                  <Plus size={14} /> Thêm loại hàng
+                </button>
+              )}
+            </div>
+            <div className="inventory-drawer-variants">
+              {product.variants.map((variant) => (
+                <div className={`inventory-drawer-variant ${variant.is_active === false ? "inactive" : ""}`} key={getItemId(variant)}>
+                  <div className="inventory-drawer-variant-info">
+                    <strong>{variant.variant_name || variant.item_name}</strong>
+                    <span>
+                      {variant.item_code}
+                      {variant.barcode ? ` · Mã vạch ${variant.barcode}` : ""}
+                      {variant.car_model ? ` · ${variant.car_model}` : ""}
+                      {variant.quality ? ` · ${getQualityLabel(variant.quality)}` : ""}
+                    </span>
+                    <span>
+                      Giá bán {formatVND(variant.unit_price)}
+                      {" · Tồn "}{formatQuantity(variant.quantity, variant.unit)}
+                      {" · Tối thiểu "}{variant.min_stock_level}{" / Tối đa "}{variant.max_stock_level}
+                    </span>
+                  </div>
+                  <div className="inventory-drawer-variant-meta">
+                    <InventoryStatusBadge status={variant.stock_status} />
+                    <div className="inventory-row-actions">
+                      <button aria-label="Lịch sử" onClick={() => loadHistory(getItemId(variant))} title="Lịch sử" type="button"><History size={15} /></button>
+                      {!readOnly && (
+                        <>
+                          <button aria-label="Nhập kho" onClick={() => onAction("stock-in", variant)} title="Nhập kho" type="button"><ArrowDownToLine size={15} /></button>
+                          <button aria-label="Xuất kho" onClick={() => onAction("stock-out", variant)} title="Xuất kho" type="button"><ArrowUpFromLine size={15} /></button>
+                          <button aria-label="Điều chỉnh" onClick={() => onAction("adjust", variant)} title="Điều chỉnh" type="button"><Scale size={15} /></button>
+                          <button aria-label="Sửa" onClick={() => onAction("edit-variant", variant)} title="Sửa" type="button"><Edit3 size={15} /></button>
+                          <button aria-label="Sao chép loại hàng" onClick={() => onAction("duplicate-variant", variant)} title="Sao chép" type="button"><Copy size={15} /></button>
+                          <button
+                            aria-label={variant.is_active === false ? "Mở khóa" : "Khóa / xóa"}
+                            onClick={() => onAction("delete-variant", variant)}
+                            title={variant.is_active === false ? "Mở khóa" : "Khóa / xóa"}
+                            type="button"
+                          >
+                            {variant.is_active === false ? <LockOpen size={15} /> : <Trash2 size={15} />}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <div className="inventory-panel-head">
+              <h3>
+                Lịch sử
+                {historyState.itemId && (
+                  <small className="inventory-muted-inline">
+                    {" "}({product.variants.find((v) => getItemId(v) === historyState.itemId)?.item_code || ""})
+                  </small>
+                )}
+              </h3>
+            </div>
+            {historyState.loading ? (
+              <InventorySkeleton rows={2} />
+            ) : historyState.error ? (
+              <StateCard message={historyState.error} title="Không tải được lịch sử" type="error" onRetry={() => loadHistory(historyState.itemId)} />
+            ) : !historyState.transactions.length ? (
+              <StateCard message="Loại hàng này chưa có giao dịch." title="Chưa có lịch sử" />
+            ) : (
+              <div className="inventory-timeline">
+                {historyState.transactions.map((tx) => (
+                  <div className="inventory-timeline-row" key={tx._id}>
+                    <span className="inventory-timeline-time">{formatDateTime(tx.created_at)}</span>
+                    <div className="inventory-timeline-content">
+                      <TransactionBadge type={tx.transaction_type} />
+                      <span>
+                        {tx.quantity_change > 0 ? "+" : ""}{tx.quantity_change} ({tx.quantity_before} → {tx.quantity_after})
+                        {tx.performed_by?.full_name ? ` · ${tx.performed_by.full_name}` : ""}
+                        {tx.notes ? ` · ${tx.notes}` : ""}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Bảng sản phẩm với expandable rows                                    */
+/* ------------------------------------------------------------------ */
+
+function ProductRow({ product, expanded, readOnly, onToggle, onAction }) {
+  return (
+    <>
+      <tr className={`inventory-product-row ${product.allInactive ? "inactive" : ""}`} onClick={() => onAction("view", product)}>
+        <td className="inventory-image-cell" onClick={(event) => { event.stopPropagation(); onToggle(product.key); }}>
+          <ProductThumb product={product} />
+        </td>
+        <td className="inventory-name-cell">
+          <strong title={product.name}>{product.name}</strong>
+          <span className="inventory-muted">
+            {product.brand || "Chưa có thương hiệu"}
+            {product.allInactive ? " · Đã khóa" : ""}
+          </span>
+        </td>
+        <td onClick={(event) => { event.stopPropagation(); onToggle(product.key); }}>
+          <button className="inventory-variant-toggle" type="button">
+            {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+            {product.variants.length} loại hàng
+          </button>
+        </td>
+        <td><span title={getCategoryLabel(product.category)}>{getCategoryLabel(product.category)}</span></td>
+        <td><span title={product.brand || "--"}>{product.brand || "--"}</span></td>
+        <td><span title={product.vehicles.join(", ") || "--"}>{product.vehicles.join(", ") || "--"}</span></td>
+        <td className="inventory-supplier-cell"><span title={product.supplier || "--"}>{product.supplier || "--"}</span></td>
+        <td><InventoryStatusBadge status={product.status} /></td>
+        <td>
+          <span className={`inventory-badge ${product.allInactive ? "muted" : "success"}`}>
+            {product.allInactive ? "Đã khóa" : "Hoạt động"}
+          </span>
+        </td>
+        <td className="inventory-actions-cell" onClick={(event) => event.stopPropagation()}>
+          <div className="inventory-row-actions">
+            <button aria-label="Xem chi tiết" onClick={() => onAction("view", product)} title="Xem chi tiết" type="button"><Eye size={16} /></button>
+            {!readOnly && (
+              <>
+                <button aria-label="Sửa sản phẩm" onClick={() => onAction("edit-product", product)} title="Sửa" type="button"><Edit3 size={16} /></button>
+                <button aria-label="Sao chép sản phẩm" onClick={() => onAction("duplicate", product)} title="Sao chép" type="button"><Copy size={16} /></button>
+                <button
+                  aria-label={product.allInactive ? "Mở khóa sản phẩm" : "Khóa / xóa sản phẩm"}
+                  onClick={() => onAction(product.allInactive ? "unlock-product" : "delete-product", product)}
+                  title={product.allInactive ? "Mở khóa" : "Khóa / xóa"}
+                  type="button"
+                >
+                  {product.allInactive ? <LockOpen size={16} /> : <Trash2 size={16} />}
+                </button>
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="inventory-variant-expansion">
+          <td colSpan={10}>
+            <table className="inventory-variant-table">
+              <thead>
+                <tr>
+                  <th>Mã hàng</th>
+                  <th>Tên loại hàng</th>
+                  <th>Mã vạch</th>
+                  <th>Dòng xe</th>
+                  <th>Chất lượng</th>
+                  <th>Giá bán</th>
+                  <th>Tồn kho</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {product.variants.map((variant) => (
+                  <tr className={variant.is_active === false ? "inactive" : ""} key={getItemId(variant)}>
+                    <td><strong>{variant.item_code}</strong></td>
+                    <td>{variant.variant_name || variant.item_name}</td>
+                    <td>{variant.barcode || "--"}</td>
+                    <td>{variant.car_model || "--"}</td>
+                    <td>{getQualityLabel(variant.quality)}</td>
+                    <td className="inventory-money-cell">{formatVND(variant.unit_price)}</td>
+                    <td>{formatQuantity(variant.quantity, variant.unit)}</td>
+                    <td><InventoryStatusBadge status={variant.stock_status} /></td>
+                    <td>
+                      <div className="inventory-row-actions">
+                        {!readOnly && (
+                          <>
+                            <button aria-label="Nhập kho" onClick={() => onAction("stock-in", variant)} title="Nhập kho" type="button"><ArrowDownToLine size={15} /></button>
+                            <button aria-label="Xuất kho" onClick={() => onAction("stock-out", variant)} title="Xuất kho" type="button"><ArrowUpFromLine size={15} /></button>
+                            <button aria-label="Điều chỉnh" onClick={() => onAction("adjust", variant)} title="Điều chỉnh" type="button"><Scale size={15} /></button>
+                            <button aria-label="Sửa variant" onClick={() => onAction("edit-variant", variant)} title="Sửa" type="button"><Edit3 size={15} /></button>
+                            <button aria-label="Sao chép variant" onClick={() => onAction("duplicate-variant", variant)} title="Sao chép" type="button"><Copy size={15} /></button>
+                            <button
+                              aria-label={variant.is_active === false ? "Mở khóa" : "Khóa / xóa"}
+                              onClick={() => onAction("delete-variant", variant)}
+                              title={variant.is_active === false ? "Mở khóa" : "Khóa / xóa"}
+                              type="button"
+                            >
+                              {variant.is_active === false ? <LockOpen size={15} /> : <Trash2 size={15} />}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Trang chính                                                          */
+/* ------------------------------------------------------------------ */
+
+export default function InventoryModule({ readOnly = false }) {
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [draftSearch, setDraftSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(draftSearch, 300);
+
+  const [itemsState, setItemsState] = useState({ loading: true, error: "", items: [], total: 0 });
+  const [statsState, setStatsState] = useState({ loading: true, error: "", overview: {} });
+  const [txState, setTxState] = useState({ loading: true, error: "", transactions: [] });
+
+  const [expanded, setExpanded] = useState(() => new Set());
+  const [drawerKey, setDrawerKey] = useState("");
+  const [productModal, setProductModal] = useState(null); // {mode, product}
+  const [variantModal, setVariantModal] = useState(null); // {mode, item, productDefaults}
+  const [stockModal, setStockModal] = useState(null); // {mode, item|null}
+  const [notice, setNotice] = useState(null);
+
+  const notify = useCallback((message, type = "success") => setNotice({ message, type }), []);
 
   useEffect(() => {
     if (!notice) return undefined;
-    const timer = window.setTimeout(() => setNotice(null), 3200);
+    const timer = window.setTimeout(() => setNotice(null), 3600);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const notify = (message, type = "success") => setNotice({ message, type });
-  const go = (path) => navigate(path);
+  const loadItems = useCallback(async () => {
+    setItemsState((prev) => ({ ...prev, loading: true, error: "" }));
+    try {
+      const { price_range, ...rest } = filters;
+      const response = await getInventoryItems({
+        ...rest,
+        ...priceRangeToParams(price_range),
+        search: debouncedSearch,
+        limit: 200,
+        sort_by: "product_name",
+        sort_order: "asc",
+      });
+      const data = normalizeItemsResponse(response);
+      setItemsState({
+        loading: false,
+        error: "",
+        items: data.items,
+        total: Number(data.pagination.total || data.items.length),
+      });
+    } catch (error) {
+      setItemsState({ loading: false, error: error.message, items: [], total: 0 });
+    }
+  }, [debouncedSearch, filters]);
+
+  const loadStats = useCallback(async () => {
+    setStatsState((prev) => ({ ...prev, loading: true, error: "" }));
+    try {
+      const response = await getInventoryStatistics({ period: 30 });
+      setStatsState({ loading: false, error: "", overview: response?.data?.overview || {} });
+    } catch (error) {
+      setStatsState({ loading: false, error: error.message, overview: {} });
+    }
+  }, []);
+
+  const loadTransactions = useCallback(async () => {
+    setTxState((prev) => ({ ...prev, loading: true, error: "" }));
+    try {
+      const response = await getInventoryTransactions({ limit: 10 });
+      setTxState({
+        loading: false,
+        error: "",
+        transactions: normalizeTransactionsResponse(response).transactions,
+      });
+    } catch (error) {
+      setTxState({ loading: false, error: error.message, transactions: [] });
+    }
+  }, []);
+
+  useEffect(() => { loadItems(); }, [loadItems]);
+  useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => { loadTransactions(); }, [loadTransactions]);
+
+  const refreshData = useCallback(() => {
+    loadItems();
+    loadStats();
+    loadTransactions();
+  }, [loadItems, loadStats, loadTransactions]);
+
+  const products = useMemo(() => groupProducts(itemsState.items), [itemsState.items]);
+  const drawerProduct = useMemo(
+    () => products.find((product) => product.key === drawerKey) || null,
+    [drawerKey, products]
+  );
+
+  const overview = statsState.overview;
+  const updateFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
+  const resetFilters = () => { setFilters(DEFAULT_FILTERS); setDraftSearch(""); };
+  const hasActiveFilter = draftSearch
+    || Object.entries(filters).some(([key, value]) => key !== "search" && value !== "");
+
+  const toggleExpanded = (key) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const closeAllOverlays = () => {
+    setProductModal(null);
+    setVariantModal(null);
+    setStockModal(null);
+  };
+
+  const handleMutationSuccess = (message) => {
+    closeAllOverlays();
+    notify(message);
+    refreshData();
+  };
+
+  const deleteVariant = async (variant) => {
+    const isInactive = variant.is_active === false;
+    if (isInactive) {
+      if (!window.confirm(`Mở khóa loại hàng ${variant.item_code}?`)) return;
+      try {
+        await activateInventoryItem(getItemId(variant));
+        notify("Đã mở khóa loại hàng.");
+        refreshData();
+      } catch (error) {
+        notify(error.message, "error");
+      }
+      return;
+    }
+
+    try {
+      const detail = await getInventoryItemById(getItemId(variant));
+      const canDelete = detail?.data?.can_delete_permanently === true;
+
+      if (canDelete) {
+        const ok = window.confirm(
+          `Loại hàng ${variant.item_code} chưa phát sinh giao dịch. Xóa vĩnh viễn?`
+        );
+        if (!ok) return;
+        await deleteInventoryItemPermanently(getItemId(variant));
+        notify("Đã xóa loại hàng.");
+      } else {
+        const ok = window.confirm(
+          `Loại hàng ${variant.item_code} đã có giao dịch hoặc còn tồn kho — không thể xóa. Khóa để ngừng sử dụng?`
+        );
+        if (!ok) return;
+        await deactivateInventoryItem(getItemId(variant));
+        notify("Đã khóa loại hàng.");
+      }
+      refreshData();
+    } catch (error) {
+      notify(error.message, "error");
+    }
+  };
+
+  const lockProduct = async (product) => {
+    if (!window.confirm(`Khóa toàn bộ ${product.variants.length} loại hàng của "${product.name}"?`)) return;
+    let done = 0;
+    for (const variant of product.variants) {
+      if (variant.is_active === false) continue;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await deactivateInventoryItem(getItemId(variant));
+        done += 1;
+      } catch {
+        // continue
+      }
+    }
+    notify(`Đã khóa ${done} loại hàng của "${product.name}".`);
+    refreshData();
+  };
+
+  const unlockProduct = async (product) => {
+    if (!window.confirm(`Mở khóa toàn bộ loại hàng của "${product.name}"?`)) return;
+    let done = 0;
+    for (const variant of product.variants) {
+      if (variant.is_active !== false) continue;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await activateInventoryItem(getItemId(variant));
+        done += 1;
+      } catch {
+        // continue
+      }
+    }
+    notify(`Đã mở khóa ${done} loại hàng của "${product.name}".`);
+    refreshData();
+  };
+
+  const deleteProduct = async (product) => {
+    const choice = window.confirm(
+      `Xử lý sản phẩm "${product.name}"?\n\nOK = Xóa các loại hàng chưa có giao dịch, khóa những loại còn lại.\nCancel = Hủy.`
+    );
+    if (!choice) return;
+
+    let deleted = 0;
+    let locked = 0;
+    let failed = 0;
+
+    for (const variant of product.variants) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const detail = await getInventoryItemById(getItemId(variant));
+        if (detail?.data?.can_delete_permanently) {
+          // eslint-disable-next-line no-await-in-loop
+          await deleteInventoryItemPermanently(getItemId(variant));
+          deleted += 1;
+        } else if (variant.is_active !== false) {
+          // eslint-disable-next-line no-await-in-loop
+          await deactivateInventoryItem(getItemId(variant));
+          locked += 1;
+        }
+      } catch {
+        failed += 1;
+      }
+    }
+
+    notify(
+      `Sản phẩm "${product.name}": xóa ${deleted}, khóa ${locked}${failed ? `, lỗi ${failed}` : ""}.`,
+      failed ? "error" : "success"
+    );
+    refreshData();
+  };
+
+  const productDefaultsFromVariant = (variant) => ({
+    product_name: variant.product_name || variant.item_name,
+    category: variant.category,
+    brand: variant.brand || "",
+    supplier_name: variant.supplier_name || "",
+    description: variant.description || "",
+    image_url: variant.image_url || "",
+  });
+
+  const productDefaultsFromProduct = (product) => ({
+    product_name: product.name,
+    category: product.category,
+    brand: product.brand || product.variants[0]?.brand || "",
+    supplier_name: product.supplier || product.variants[0]?.supplier_name || "",
+    description: product.description,
+    image_url: product.image_url || "",
+  });
+
+  const handleAction = (action, target) => {
+    switch (action) {
+      case "view":
+        setDrawerKey(target.key);
+        break;
+      case "edit-product":
+        setProductModal({ mode: "edit", product: target });
+        break;
+      case "duplicate":
+        setProductModal({ mode: "duplicate", product: target });
+        break;
+      case "delete-product":
+        deleteProduct(target);
+        break;
+      case "lock-product":
+        lockProduct(target);
+        break;
+      case "unlock-product":
+        unlockProduct(target);
+        break;
+      case "add-variant":
+        setVariantModal({
+          mode: "create",
+          item: null,
+          productDefaults: productDefaultsFromProduct(target),
+        });
+        break;
+      case "edit-variant":
+        setVariantModal({
+          mode: "edit",
+          item: target,
+          productDefaults: productDefaultsFromVariant(target),
+        });
+        break;
+      case "duplicate-variant":
+        setVariantModal({
+          mode: "duplicate",
+          item: target,
+          productDefaults: productDefaultsFromVariant(target),
+        });
+        break;
+      case "delete-variant":
+        deleteVariant(target);
+        break;
+      case "stock-in":
+        setStockModal({ mode: "in", item: target });
+        break;
+      case "stock-out":
+        setStockModal({ mode: "out", item: target });
+        break;
+      case "adjust":
+        setStockModal({ mode: "adjust", item: target });
+        break;
+      default:
+        break;
+    }
+  };
+
+  const activeItems = itemsState.items.filter((item) => item.is_active !== false);
+  const today = new Date().toLocaleDateString("vi-VN", {
+    weekday: "long", day: "2-digit", month: "2-digit", year: "numeric",
+  });
 
   return (
     <div className={`inventory-module ${readOnly ? "read-only" : ""}`}>
       <InventoryNotice notice={notice} onClose={() => setNotice(null)} />
-      {routeState.view === "transactions" && !readOnly ? (
-        <TransactionsView basePath={basePath} />
-      ) : routeState.view === "form" && !readOnly ? (
-        <FormView basePath={basePath} itemId={routeState.itemId} mode={routeState.mode} />
-      ) : routeState.view === "detail" ? (
-        <DetailView basePath={basePath} itemId={routeState.itemId} notify={notify} readOnly={readOnly} />
-      ) : routeState.view === "list" ? (
-        <ListView basePath={basePath} go={go} notify={notify} readOnly={readOnly} />
+      <datalist id="inventory-vehicle-list">
+        {VEHICLE_MODELS.map((model) => <option key={model} value={model} />)}
+      </datalist>
+
+      {/* ------------------------- HEADER ------------------------- */}
+      <div className="inventory-page-head">
+        <div>
+          <span>QUẢN LÝ KHO</span>
+          <h2>Kho vật tư</h2>
+          <p className="inventory-breadcrumb">
+            Trang chủ / Kho vật tư <i>·</i> {today}
+          </p>
+        </div>
+        {!readOnly && (
+          <div className="inventory-head-actions">
+            <button className="inventory-btn primary" onClick={() => setProductModal({ mode: "create", product: null })} type="button">
+              <Plus size={17} /> Thêm sản phẩm
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ---------------------- DASHBOARD KPI ---------------------- */}
+      {statsState.loading ? (
+        <InventorySkeleton rows={4} />
+      ) : statsState.error ? (
+        <StateCard message={statsState.error} onRetry={loadStats} title="Không tải được thống kê kho" type="error" />
       ) : (
-        <DashboardView basePath={basePath} go={go} notify={notify} readOnly={readOnly} />
+        <div className="inventory-kpi-grid">
+          <KpiCard icon={Package} label="Tổng sản phẩm" value={(overview.total_products || products.length || 0).toLocaleString("vi-VN")} />
+          <KpiCard icon={Boxes} label="Tổng loại hàng" value={(overview.total_variants || overview.active_items || 0).toLocaleString("vi-VN")} tone="info" />
+          <KpiCard icon={TrendingDown} label="Sắp hết hàng" tone="warning" value={overview.low_stock_items || 0} />
+          <KpiCard icon={PackageX} label="Hết hàng" tone="danger" value={overview.out_of_stock_items || 0} />
+          <KpiCard icon={ArrowDownToLine} label="Nhập hôm nay" tone="success" value={overview.today_import?.count || 0} sub={`${overview.today_import?.quantity || 0} đơn vị`} />
+          <KpiCard icon={ArrowUpFromLine} label="Xuất hôm nay" tone="warning" value={overview.today_export?.count || 0} sub={`${overview.today_export?.quantity || 0} đơn vị`} />
+          <KpiCard icon={Building2} label="Nhà cung cấp" value={overview.supplier_count || 0} />
+        </div>
+      )}
+
+      {/* -------------------- SEARCH + FILTERS -------------------- */}
+      <section className="inventory-panel inventory-filter-panel">
+        <div className="inventory-filter-head">
+          <span className="inventory-filter-label"><SlidersHorizontal size={16} /> Tìm kiếm & bộ lọc</span>
+          {hasActiveFilter && (
+            <button className="inventory-link-btn" onClick={resetFilters} type="button">
+              <RefreshCcw size={13} /> Xóa bộ lọc
+            </button>
+          )}
+        </div>
+        <div className="inventory-filter-grid">
+          <label className="inventory-search inventory-filter-search">
+            <Search size={17} />
+            <input
+              onChange={(event) => setDraftSearch(event.target.value)}
+              placeholder="Tìm theo tên sản phẩm, mã hàng (SKU) hoặc mã vạch..."
+              value={draftSearch}
+            />
+          </label>
+          <select onChange={(event) => updateFilter("category", event.target.value)} value={filters.category}>
+            <option value="">Tất cả danh mục</option>
+            {INVENTORY_CATEGORIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <input
+            list="inventory-brand-list"
+            onChange={(event) => updateFilter("brand", event.target.value)}
+            placeholder="Thương hiệu"
+            value={filters.brand}
+          />
+          <datalist id="inventory-brand-list">
+            {[...new Set(itemsState.items.map((item) => item.brand).filter(Boolean))].map((brand) => (
+              <option key={brand} value={brand} />
+            ))}
+          </datalist>
+          <input
+            list="inventory-supplier-list"
+            onChange={(event) => updateFilter("supplier", event.target.value)}
+            placeholder="Nhà cung cấp"
+            value={filters.supplier}
+          />
+          <datalist id="inventory-supplier-list">
+            {[...new Set(itemsState.items.map((item) => item.supplier_name).filter(Boolean))].map((supplier) => (
+              <option key={supplier} value={supplier} />
+            ))}
+          </datalist>
+          <input
+            list="inventory-vehicle-list"
+            onChange={(event) => updateFilter("car_model", event.target.value)}
+            placeholder="Dòng xe"
+            value={filters.car_model}
+          />
+          <select onChange={(event) => updateFilter("quality", event.target.value)} value={filters.quality}>
+            <option value="">Tất cả chất lượng</option>
+            {INVENTORY_QUALITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <select onChange={(event) => updateFilter("stock_status", event.target.value)} value={filters.stock_status}>
+            <option value="">Tất cả tồn kho</option>
+            <option value="IN_STOCK">Còn hàng</option>
+            <option value="LOW_STOCK">Sắp hết</option>
+            <option value="BELOW_MIN">Dưới mức tối thiểu</option>
+            <option value="OUT_OF_STOCK">Hết hàng</option>
+            <option value="OVERSTOCK">Tồn kho cao</option>
+          </select>
+          <select onChange={(event) => updateFilter("price_range", event.target.value)} value={filters.price_range}>
+            {PRICE_RANGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <select onChange={(event) => updateFilter("is_active", event.target.value)} value={filters.is_active}>
+            <option value="">Hoạt động & đã khóa</option>
+            <option value="true">Đang hoạt động</option>
+            <option value="false">Đã khóa</option>
+          </select>
+        </div>
+      </section>
+
+      {/* --------------------- INVENTORY TABLE --------------------- */}
+      <section className="inventory-panel inventory-list-panel">
+        <div className="inventory-panel-head">
+          <h3><Filter size={16} /> Danh sách sản phẩm ({products.length})</h3>
+          <span className="inventory-muted-inline">{itemsState.total.toLocaleString("vi-VN")} mã hàng</span>
+        </div>
+        {itemsState.loading ? (
+          <InventorySkeleton />
+        ) : itemsState.error ? (
+          <StateCard message={itemsState.error} onRetry={loadItems} title="Không tải được danh sách kho" type="error" />
+        ) : !products.length ? (
+          <StateCard
+            message={hasActiveFilter ? "Thử đổi từ khóa tìm kiếm hoặc bộ lọc." : "Bấm \"Thêm sản phẩm\" để tạo sản phẩm đầu tiên."}
+            title={hasActiveFilter ? "Không có sản phẩm phù hợp" : "Kho chưa có sản phẩm"}
+          />
+        ) : (
+          <div className="inventory-table-wrap sticky">
+            <table className="inventory-table inventory-product-table">
+              <thead>
+                <tr>
+                  <th>Ảnh</th>
+                  <th>Sản phẩm</th>
+                  <th>Loại hàng</th>
+                  <th>Danh mục</th>
+                  <th>Thương hiệu</th>
+                  <th>Dòng xe</th>
+                  <th>Nhà cung cấp</th>
+                  <th>Tồn kho</th>
+                  <th>Hoạt động</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((product) => (
+                  <ProductRow
+                    expanded={expanded.has(product.key)}
+                    key={product.key}
+                    onAction={handleAction}
+                    onToggle={toggleExpanded}
+                    product={product}
+                    readOnly={readOnly}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* -------------------- ACTIVITY TIMELINE -------------------- */}
+      <section className="inventory-panel">
+        <div className="inventory-panel-head">
+          <h3><ClipboardList size={16} /> Hoạt động gần đây</h3>
+          <button className="inventory-link-btn" onClick={loadTransactions} type="button">
+            <RefreshCcw size={13} /> Làm mới
+          </button>
+        </div>
+        {txState.loading ? (
+          <InventorySkeleton rows={2} />
+        ) : txState.error ? (
+          <StateCard message={txState.error} onRetry={loadTransactions} title="Không tải được hoạt động" type="error" />
+        ) : !txState.transactions.length ? (
+          <StateCard message="Nhập kho, xuất kho và điều chỉnh sẽ hiển thị tại đây." title="Chưa có hoạt động" />
+        ) : (
+          <div className="inventory-timeline">
+            {txState.transactions.map((tx) => {
+              const item = tx.inventory_item_id || {};
+              const performer = tx.performed_by || {};
+              return (
+                <div className="inventory-timeline-row" key={tx._id}>
+                  <span className="inventory-timeline-time">{formatDateTime(tx.created_at)}</span>
+                  <div className="inventory-timeline-content">
+                    <TransactionBadge type={tx.transaction_type} />
+                    <span>
+                      <strong>{item.item_name || "--"}</strong>
+                      {" "}({item.item_code || "--"}) · {tx.quantity_change > 0 ? "+" : ""}{tx.quantity_change}
+                      {" "}· {tx.quantity_before} → {tx.quantity_after}
+                      {performer.full_name ? ` · ${performer.full_name}` : ""}
+                      {tx.notes ? ` · ${tx.notes}` : ""}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* --------------------- OVERLAYS --------------------- */}
+      {drawerProduct && (
+        <ProductDrawer
+          onAction={handleAction}
+          onClose={() => setDrawerKey("")}
+          product={drawerProduct}
+          readOnly={readOnly}
+        />
+      )}
+
+      {productModal && (
+        <ProductModal
+          mode={productModal.mode}
+          onClose={() => setProductModal(null)}
+          onSuccess={handleMutationSuccess}
+          product={productModal.product}
+        />
+      )}
+
+      {variantModal && (
+        <VariantModal
+          item={variantModal.item}
+          mode={variantModal.mode}
+          onClose={() => setVariantModal(null)}
+          onSuccess={handleMutationSuccess}
+          productDefaults={variantModal.productDefaults}
+        />
+      )}
+
+      {stockModal && (
+        <QuickStockModal
+          item={stockModal.item}
+          items={activeItems}
+          mode={stockModal.mode}
+          onClose={() => setStockModal(null)}
+          onSuccess={handleMutationSuccess}
+        />
       )}
     </div>
   );

@@ -17,14 +17,34 @@ const validate = (req, res, next) => {
   next();
 };
 
+const INVENTORY_CATEGORIES = [
+  'ENGINE_PARTS', 'BRAKE_SYSTEM', 'TIRES_TUBES', 'LUBRICANTS', 'FILTERS',
+  'ELECTRICAL', 'LIGHTS_MIRRORS', 'TRANSMISSION', 'SUSPENSION', 'BODY_PARTS',
+  'ACCESSORIES', 'CONSUMABLES', 'TOOLS_EQUIPMENT', 'SPARE_PARTS', 'TOOLS', 'OTHER'
+];
+
+const INVENTORY_QUALITIES = ['OEM', 'PREMIUM', 'STANDARD', 'BUDGET'];
+
 // Validation rules
 const createInventoryValidation = [
   body('item_name').notEmpty().trim().isLength({ min: 2, max: 200 })
     .withMessage('Item name must be between 2 and 200 characters'),
   body('item_code').notEmpty().trim().isLength({ min: 2, max: 50 })
     .withMessage('Item code is required'),
-  body('category').optional().isIn(['SPARE_PARTS', 'TOOLS', 'CONSUMABLES', 'ACCESSORIES', 'OTHER'])
+  body('product_name').optional().trim().isLength({ max: 200 })
+    .withMessage('Product name cannot exceed 200 characters'),
+  body('variant_name').optional().trim().isLength({ max: 120 })
+    .withMessage('Variant name cannot exceed 120 characters'),
+  body('barcode').optional().trim().isLength({ max: 64 })
+    .withMessage('Barcode cannot exceed 64 characters'),
+  body('category').optional().isIn(INVENTORY_CATEGORIES)
     .withMessage('Invalid category'),
+  body('brand').optional().trim().isLength({ max: 100 })
+    .withMessage('Brand cannot exceed 100 characters'),
+  body('car_model').optional().trim().isLength({ max: 200 })
+    .withMessage('Car model cannot exceed 200 characters'),
+  body('quality').optional().isIn(INVENTORY_QUALITIES)
+    .withMessage('Invalid quality'),
   body('unit').notEmpty().trim()
     .withMessage('Unit is required'),
   body('unit_price').notEmpty().isFloat({ min: 0 })
@@ -44,8 +64,20 @@ const createInventoryValidation = [
 const updateInventoryValidation = [
   body('item_name').optional().trim().isLength({ min: 2, max: 200 })
     .withMessage('Item name must be between 2 and 200 characters'),
-  body('category').optional().isIn(['SPARE_PARTS', 'TOOLS', 'CONSUMABLES', 'ACCESSORIES', 'OTHER'])
+  body('product_name').optional().trim().isLength({ max: 200 })
+    .withMessage('Product name cannot exceed 200 characters'),
+  body('variant_name').optional().trim().isLength({ max: 120 })
+    .withMessage('Variant name cannot exceed 120 characters'),
+  body('barcode').optional().trim().isLength({ max: 64 })
+    .withMessage('Barcode cannot exceed 64 characters'),
+  body('category').optional().isIn(INVENTORY_CATEGORIES)
     .withMessage('Invalid category'),
+  body('brand').optional().trim().isLength({ max: 100 })
+    .withMessage('Brand cannot exceed 100 characters'),
+  body('car_model').optional().trim().isLength({ max: 200 })
+    .withMessage('Car model cannot exceed 200 characters'),
+  body('quality').optional().isIn(INVENTORY_QUALITIES)
+    .withMessage('Invalid quality'),
   body('unit_price').optional().isFloat({ min: 0 })
     .withMessage('Unit price must be positive'),
   body('cost_price').optional().isFloat({ min: 0 })
@@ -134,10 +166,19 @@ router.get('/inventory',
   authenticate,
   authorize('ADMIN', 'MANAGER'),
   query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 100 }),
-  query('category').optional().isIn(['SPARE_PARTS', 'TOOLS', 'CONSUMABLES', 'ACCESSORIES', 'OTHER']),
+  query('limit').optional().isInt({ min: 1, max: 200 }),
+  query('search').optional().trim().isLength({ max: 200 }),
+  query('category').optional().isIn(INVENTORY_CATEGORIES),
+  query('brand').optional().trim().isLength({ max: 100 }),
+  query('car_model').optional().trim().isLength({ max: 200 }),
+  query('quality').optional().isIn(INVENTORY_QUALITIES),
+  query('supplier').optional().trim().isLength({ max: 200 }),
   query('is_active').optional().isIn(['true', 'false']),
   query('stock_status').optional().isIn(['OUT_OF_STOCK', 'LOW_STOCK', 'BELOW_MIN', 'IN_STOCK', 'OVERSTOCK']),
+  query('price_min').optional().isFloat({ min: 0 }),
+  query('price_max').optional().isFloat({ min: 0 }),
+  query('sort_by').optional().isIn(['item_name', 'product_name', 'item_code', 'quantity', 'unit_price', 'cost_price', 'created_at', 'updated_at']),
+  query('sort_order').optional().isIn(['asc', 'desc']),
   validate,
   adminInventoryController.getAllInventoryItems
 );
@@ -222,6 +263,23 @@ router.post('/inventory/:id/stock-out',
   stockOutValidation,
   validate,
   adminInventoryController.stockOut
+);
+
+/**
+ * @route   POST /api/admin/inventory/:id/adjust
+ * @desc    Adjust stock to an exact quantity (stock take / correction)
+ * @access  Private/Admin
+ */
+router.post('/inventory/:id/adjust',
+  authenticate,
+  authorize('ADMIN', 'MANAGER'),
+  param('id').isMongoId().withMessage('Invalid inventory item ID'),
+  body('new_quantity').notEmpty().isInt({ min: 0 })
+    .withMessage('Valid new quantity is required'),
+  body('notes').optional().trim().isLength({ max: 500 })
+    .withMessage('Notes cannot exceed 500 characters'),
+  validate,
+  adminInventoryController.adjustStock
 );
 
 module.exports = router;
