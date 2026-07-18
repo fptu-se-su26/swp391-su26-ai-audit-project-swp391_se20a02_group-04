@@ -8,7 +8,7 @@ const { successResponse, errorResponse } = require('../utils/response.util');
  */
 const updateProfile = async (req, res) => {
   try {
-    const { full_name, phone } = req.body;
+    const { full_name, phone, specialization, avatar_url } = req.body;
     const userId = req.user.userId;
 
     // Check if phone is being changed and already exists
@@ -32,11 +32,15 @@ const updateProfile = async (req, res) => {
 
     const oldValues = {
       full_name: user.full_name,
-      phone: user.phone
+      phone: user.phone,
+      specialization: user.specialization,
+      avatar_url: user.avatar_url
     };
 
     if (full_name !== undefined) user.full_name = full_name;
     if (phone !== undefined) user.phone = phone;
+    if (specialization !== undefined) user.specialization = specialization;
+    if (avatar_url !== undefined) user.avatar_url = avatar_url;
 
     await user.save();
 
@@ -51,7 +55,9 @@ const updateProfile = async (req, res) => {
         old_values: oldValues,
         new_values: {
           full_name: user.full_name,
-          phone: user.phone
+          phone: user.phone,
+          specialization: user.specialization,
+          avatar_url: user.avatar_url
         }
       }
     });

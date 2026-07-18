@@ -4,6 +4,7 @@ import "../../styles/customer/BookingPage.css";
 import { clearAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
 import { getNotifications, markAsRead as markNotificationAsRead, markAllAsRead as markAllNotificationsAsRead } from "../../services/notificationApi";
+import CustomerChatWidget from "../../components/CustomerChatWidget";
 
 const washPackages = [
   {
@@ -397,7 +398,7 @@ export default function BookingPage() {
           <button className="icon-button" type="button" aria-label="Tìm kiếm">
             <MaterialIcon>search</MaterialIcon>
           </button>
-          <a className="booking-contact-button" href="/home">
+          <a className="booking-contact-button" href="/support">
             Liên hệ ngay
           </a>
 
@@ -813,6 +814,7 @@ export default function BookingPage() {
           </aside>
         </section>
       </main>
+      <CustomerChatWidget />
     </div>
   );
 }

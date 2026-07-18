@@ -13,6 +13,7 @@ import AboutPage from "./pages/home/AboutPage";
 import ServicesPage from "./pages/home/ServicesPage";
 import BookingPage from "./pages/customer/BookingPage";
 import UserProfile from "./pages/customer/UserProfile";
+import SupportChat from "./pages/customer/SupportChat";
 import HomePage from "./pages/home/HomePage";
 import StaffLayout from "./pages/staff/StaffLayout";
 import ManagerLayout from "./pages/manager/ManagerLayout";
@@ -64,6 +65,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           element={
             <ProtectedRoute allowedRoles={["CUSTOMER"]}>
               <UserProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/support"
+          element={
+            <ProtectedRoute allowedRoles={["CUSTOMER"]}>
+              <SupportChat />
             </ProtectedRoute>
           }
         />
