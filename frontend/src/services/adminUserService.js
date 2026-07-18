@@ -43,6 +43,10 @@ export const adminUserService = {
     return request(`/admin/users?${query.toString()}`);
   },
 
+  getDashboardStatistics(period = 30) {
+    return request(`/admin/dashboard/statistics?period=${period}`);
+  },
+
   replaceRole(userId, roleName) {
     return request(`/admin/users/${userId}/role`, {
       method: "PUT",

@@ -224,11 +224,28 @@ const updateProfileValidation = [
       }
       return value;
     }),
+
+  body('specialization')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 120 }).withMessage('Specialization cannot exceed 120 characters'),
   
   body('avatar_url')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .trim()
-    .isURL().withMessage('Avatar URL must be a valid URL')
+    .custom((value) => {
+      if (!value) return true;
+      if (String(value).startsWith('data:image/')) {
+        return String(value).length <= 1500000;
+      }
+      try {
+        // eslint-disable-next-line no-new
+        new URL(value);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }).withMessage('Avatar must be a valid image URL or image data')
 ];
 
 /**

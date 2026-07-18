@@ -8,6 +8,7 @@ import {
 import { clearAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
 import "../../styles/customer/UserProfile.css";
+import CustomerChatWidget from "../../components/CustomerChatWidget";
 
 function MaterialIcon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
@@ -553,6 +554,10 @@ export default function UserProfile() {
                 <MaterialIcon>event_available</MaterialIcon>
                 <span>Lịch hẹn của tôi</span>
               </a>
+              <a href="/support" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                <MaterialIcon>chat</MaterialIcon>
+                <span>Chat hỗ trợ</span>
+              </a>
               <div className="dropdown-divider" />
               <a href="/home" className="dropdown-item text-danger" onClick={handleLogout}>
                 <MaterialIcon>logout</MaterialIcon>
@@ -610,6 +615,10 @@ export default function UserProfile() {
                 <span>{user.address}</span>
               </div>
             </div>
+
+            <a href="/support" className="booking-contact-button" style={{ display: "inline-flex", justifyContent: "center", width: "100%", marginTop: 12, textDecoration: "none" }}>
+              Chat hỗ trợ garage
+            </a>
 
             <div className="membership-perks">
               <h3>Đặc quyền hạng vàng</h3>
@@ -1060,6 +1069,7 @@ export default function UserProfile() {
           </section>
         </section>
       </main>
+      <CustomerChatWidget />
     </div>
   );
 };

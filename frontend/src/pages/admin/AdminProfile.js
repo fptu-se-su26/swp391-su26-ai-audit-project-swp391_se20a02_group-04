@@ -1,654 +1,560 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  LayoutDashboard,
-  Calendar,
-  Wrench,
-  Users,
-  BarChart2,
-  Plus,
-  HelpCircle,
-  Search,
-  Bell,
-  Settings,
   User,
   Camera,
   Lock,
   Mail,
   Phone,
-  MapPin,
   Save,
   Eye,
   EyeOff,
   Check,
   Shield,
   Activity,
-  UserCheck,
+  AlertCircle,
+  RefreshCw,
+  X,
+  BadgeCheck,
 } from "lucide-react";
-import "../../styles/admin/AdminProfile.css";
 import AdminSidebar from "../../components/AdminSidebar";
 import { profileService } from "../../services/profileService";
+import { getAuthSession } from "../../services/authApi";
+import "../../styles/admin/AdminDashboard.css";
+import "../../styles/admin/AdminProfile.css";
 
-const activityLogs = [
-  {
-    id: 1,
-    action: "Xác nhận lịch hẹn #MC-99275",
-    target: "Ducati Panigale V4 • Khách: Trần Thị Hồng",
-    time: "14:20 Hôm nay",
-    icon: Calendar,
-    color: "log-blue",
-  },
-  {
-    id: 2,
-    action: "Phân công kỹ thuật viên",
-    target: "KTV Thắng đảm nhận BMW R1250GS (#MC-99281)",
-    time: "10:15 Hôm nay",
-    icon: UserCheck,
-    color: "log-green",
-  },
-  {
-    id: 3,
-    action: "Cập nhật kho phụ tùng",
-    target: "Đã nhập thêm 20 bình Nhớt Motul 300V 10W40",
-    time: "Hôm qua - 16:45",
-    icon: Wrench,
-    color: "log-orange",
-  },
-  {
-    id: 4,
-    action: "Thay đổi cài đặt hệ thống",
-    target: "Cập nhật thời gian làm việc ngày lễ",
-    time: "22/05/2026 - 09:30",
-    icon: Settings,
-    color: "log-purple",
-  },
-  {
-    id: 5,
-    action: "Khởi tạo tài khoản nhân viên mới",
-    target: "Đã tạo tài khoản KTV Quốc (Học việc)",
-    time: "18/05/2026 - 14:00",
-    icon: Users,
-    color: "log-teal",
-  },
-];
+const DEFAULT_AVATAR =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23e4282b"/></svg>';
 
-const AdminProfile = ({ onViewChange }) => {
+const ACTION_LABELS = {
+  PROFILE_UPDATE: "Cập nhật hồ sơ",
+  PASSWORD_CHANGE: "Đổi mật khẩu",
+  LOGIN: "Đăng nhập",
+  LOGOUT: "Đăng xuất",
+  LOGIN_FAILED: "Đăng nhập thất bại",
+};
+
+function formatDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getRoleLabel(roles = []) {
+  const names = roles
+    .map((role) => (typeof role === "string" ? role : role?.name || role?.role_name || ""))
+    .filter(Boolean)
+    .map((role) => role.toUpperCase());
+
+  if (names.includes("ADMIN")) return "Quản trị viên";
+  if (names.includes("MANAGER")) return "Quản lý garage";
+  if (names.includes("STAFF")) return "Nhân viên kỹ thuật";
+  return "Người dùng";
+}
+
+function normalizePhone(value = "") {
+  return String(value).replace(/\s+/g, "").trim();
+}
+
+export default function AdminProfile({ onViewChange }) {
   const [activeTab, setActiveTab] = useState("info");
-  const [isSaving, setIsSaving] = useState(false);
-  const [isUsingMock, setIsUsingMock] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const [roles, setRoles] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchAdminData = async () => {
-      try {
-        const res = await profileService.getMe();
-        if (res && res.success && res.data) {
-          const apiUser = res.data.user || res.data;
-          setProfile((prev) => ({
-            ...prev,
-            fullname: apiUser.full_name || apiUser.fullname || prev.fullname,
-            email: apiUser.email || prev.email,
-            phone: apiUser.phone || prev.phone,
-          }));
-          setIsUsingMock(false);
-        }
-      } catch (err) {
-        console.log("Could not load API admin profile, falling back to mock data:", err.message);
-        setIsUsingMock(true);
-      }
-    };
-    fetchAdminData();
-  }, []);
-
-  // Profile Info State
   const [profile, setProfile] = useState({
-    fullname: "Nguyễn Văn A",
-    email: "nguyenvana.admin@motocore.vn",
-    phone: "0988.777.999",
-    branch: "Cơ sở 1 - 268 Cầu Giấy, Hà Nội",
-    role: "Quản trị viên cấp cao (Super Admin)",
-    joinedDate: "15/01/2024",
-    bio: "Hơn 10 năm kinh nghiệm quản lý vận hành garage mô tô phân khối lớn. Đam mê tốc độ và kỹ thuật cơ khí chính xác.",
-    avatar: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6b00"/></svg>',
+    fullname: "",
+    email: "",
+    phone: "",
+    bio: "",
+    avatar: DEFAULT_AVATAR,
+    joinedDate: "",
+    lastLogin: "",
+    verified: false,
   });
 
-  // Password State
   const [passwords, setPasswords] = useState({
     current: "",
     new: "",
     confirm: "",
   });
 
-  // Show/Hide Password State
   const [showPassword, setShowPassword] = useState({
     current: false,
     new: false,
     confirm: false,
   });
 
-  // Notifications Toggle State
-  const [notifications, setNotifications] = useState({
-    bookingEmail: true,
-    lowStock: true,
-    weeklyReport: false,
-    staffAttendance: true,
-  });
-
-  // Toast Notification State
-  const [toast, setToast] = useState({
-    show: false,
-    message: "",
-    type: "success",
-  });
-
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
-    setTimeout(() => {
-      setToast({ show: false, message: "", type: "success" });
-    }, 3000);
+    setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3200);
   };
 
-  const handleInfoChange = (e) => {
-    const { name, value } = e.target;
+  const applyUser = useCallback((apiUser = {}, apiRoles = []) => {
+    setRoles(apiRoles);
+    setProfile({
+      fullname: apiUser.full_name || apiUser.fullname || "",
+      email: apiUser.email || "",
+      phone: apiUser.phone || "",
+      bio: apiUser.specialization || "",
+      avatar: apiUser.avatar_url || DEFAULT_AVATAR,
+      joinedDate: formatDate(apiUser.created_at),
+      lastLogin: formatDateTime(apiUser.last_login),
+      verified: Boolean(apiUser.verified),
+    });
+  }, []);
+
+  const loadProfile = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await profileService.getMe();
+      const apiUser = res.data?.user || res.user || {};
+      const apiRoles = res.data?.roles || res.roles || getAuthSession().roles || [];
+      applyUser(apiUser, apiRoles);
+    } catch (err) {
+      setError(err.message || "Không thể tải hồ sơ");
+    } finally {
+      setLoading(false);
+    }
+  }, [applyUser]);
+
+  const loadLogs = useCallback(async () => {
+    setLogsLoading(true);
+    try {
+      const res = await profileService.getActivityLogs(1, 20);
+      setLogs(res.data?.logs || res.logs || []);
+    } catch (err) {
+      setLogs([]);
+      if (activeTab === "logs") {
+        showToast(err.message || "Không tải được nhật ký", "error");
+      }
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (activeTab === "logs") loadLogs();
+  }, [activeTab, loadLogs]);
+
+  const roleLabel = useMemo(() => getRoleLabel(roles), [roles]);
+
+  const passwordStrength = useMemo(() => {
+    const value = passwords.new || "";
+    let score = 0;
+    if (value.length >= 8) score += 1;
+    if (/[A-Z]/.test(value)) score += 1;
+    if (/[a-z]/.test(value)) score += 1;
+    if (/\d/.test(value)) score += 1;
+    if (/[@$!%*?&#]/.test(value)) score += 1;
+    return score;
+  }, [passwords.new]);
+
+  const handleInfoChange = (event) => {
+    const { name, value } = event.target;
     setProfile((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target;
+  const handlePasswordChange = (event) => {
+    const { name, value } = event.target;
     setPasswords((prev) => ({ ...prev, [name]: value }));
   };
 
-  const toggleShowPassword = (field) => {
-    setShowPassword((prev) => ({ ...prev, [field]: !prev[field] }));
-  };
+  const handleSaveInfo = async (event) => {
+    event.preventDefault();
+    const phone = normalizePhone(profile.phone);
 
-  const handleNotificationToggle = (field) => {
-    setNotifications((prev) => {
-      const updated = { ...prev, [field]: !prev[field] };
-      showToast(`Đã cập nhật cấu hình thông báo thành công!`, "success");
-      return updated;
-    });
-  };
-
-  const handleSaveInfo = async (e) => {
-    e.preventDefault();
-    if (!profile.fullname.trim() || !profile.email.trim() || !profile.phone.trim()) {
-      showToast("Vui lòng điền đầy đủ các thông tin bắt buộc!", "error");
+    if (!profile.fullname.trim() || !phone) {
+      showToast("Vui lòng nhập họ tên và số điện thoại.", "error");
       return;
     }
 
-    setIsSaving(true);
+    if (!/^(0|\+84)[0-9]{9,10}$/.test(phone)) {
+      showToast("Số điện thoại không hợp lệ (VD: 0901234567).", "error");
+      return;
+    }
+
+    setSaving(true);
     try {
-      if (!isUsingMock) {
-        await profileService.updateProfile({
-          fullname: profile.fullname,
-          phone: profile.phone
-        });
-      }
-      setTimeout(() => {
-        setIsSaving(false);
-        showToast("Đã lưu thông tin hồ sơ thành công!");
-      }, 1000);
+      const res = await profileService.updateProfile({
+        fullname: profile.fullname.trim(),
+        phone,
+        bio: profile.bio.trim(),
+        avatar:
+          profile.avatar?.startsWith("data:image/") || profile.avatar?.startsWith("http")
+            ? profile.avatar
+            : undefined,
+      });
+
+      const apiUser = res.data?.user || {};
+      applyUser(apiUser, roles);
+
+      const sessionUser = getAuthSession().user || {};
+      localStorage.setItem(
+        "authUser",
+        JSON.stringify({
+          ...sessionUser,
+          ...apiUser,
+          full_name: apiUser.full_name || profile.fullname,
+          phone: apiUser.phone || phone,
+        })
+      );
+
+      showToast("Đã lưu hồ sơ thành công.");
     } catch (err) {
-      setIsSaving(false);
-      showToast(err.message || "Không thể cập nhật hồ sơ lên máy chủ!", "error");
+      showToast(err.message || "Không thể cập nhật hồ sơ.", "error");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleSavePassword = async (e) => {
-    e.preventDefault();
-    if (!passwords.current || !passwords.new || !passwords.confirm) {
-      showToast("Vui lòng nhập đầy đủ các trường mật khẩu!", "error");
-      return;
-    }
+  const handleSavePassword = async (event) => {
+    event.preventDefault();
 
-    if (passwords.new.length < 6) {
-      showToast("Mật khẩu mới phải có tối thiểu 6 ký tự!", "error");
+    if (!passwords.current || !passwords.new || !passwords.confirm) {
+      showToast("Vui lòng nhập đầy đủ mật khẩu.", "error");
       return;
     }
 
     if (passwords.new !== passwords.confirm) {
-      showToast("Mật khẩu xác nhận không trùng khớp!", "error");
+      showToast("Mật khẩu xác nhận không khớp.", "error");
       return;
     }
 
-    setIsSaving(true);
+    if (passwordStrength < 5) {
+      showToast(
+        "Mật khẩu mới cần tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&#).",
+        "error"
+      );
+      return;
+    }
+
+    setSaving(true);
     try {
-      if (!isUsingMock) {
-        await profileService.changePassword({
-          current: passwords.current,
-          new: passwords.new
-        });
-      }
-      setTimeout(() => {
-        setIsSaving(false);
-        showToast("Đã thay đổi mật khẩu tài khoản thành công!");
-        setPasswords({ current: "", new: "", confirm: "" });
-      }, 1000);
+      await profileService.changePassword({
+        current: passwords.current,
+        new: passwords.new,
+        confirm: passwords.confirm,
+      });
+      setPasswords({ current: "", new: "", confirm: "" });
+      showToast("Đã đổi mật khẩu thành công.");
     } catch (err) {
-      setIsSaving(false);
-      showToast(err.message || "Lỗi thay đổi mật khẩu trên máy chủ!", "error");
+      showToast(err.message || "Không thể đổi mật khẩu.", "error");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleAvatarClick = () => {
-    // Simulating file upload trigger
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (readerEvent) => {
-          setProfile((prev) => ({ ...prev, avatar: readerEvent.target.result }));
-          showToast("Đã cập nhật ảnh đại diện thành công!");
-        };
-        reader.readAsDataURL(file);
+    input.onchange = (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      if (file.size > 900 * 1024) {
+        showToast("Ảnh đại diện nên nhỏ hơn 900KB.", "error");
+        return;
       }
+      const reader = new FileReader();
+      reader.onload = (readerEvent) => {
+        setProfile((prev) => ({ ...prev, avatar: readerEvent.target.result }));
+        showToast("Ảnh đã chọn. Nhấn Lưu thay đổi để cập nhật.", "success");
+      };
+      reader.readAsDataURL(file);
     };
     input.click();
   };
 
   return (
-    <div className="profile-layout">
-      {/* Toast Notification */}
+    <div className="profile-layout dashboard-layout">
       {toast.show && (
-        <div className={`custom-toast ${toast.type}`}>
-          <div className="toast-content">
-            <div className="toast-icon-wrapper">
-              <Check className="toast-icon" />
-            </div>
-            <p>{toast.message}</p>
-          </div>
+        <div className={`profile-toast ${toast.type}`}>
+          {toast.type === "error" ? <AlertCircle size={16} /> : <Check size={16} />}
+          <span>{toast.message}</span>
+          <button type="button" onClick={() => setToast({ show: false, message: "", type: "success" })}>
+            <X size={14} />
+          </button>
         </div>
       )}
 
-      {/* Sidebar */}
       <AdminSidebar activeView="profile" onViewChange={onViewChange} />
 
-      {/* Main Content */}
       <main className="main-content">
-        {/* Header */}
-        <header className="header">
-          <div className="header-left">
-            <h2>MOTOCORE</h2>
-            <span className="breadcrumb">Hồ sơ quản trị viên</span>
+        <header className="profile-topbar">
+          <div>
+            <span>Tài khoản quản trị</span>
+            <h2>Hồ sơ</h2>
           </div>
-
-          <div className="header-actions">
-            <div className="search-container">
-              <Search className="search-icon" />
-              <input
-                type="text"
-                placeholder="Tìm kiếm..."
-                className="search-input"
-                disabled
-              />
-            </div>
-            <div className="header-icons">
-              <Settings className="header-icon active-icon" onClick={() => onViewChange("profile")} />
-              <div className="avatar" onClick={() => onViewChange("profile")}>
-                <img src={profile.avatar} alt="Ảnh đại diện" />
-              </div>
-            </div>
-          </div>
+          <button className="profile-icon-btn" type="button" onClick={loadProfile} aria-label="Tải lại">
+            <RefreshCw size={16} className={loading ? "is-spinning" : ""} />
+          </button>
         </header>
 
-        {/* Content Body */}
-        <div className="content-body">
-          <h2 className="page-title">Hồ sơ cá nhân</h2>
+        <div className="profile-body">
+          {error && (
+            <div className="profile-error">
+              <AlertCircle size={16} />
+              <span>{error}</span>
+              <button type="button" onClick={loadProfile}>
+                Thử lại
+              </button>
+            </div>
+          )}
 
-          <div className="profile-grid">
-            {/* Left Card: Overview */}
-            <div className="overview-card">
-              <div className="avatar-section">
-                <div className="avatar-large-container">
-                  <img src={profile.avatar} alt="Large Avatar" className="avatar-large" />
-                  <button className="avatar-overlay" onClick={handleAvatarClick} title="Thay ảnh đại diện">
-                    <Camera size={20} />
-                  </button>
-                </div>
-                <h3 className="admin-name">{profile.fullname}</h3>
-                <span className="role-badge">
-                  <Shield size={12} className="mr-1" /> {profile.role}
-                </span>
-                <p className="admin-meta">Thành viên từ: {profile.joinedDate}</p>
+          <section className="profile-identity-card">
+            <div className="profile-identity-main">
+              <div className="profile-avatar-wrap">
+                <img src={profile.avatar || DEFAULT_AVATAR} alt={profile.fullname || "Avatar"} />
+                <button type="button" className="profile-avatar-btn" onClick={handleAvatarClick} title="Đổi ảnh">
+                  <Camera size={15} />
+                </button>
               </div>
 
-              <div className="overview-divider" />
-
-              <div className="stats-mini-grid">
-                <div className="stat-mini">
-                  <span className="stat-label">Hoạt động</span>
-                  <span className="stat-value text-green">14 Ngày</span>
+              <div className="profile-identity-copy">
+                <h3>{loading ? "Đang tải..." : profile.fullname || "Chưa có tên"}</h3>
+                <div className="profile-identity-tags">
+                  <span className="profile-role-badge">
+                    <Shield size={12} /> {roleLabel}
+                  </span>
+                  <span className={`profile-verify-badge ${profile.verified ? "ok" : "warn"}`}>
+                    <BadgeCheck size={12} />
+                    {profile.verified ? "Email đã xác thực" : "Email chưa xác thực"}
+                  </span>
                 </div>
-                <div className="stat-mini">
-                  <span className="stat-label">Duyệt lịch</span>
-                  <span className="stat-value text-orange">186 lần</span>
-                </div>
-                <div className="stat-mini">
-                  <span className="stat-label">Chi nhánh</span>
-                  <span className="stat-value">Cầu Giấy</span>
-                </div>
-              </div>
-
-              <div className="bio-section">
-                <h4>Giới thiệu</h4>
-                <p>{profile.bio || "Chưa có giới thiệu."}</p>
+                <p>{profile.bio || "Chưa có giới thiệu chuyên môn."}</p>
               </div>
             </div>
 
-            {/* Right Card: Interactive Tabs */}
-            <div className="tabs-container">
-              {/* Tab Header Navigation */}
-              <div className="tabs-header">
-                <button
-                  className={`tab-btn ${activeTab === "info" ? "active" : ""}`}
-                  onClick={() => setActiveTab("info")}
-                >
-                  <User size={16} />
-                  <span>Thông tin cá nhân</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === "password" ? "active" : ""}`}
-                  onClick={() => setActiveTab("password")}
-                >
-                  <Lock size={16} />
-                  <span>Bảo mật</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === "notifications" ? "active" : ""}`}
-                  onClick={() => setActiveTab("notifications")}
-                >
-                  <Bell size={16} />
-                  <span>Cài đặt thông báo</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === "logs" ? "active" : ""}`}
-                  onClick={() => setActiveTab("logs")}
-                >
-                  <Activity size={16} />
-                  <span>Nhật ký hoạt động</span>
-                </button>
+            <div className="profile-identity-stats" aria-label="Thông tin tài khoản">
+              <div>
+                <small>Email</small>
+                <strong title={profile.email}>{profile.email || "—"}</strong>
               </div>
+              <div>
+                <small>Thành viên từ</small>
+                <strong>{profile.joinedDate}</strong>
+              </div>
+              <div>
+                <small>Đăng nhập gần nhất</small>
+                <strong>{profile.lastLogin}</strong>
+              </div>
+            </div>
+          </section>
 
-              {/* Tab Content Panels */}
-              <div className="tabs-content">
-                {/* Tab 1: Personal Info Form */}
-                {activeTab === "info" && (
-                  <form onSubmit={handleSaveInfo} className="tab-pane">
-                    <div className="section-title-inside">
-                      <h3>Cập nhật thông tin</h3>
-                      <p>Quản lý và cập nhật thông tin hiển thị trên hệ thống của bạn.</p>
-                    </div>
+          <section className="profile-panel">
+            <div className="profile-tabs">
+              {[
+                ["info", User, "Thông tin"],
+                ["password", Lock, "Bảo mật"],
+                ["logs", Activity, "Nhật ký"],
+              ].map(([key, Icon, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={activeTab === key ? "active" : ""}
+                  onClick={() => setActiveTab(key)}
+                >
+                  <Icon size={15} />
+                  {label}
+                </button>
+              ))}
+            </div>
 
-                    <div className="form-grid">
-                      <div className="form-group">
-                        <label htmlFor="fullname">Họ và tên *</label>
-                        <div className="input-with-icon">
-                          <User size={16} className="input-icon" />
-                          <input
-                            type="text"
-                            id="fullname"
-                            name="fullname"
-                            value={profile.fullname}
-                            onChange={handleInfoChange}
-                            placeholder="Nhập họ và tên"
-                          />
-                        </div>
-                      </div>
+            <div className="profile-panel-body">
+              {activeTab === "info" && (
+                <form className="profile-form" onSubmit={handleSaveInfo}>
+                  <div className="profile-section-title">
+                    <h3>Cập nhật thông tin</h3>
+                    <p>Chỉnh sửa thông tin hiển thị trên hệ thống MOTOCORE.</p>
+                  </div>
 
-                      <div className="form-group">
-                        <label htmlFor="email">Địa chỉ Email *</label>
-                        <div className="input-with-icon">
-                          <Mail size={16} className="input-icon" />
-                          <input
-                            type="email"
-                            id="email"
-                            name="email"
-                            value={profile.email}
-                            onChange={handleInfoChange}
-                            placeholder="Nhập địa chỉ email"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <label htmlFor="phone">Số điện thoại *</label>
-                        <div className="input-with-icon">
-                          <Phone size={16} className="input-icon" />
-                          <input
-                            type="text"
-                            id="phone"
-                            name="phone"
-                            value={profile.phone}
-                            onChange={handleInfoChange}
-                            placeholder="Nhập số điện thoại"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <label htmlFor="branch">Chi nhánh làm việc</label>
-                        <div className="input-with-icon">
-                          <MapPin size={16} className="input-icon" />
-                          <input
-                            type="text"
-                            id="branch"
-                            name="branch"
-                            value={profile.branch}
-                            onChange={handleInfoChange}
-                            placeholder="Chọn chi nhánh"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-group full-width">
-                        <label htmlFor="bio">Giới thiệu bản thân</label>
-                        <textarea
-                          id="bio"
-                          name="bio"
-                          value={profile.bio}
+                  <div className="profile-form-grid">
+                    <label className="profile-field">
+                      <span>Họ và tên *</span>
+                      <div className="profile-input">
+                        <User size={15} />
+                        <input
+                          name="fullname"
+                          value={profile.fullname}
                           onChange={handleInfoChange}
-                          rows={4}
-                          placeholder="Viết một vài dòng giới thiệu bản thân..."
+                          placeholder="Nhập họ và tên"
+                          disabled={loading || saving}
                         />
                       </div>
-                    </div>
+                    </label>
 
-                    <div className="form-actions">
-                      <button type="submit" className="btn-save" disabled={isSaving}>
-                        <Save size={16} />
-                        {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
-                      </button>
-                    </div>
-                  </form>
-                )}
+                    <label className="profile-field">
+                      <span>Email</span>
+                      <div className="profile-input is-readonly">
+                        <Mail size={15} />
+                        <input value={profile.email} readOnly />
+                      </div>
+                    </label>
 
-                {/* Tab 2: Change Password Form */}
-                {activeTab === "password" && (
-                  <form onSubmit={handleSavePassword} className="tab-pane">
-                    <div className="section-title-inside">
-                      <h3>Thay đổi mật khẩu</h3>
-                      <p>Để đảm bảo an toàn, hãy sử dụng mật khẩu mạnh gồm chữ hoa, chữ thường và chữ số.</p>
-                    </div>
+                    <label className="profile-field">
+                      <span>Số điện thoại *</span>
+                      <div className="profile-input">
+                        <Phone size={15} />
+                        <input
+                          name="phone"
+                          value={profile.phone}
+                          onChange={handleInfoChange}
+                          placeholder="0901234567"
+                          disabled={loading || saving}
+                        />
+                      </div>
+                    </label>
 
-                    <div className="form-column">
-                      <div className="form-group">
-                        <label htmlFor="current">Mật khẩu hiện tại *</label>
-                        <div className="input-with-icon">
-                          <Lock size={16} className="input-icon" />
+                    <label className="profile-field full">
+                      <span>Giới thiệu / chuyên môn</span>
+                      <textarea
+                        name="bio"
+                        value={profile.bio}
+                        onChange={handleInfoChange}
+                        rows={4}
+                        placeholder="Mô tả ngắn về vai trò và kinh nghiệm của bạn..."
+                        disabled={loading || saving}
+                        maxLength={120}
+                      />
+                      <em>{profile.bio.length}/120</em>
+                    </label>
+                  </div>
+
+                  <div className="profile-form-actions">
+                    <button type="submit" className="profile-save-btn" disabled={loading || saving}>
+                      <Save size={15} />
+                      {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {activeTab === "password" && (
+                <form className="profile-form" onSubmit={handleSavePassword}>
+                  <div className="profile-section-title">
+                    <h3>Đổi mật khẩu</h3>
+                    <p>Mật khẩu tối thiểu 8 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt.</p>
+                  </div>
+
+                  <div className="profile-form-column">
+                    {[
+                      ["current", "Mật khẩu hiện tại"],
+                      ["new", "Mật khẩu mới"],
+                      ["confirm", "Xác nhận mật khẩu mới"],
+                    ].map(([name, label]) => (
+                      <label className="profile-field" key={name}>
+                        <span>{label} *</span>
+                        <div className="profile-input">
+                          <Lock size={15} />
                           <input
-                            type={showPassword.current ? "text" : "password"}
-                            id="current"
-                            name="current"
-                            value={passwords.current}
+                            type={showPassword[name] ? "text" : "password"}
+                            name={name}
+                            value={passwords[name]}
                             onChange={handlePasswordChange}
-                            placeholder="Nhập mật khẩu hiện tại"
+                            placeholder={label}
+                            disabled={saving}
                           />
                           <button
                             type="button"
-                            className="btn-toggle-eye"
-                            onClick={() => toggleShowPassword("current")}
+                            className="profile-eye-btn"
+                            onClick={() =>
+                              setShowPassword((prev) => ({ ...prev, [name]: !prev[name] }))
+                            }
                           >
-                            {showPassword.current ? <EyeOff size={16} /> : <Eye size={16} />}
+                            {showPassword[name] ? <EyeOff size={15} /> : <Eye size={15} />}
                           </button>
                         </div>
-                      </div>
+                      </label>
+                    ))}
 
-                      <div className="form-group">
-                        <label htmlFor="new">Mật khẩu mới *</label>
-                        <div className="input-with-icon">
-                          <Lock size={16} className="input-icon" />
-                          <input
-                            type={showPassword.new ? "text" : "password"}
-                            id="new"
-                            name="new"
-                            value={passwords.new}
-                            onChange={handlePasswordChange}
-                            placeholder="Tối thiểu 6 ký tự"
-                          />
-                          <button
-                            type="button"
-                            className="btn-toggle-eye"
-                            onClick={() => toggleShowPassword("new")}
-                          >
-                            {showPassword.new ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <label htmlFor="confirm">Xác nhận mật khẩu mới *</label>
-                        <div className="input-with-icon">
-                          <Lock size={16} className="input-icon" />
-                          <input
-                            type={showPassword.confirm ? "text" : "password"}
-                            id="confirm"
-                            name="confirm"
-                            value={passwords.confirm}
-                            onChange={handlePasswordChange}
-                            placeholder="Nhập lại mật khẩu mới"
-                          />
-                          <button
-                            type="button"
-                            className="btn-toggle-eye"
-                            onClick={() => toggleShowPassword("confirm")}
-                          >
-                            {showPassword.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="form-actions">
-                      <button type="submit" className="btn-save" disabled={isSaving}>
-                        <Save size={16} />
-                        {isSaving ? "Đang xử lý..." : "Cập nhật mật khẩu"}
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                {/* Tab 3: Notification Toggles */}
-                {activeTab === "notifications" && (
-                  <div className="tab-pane">
-                    <div className="section-title-inside">
-                      <h3>Cài đặt thông báo</h3>
-                      <p>Chọn các loại cập nhật và cảnh báo bạn muốn nhận qua hệ thống và email.</p>
-                    </div>
-
-                    <div className="toggles-list">
-                      <div className="toggle-item">
-                        <div className="toggle-info">
-                          <h4>Email xác nhận lịch đặt mới</h4>
-                          <p>Gửi thông báo email tự động mỗi khi có khách hàng đặt lịch hẹn thành công.</p>
-                        </div>
-                        <button
-                          className={`switch-btn ${notifications.bookingEmail ? "checked" : ""}`}
-                          onClick={() => handleNotificationToggle("bookingEmail")}
-                        >
-                          <span className="switch-thumb" />
-                        </button>
-                      </div>
-
-                      <div className="toggle-item">
-                        <div className="toggle-info">
-                          <h4>Cảnh báo phụ tùng sắp hết</h4>
-                          <p>Báo cáo tức thời lên màn hình khi phụ tùng trong kho đạt ngưỡng tối thiểu.</p>
-                        </div>
-                        <button
-                          className={`switch-btn ${notifications.lowStock ? "checked" : ""}`}
-                          onClick={() => handleNotificationToggle("lowStock")}
-                        >
-                          <span className="switch-thumb" />
-                        </button>
-                      </div>
-
-                      <div className="toggle-item">
-                        <div className="toggle-info">
-                          <h4>Báo cáo doanh thu & hiệu suất hàng tuần</h4>
-                          <p>Gửi file thống kê Excel chi tiết vào mỗi sáng thứ Hai hàng tuần.</p>
-                        </div>
-                        <button
-                          className={`switch-btn ${notifications.weeklyReport ? "checked" : ""}`}
-                          onClick={() => handleNotificationToggle("weeklyReport")}
-                        >
-                          <span className="switch-thumb" />
-                        </button>
-                      </div>
-
-                      <div className="toggle-item">
-                        <div className="toggle-info">
-                          <h4>Báo cáo điểm danh nhân viên</h4>
-                          <p>Thông báo khi kỹ thuật viên và nhân sự vào ca/tan ca muộn.</p>
-                        </div>
-                        <button
-                          className={`switch-btn ${notifications.staffAttendance ? "checked" : ""}`}
-                          onClick={() => handleNotificationToggle("staffAttendance")}
-                        >
-                          <span className="switch-thumb" />
-                        </button>
-                      </div>
+                    <div className="password-strength">
+                      <div className={`bar level-${passwordStrength}`} />
+                      <small>
+                        Độ mạnh:{" "}
+                        {passwordStrength < 3 ? "Yếu" : passwordStrength < 5 ? "Trung bình" : "Mạnh"}
+                      </small>
                     </div>
                   </div>
-                )}
 
-                {/* Tab 4: Activity Timeline */}
-                {activeTab === "logs" && (
-                  <div className="tab-pane">
-                    <div className="section-title-inside">
-                      <h3>Nhật ký hoạt động</h3>
-                      <p>Danh sách các hoạt động quản trị gần nhất do tài khoản của bạn thực hiện.</p>
+                  <div className="profile-form-actions">
+                    <button type="submit" className="profile-save-btn" disabled={saving}>
+                      <Save size={15} />
+                      {saving ? "Đang xử lý..." : "Cập nhật mật khẩu"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {activeTab === "logs" && (
+                <div className="profile-form">
+                  <div className="profile-section-title">
+                    <h3>Nhật ký hoạt động</h3>
+                    <p>Các thao tác gần đây của tài khoản này trên hệ thống.</p>
+                  </div>
+
+                  {logsLoading && <p className="profile-empty">Đang tải nhật ký...</p>}
+
+                  {!logsLoading && logs.length === 0 && (
+                    <div className="profile-empty-state">
+                      <Activity size={22} />
+                      <p>Chưa có nhật ký hoạt động.</p>
                     </div>
+                  )}
 
-                    <div className="timeline">
-                      {activityLogs.map((log) => {
-                        const LogIcon = log.icon;
-                        return (
-                          <div className="timeline-item" key={log.id}>
-                            <div className={`timeline-badge ${log.color}`}>
-                              <LogIcon size={16} />
+                  <div className="profile-timeline">
+                    {!logsLoading &&
+                      logs.map((log) => (
+                        <article
+                          key={log._id || `${log.action}-${log.created_at}`}
+                          className="profile-log-item"
+                        >
+                          <div className={`profile-log-dot ${String(log.status || "").toLowerCase()}`} />
+                          <div>
+                            <div className="profile-log-head">
+                              <strong>{ACTION_LABELS[log.action] || log.action || "Hoạt động"}</strong>
+                              <span>{formatDateTime(log.created_at)}</span>
                             </div>
-                            <div className="timeline-content">
-                              <div className="timeline-header-row">
-                                <h4>{log.action}</h4>
-                                <span className="timeline-time">{log.time}</span>
-                              </div>
-                              <p className="timeline-desc">{log.target}</p>
-                            </div>
+                            <p>
+                              Trạng thái: {log.status === "SUCCESS" ? "Thành công" : log.status || "—"}
+                              {log.ip_address ? ` · IP ${log.ip_address}` : ""}
+                            </p>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </article>
+                      ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-          </div>
+          </section>
         </div>
       </main>
     </div>
   );
-};
-
-export default AdminProfile;
+}

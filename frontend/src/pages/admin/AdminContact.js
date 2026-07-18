@@ -1,324 +1,500 @@
-import React, { useState, useEffect, useRef } from "react";
-import "../../styles/admin/AdminChatDashboard.css"; // Sẽ định nghĩa CSS ở phần dưới
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Search,
+  RefreshCw,
+  Send,
+  Phone,
+  Mail,
+  Bike,
+  MessageSquare,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  CircleDot,
+  UserRound,
+} from "lucide-react";
+import AdminSidebar from "../../components/AdminSidebar";
+import { chatApi } from "../../services/chatApi";
+import "../../styles/admin/AdminDashboard.css";
+import "../../styles/admin/AdminContact.css";
 
-// Mock data ban đầu đại diện cho các hội thoại từ khách hàng gửi về
-const initialConversations = [
-  {
-    id: 1,
-    name: "Nguyễn Văn An",
-    avatar: "https://i.pravatar.cc/150?img=11",
-    bikeInfo: "Honda Vision",
-    plate: "51F1-123.45",
-    phone: "090 123 4567",
-    email: "an.nguyen@gmail.com",
-    address: "Quận 1, TP. HCM",
-    level: "Hạng Kim Cương",
-    odo: "12,450 km",
-    time: "2 phút",
-    status: "VIP", // VIP, XỬ LÝ XONG, CHỜ XỬ LÝ
-    messages: [
-      { sender: "user", text: "Chào MOTOCORE, mình muốn hỏi về lịch thay nhớt định kỳ cho xe Vision. Xe mình mới đi được 2000km từ lần bảo dưỡng trước.", time: "14:20" },
-      { sender: "admin", text: "Dạ chào anh An ạ. Với dòng xe Honda Vision, sau 2000km anh nên kiểm tra nhớt máy và nhớt hộp số ạ. Anh có muốn em gửi bảng báo giá các loại nhớt tốt nhất bên em không?", time: "14:22" }
-    ]
-  },
-  {
-    id: 2,
-    name: "Trần Thị Mai",
-    avatar: "https://i.pravatar.cc/150?img=51",
-    bikeInfo: "Yamaha Grande",
-    plate: "59G2-888.88",
-    phone: "098 765 4321",
-    email: "mai.tran@gmail.com",
-    address: "Quận 7, TP. HCM",
-    level: "Hạng Vàng",
-    odo: "8,300 km",
-    time: "15 phút",
-    status: "XỬ LÝ XONG",
-    messages: [
-      { sender: "user", text: "Cảm ơn shop đã hỗ trợ nhiệt tình nha!", time: "11:05" }
-    ]
-  },
-  {
-    id: 3,
-    name: "Lê Hoàng Nam",
-    avatar: "https://i.pravatar.cc/150?img=33",
-    bikeInfo: "Kawasaki Z1000",
-    plate: "51A-543.21",
-    phone: "091 223 3445",
-    email: "nam.le@gmail.com",
-    address: "Quận 2, TP. HCM",
-    level: "Thành viên mới",
-    odo: "22,100 km",
-    time: "1 giờ",
-    status: "CHỜ XỬ LÝ",
-    messages: [
-      { sender: "user", text: "Báo giá thay lốp Michelin cho xe Z1000 giúp mình nhé.", time: "09:15" }
-    ]
-  }
+const STATUS_META = {
+  WAITING_ADMIN: { label: "Chờ phản hồi", tone: "warning" },
+  WAITING_CUSTOMER: { label: "Đã trả lời", tone: "info" },
+  OPEN: { label: "Đang mở", tone: "neutral" },
+  RESOLVED: { label: "Đã xong", tone: "success" },
+};
+
+const QUICK_REPLIES = [
+  { label: "Đã nhận thông tin", text: "Dạ garage đã nhận thông tin, em sẽ kiểm tra và phản hồi anh/chị ngay ạ." },
+  { label: "Hướng dẫn đặt lịch", text: "Anh/chị có thể đặt lịch trực tiếp tại mục Đặt lịch trên website MOTOCORE ạ." },
+  { label: "Giờ làm việc", text: "Garage làm việc 8:00–18:00 hàng ngày. Anh/chị muốn book khung giờ nào ạ?" },
 ];
 
-function MaterialIcon({ children, className = "" }) {
-  return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
+function formatTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  }
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-export default function AdminChatDashboard() {
-  const [conversations, setConversations] = useState(initialConversations);
-  const [activeId, setActiveId] = useState(1);
-  const [adminInput, setAdminInput] = useState("");
+function getInitials(name = "") {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "KH";
+  return parts
+    .slice(-2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function isRateLimitError(message = "") {
+  return /too many requests/i.test(message);
+}
+
+export default function AdminContact({ onViewChange }) {
+  const [conversations, setConversations] = useState([]);
+  const [stats, setStats] = useState({ total: 0, waiting_admin: 0, in_progress: 0, resolved: 0 });
+  const [activeId, setActiveId] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [activeConversation, setActiveConversation] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [draft, setDraft] = useState("");
+  const [loadingList, setLoadingList] = useState(true);
+  const [loadingThread, setLoadingThread] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
   const chatEndRef = useRef(null);
+  const activeIdRef = useRef("");
+  const composerRef = useRef(null);
 
-  // Tìm hội thoại hiện tại đang được chọn
-  const activeChat = conversations.find(c => c.id === activeId) || conversations[0];
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
 
-  // Tự động cuộn xuống khi có tin nhắn mới trong khung chat hiện tại
+  const loadList = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoadingList(true);
+    try {
+      const data = await chatApi.listConversations({ limit: 100 });
+      setConversations(data.conversations || []);
+      setStats(data.stats || { total: 0, waiting_admin: 0, in_progress: 0, resolved: 0 });
+      if (!silent) setError("");
+
+      const currentId = activeIdRef.current;
+      if (!currentId && data.conversations?.length) {
+        setActiveId(data.conversations[0].id);
+      } else if (currentId && !data.conversations?.some((item) => item.id === currentId)) {
+        setActiveId(data.conversations?.[0]?.id || "");
+      }
+    } catch (err) {
+      const message = err.message || "Không thể tải hội thoại";
+      if (!silent || !isRateLimitError(message)) {
+        setError(message);
+      }
+      if (!silent) setConversations([]);
+    } finally {
+      if (!silent) setLoadingList(false);
+    }
+  }, []);
+
+  const loadThread = useCallback(async (id, { silent = false } = {}) => {
+    if (!id) {
+      setMessages([]);
+      setActiveConversation(null);
+      return;
+    }
+
+    if (!silent) setLoadingThread(true);
+    try {
+      const data = await chatApi.getConversation(id);
+      setActiveConversation(data.conversation || null);
+      setMessages(data.messages || []);
+      setConversations((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, unread_admin: 0 } : item))
+      );
+    } catch (err) {
+      const message = err.message || "Không thể tải tin nhắn";
+      if (!silent || !isRateLimitError(message)) {
+        setError(message);
+      }
+    } finally {
+      if (!silent) setLoadingThread(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadList();
+  }, [loadList]);
+
+  useEffect(() => {
+    if (activeId) loadThread(activeId);
+  }, [activeId, loadThread]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.hidden) return;
+      if (activeIdRef.current) {
+        loadThread(activeIdRef.current, { silent: true });
+      } else {
+        loadList({ silent: true });
+      }
+    }, 12000);
+    return () => clearInterval(timer);
+  }, [loadList, loadThread]);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeChat.messages]);
+  }, [messages]);
 
-  // Xử lý gửi tin nhắn từ phía Admin phản hồi khách hàng
-  const handleSendAdminMessage = (e) => {
-    e.preventDefault();
-    if (!adminInput.trim()) return;
+  const filteredConversations = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    return conversations.filter((item) => {
+      const matchesFilter =
+        filter === "all" ||
+        (filter === "waiting" && item.status === "WAITING_ADMIN") ||
+        (filter === "active" && ["OPEN", "WAITING_CUSTOMER"].includes(item.status)) ||
+        (filter === "resolved" && item.status === "RESOLVED");
 
-    const timeString = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-    const newMsg = {
-      sender: "admin",
-      text: adminInput.trim(),
-      time: timeString
-    };
+      if (!matchesFilter) return false;
+      if (!keyword) return true;
 
-    setConversations(prev =>
-      prev.map(chat => {
-        if (chat.id === activeId) {
-          return {
-            ...chat,
-            messages: [...chat.messages, newMsg]
-          };
-        }
-        return chat;
-      })
-    );
+      const haystack = [
+        item.customer?.full_name,
+        item.customer?.phone,
+        item.customer?.email,
+        item.vehicle?.plate,
+        item.last_message,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
-    setAdminInput("");
+      return haystack.includes(keyword);
+    });
+  }, [conversations, filter, search]);
+
+  const handleSend = async (event) => {
+    event.preventDefault();
+    if (!activeId || !draft.trim() || sending) return;
+
+    const text = draft.trim();
+    setSending(true);
+    setError("");
+    setDraft("");
+    try {
+      const data = await chatApi.sendStaffMessage(activeId, text);
+      setMessages((prev) => [...prev, data.message]);
+      await loadList({ silent: true });
+    } catch (err) {
+      setDraft(text);
+      setError(err.message || "Không gửi được tin nhắn");
+    } finally {
+      setSending(false);
+      composerRef.current?.focus();
+    }
   };
 
+  const handleResolve = async () => {
+    if (!activeId) return;
+    try {
+      await chatApi.updateStatus(activeId, "RESOLVED");
+      await Promise.all([loadList({ silent: true }), loadThread(activeId, { silent: true })]);
+    } catch (err) {
+      setError(err.message || "Không cập nhật được trạng thái");
+    }
+  };
+
+  const handleReopen = async () => {
+    if (!activeId) return;
+    try {
+      await chatApi.updateStatus(activeId, "OPEN");
+      await Promise.all([loadList({ silent: true }), loadThread(activeId, { silent: true })]);
+    } catch (err) {
+      setError(err.message || "Không mở lại được hội thoại");
+    }
+  };
+
+  const kpis = [
+    { label: "Tổng", value: stats.total, Icon: MessageSquare, tone: "neutral" },
+    { label: "Chờ trả lời", value: stats.waiting_admin, Icon: Clock, tone: "warning" },
+    { label: "Đang xử lý", value: stats.in_progress, Icon: CircleDot, tone: "info" },
+    { label: "Đã xong", value: stats.resolved, Icon: CheckCircle2, tone: "success" },
+  ];
+
+  const customer = activeConversation?.customer;
+  const vehicle = activeConversation?.vehicle;
+  const statusMeta = STATUS_META[activeConversation?.status] || STATUS_META.OPEN;
+
   return (
-    <div className="admin-chat-dashboard">
-      
-      {/* 1. HÀNG THỐNG KÊ NHANH (STAT CARDS) */}
-      <div className="chat-stats-grid">
-        <div className="chat-stat-card">
-          <div className="stat-icon-wrapper blue">
-            <MaterialIcon>forum</MaterialIcon>
-          </div>
-          <div className="stat-details">
-            <span className="stat-value">128</span>
-            <span className="stat-label">Tổng hội thoại</span>
-          </div>
-        </div>
+    <div className="contact-layout dashboard-layout">
+      <AdminSidebar activeView="contact" onViewChange={onViewChange} />
 
-        <div className="chat-stat-card">
-          <div className="stat-icon-wrapper orange">
-            <MaterialIcon>hourglass_empty</MaterialIcon>
-          </div>
-          <div className="stat-details">
-            <span className="stat-value">14</span>
-            <span className="stat-label">Chờ phản hồi</span>
-          </div>
-        </div>
-
-        <div className="chat-stat-card">
-          <div className="stat-icon-wrapper purple">
-            <MaterialIcon>assignment_late</MaterialIcon>
-          </div>
-          <div className="stat-details">
-            <span className="stat-value">42</span>
-            <span className="stat-label">Đang xử lý</span>
-          </div>
-        </div>
-
-        <div className="chat-stat-card">
-          <div className="stat-icon-wrapper green">
-            <MaterialIcon>check_circle</MaterialIcon>
-          </div>
-          <div className="stat-details">
-            <span className="stat-value">72</span>
-            <span className="stat-label">Đã giải quyết</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. KHU VỰC LÀM VIỆC CHÍNH (MAIN WORKSPACE) */}
-      <div className="chat-workspace">
-        
-        {/* CỘT TRÁI: DANH SÁCH HỘI THOẠI GẦN ĐÂY */}
-        <div className="chat-sidebar-list">
-          <div className="sidebar-header-row">
-            <h3>Hội thoại gần đây</h3>
-            <button className="filter-btn">
-              <MaterialIcon>filter_list</MaterialIcon>
-            </button>
+      <main className="main-content contact-main">
+        <header className="contact-topbar">
+          <div className="contact-topbar-title">
+            <span>Chăm sóc khách hàng</span>
+            <h2>Liên hệ</h2>
           </div>
 
-          <div className="conversations-wrapper">
-            {conversations.map((chat) => {
-              const lastMsg = chat.messages[chat.messages.length - 1];
-              return (
-                <div 
-                  key={chat.id} 
-                  className={`conversation-item ${chat.id === activeId ? "active" : ""}`}
-                  onClick={() => setActiveId(chat.id)}
-                >
-                  <div className="avatar-container">
-                    <img src={chat.avatar} alt={chat.name} className="user-avatar" />
-                    <span className="status-dot online"></span>
-                  </div>
-                  <div className="conv-summary">
-                    <div className="conv-title-row">
-                      <strong className="user-name">{chat.name}</strong>
-                      <span className="conv-time">{chat.time}</span>
-                    </div>
-                    <div className="conv-plate">{chat.plate}</div>
-                    <p className="conv-last-msg">{lastMsg ? lastMsg.text : ""}</p>
-                    <div className="conv-tags">
-                      {chat.status === "VIP" && <span className="tag vip">VIP</span>}
-                      {chat.status === "XỬ LÝ XONG" && <span className="tag resolved">XỬ LÝ XONG</span>}
-                      {chat.status === "CHỜ XỬ LÝ" && <span className="tag pending">CHỜ XỬ LÝ</span>}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* CỘT GIỮA: KHUNG CHÁT CHI TIẾT */}
-        <div className="chat-main-window">
-          {/* Header của cửa sổ chat */}
-          <div className="chat-window-header">
-            <div className="active-user-info">
-              <div className="avatar-wrapper">
-                <img src={activeChat.avatar} alt={activeChat.name} />
-                <span className="status-dot online"></span>
-              </div>
-              <div>
-                <h4>{activeChat.name}</h4>
-                <div className="bike-subtitle">
-                  <span>{activeChat.bikeInfo}</span>
-                  <span className="dot-divider">•</span>
-                  <span>{activeChat.plate}</span>
-                </div>
-              </div>
-            </div>
-            <div className="header-actions">
-              <button className="action-icon-btn"><MaterialIcon>call</MaterialIcon></button>
-              <button className="action-icon-btn"><MaterialIcon>videocam</MaterialIcon></button>
-              <button className="action-icon-btn"><MaterialIcon>more_vert</MaterialIcon></button>
-            </div>
-          </div>
-
-          {/* Vùng tin nhắn */}
-          <div className="chat-window-messages">
-            <div className="chat-timeline-divider">Hôm nay, 14:20</div>
-            
-            {activeChat.messages.map((msg, idx) => (
-              <div key={idx} className={`chat-bubble-row ${msg.sender === "admin" ? "admin" : "user"}`}>
-                {msg.sender === "user" && (
-                  <img src={activeChat.avatar} alt={activeChat.name} className="bubble-avatar" />
-                )}
-                <div className="bubble-content-wrapper">
-                  <div className="bubble-text">{msg.text}</div>
-                  <span className="bubble-time">{msg.time}</span>
+          <div className="contact-kpi-strip" aria-label="Thống kê hội thoại">
+            {kpis.map(({ label, value, Icon, tone }) => (
+              <div className={`contact-kpi-chip ${tone}`} key={label}>
+                <Icon size={15} />
+                <div>
+                  <small>{label}</small>
+                  <strong>{value}</strong>
                 </div>
               </div>
             ))}
-            <div ref={chatEndRef} />
           </div>
 
-          {/* Thanh chức năng nhanh & Nhập tin nhắn */}
-          <div className="chat-window-footer">
-            <div className="quick-action-bar">
-              <button className="quick-btn">
-                <MaterialIcon>calendar_today</MaterialIcon> Đặt lịch hẹn
-              </button>
-              <button className="quick-btn">
-                <MaterialIcon>description</MaterialIcon> Gửi báo giá
-              </button>
-              <button className="quick-btn">
-                <MaterialIcon>store</MaterialIcon> Địa chỉ cửa hàng
-              </button>
-            </div>
-            
-            <form className="chat-input-row" onSubmit={handleSendAdminMessage}>
-              <button type="button" className="input-tool-btn"><MaterialIcon>sentiment_satisfied</MaterialIcon></button>
-              <button type="button" className="input-tool-btn"><MaterialIcon>attach_file</MaterialIcon></button>
-              <input 
-                type="text" 
-                value={adminInput}
-                onChange={(e) => setAdminInput(e.target.value)}
-                placeholder="Nhập câu trả lời cho khách hàng..." 
+          <div className="contact-topbar-actions">
+            <label className="contact-search">
+              <Search size={16} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Tìm khách, SĐT, biển số..."
               />
-              <button type="submit" className="admin-send-btn">
-                <MaterialIcon>send</MaterialIcon>
+            </label>
+            <button
+              className="contact-icon-btn"
+              type="button"
+              onClick={() => {
+                loadList();
+                if (activeId) loadThread(activeId);
+              }}
+              aria-label="Tải lại"
+            >
+              <RefreshCw size={16} className={loadingList ? "is-spinning" : ""} />
+            </button>
+          </div>
+        </header>
+
+        <div className="contact-body">
+          {error && (
+            <div className="contact-error">
+              <AlertCircle size={16} />
+              <span>{error}</span>
+              <button type="button" onClick={() => setError("")}>
+                Đóng
               </button>
-            </form>
-          </div>
+            </div>
+          )}
+
+          <section className="contact-workspace">
+            <aside className="contact-inbox">
+              <div className="contact-inbox-head">
+                <h3>Hội thoại</h3>
+                <span>{filteredConversations.length}</span>
+              </div>
+
+              <div className="contact-inbox-filters">
+                {[
+                  ["all", "Tất cả"],
+                  ["waiting", "Chờ"],
+                  ["active", "Đang xử lý"],
+                  ["resolved", "Xong"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={filter === key ? "active" : ""}
+                    onClick={() => setFilter(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="contact-inbox-list">
+                {loadingList && <p className="contact-empty">Đang tải hội thoại...</p>}
+                {!loadingList && filteredConversations.length === 0 && (
+                  <div className="contact-empty-state">
+                    <MessageSquare size={22} />
+                    <p>Chưa có hội thoại phù hợp</p>
+                  </div>
+                )}
+                {!loadingList &&
+                  filteredConversations.map((item) => {
+                    const meta = STATUS_META[item.status] || STATUS_META.OPEN;
+                    return (
+                      <button
+                        type="button"
+                        key={item.id}
+                        className={`contact-thread-item ${item.id === activeId ? "active" : ""}`}
+                        onClick={() => setActiveId(item.id)}
+                      >
+                        <div className="contact-thread-avatar">{getInitials(item.customer?.full_name)}</div>
+                        <div className="contact-thread-copy">
+                          <div className="contact-thread-title">
+                            <strong>{item.customer?.full_name || "Khách hàng"}</strong>
+                            <span>{formatTime(item.last_message_at)}</span>
+                          </div>
+                          <p>{item.last_message || "Chưa có tin nhắn"}</p>
+                          <div className="contact-thread-meta">
+                            <em className={`tone-${meta.tone}`}>{meta.label}</em>
+                            {item.unread_admin > 0 && <b>{item.unread_admin}</b>}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+            </aside>
+
+            <section className="contact-chat">
+              {!activeConversation ? (
+                <div className="contact-chat-empty">
+                  <div className="contact-empty-icon">
+                    <MessageSquare size={26} />
+                  </div>
+                  <h3>Chọn hội thoại để hỗ trợ</h3>
+                  <p>Trả lời khách nhanh từ hộp thư bên trái.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="contact-chat-header">
+                    <div className="contact-chat-identity">
+                      <div className="contact-thread-avatar sm">{getInitials(customer?.full_name)}</div>
+                      <div>
+                        <h3>{customer?.full_name}</h3>
+                        <p>
+                          {vehicle?.bike || "Chưa có xe"} · {vehicle?.plate || "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="contact-chat-actions">
+                      <span className={`contact-status tone-${statusMeta.tone}`}>{statusMeta.label}</span>
+                      {activeConversation.status === "RESOLVED" ? (
+                        <button type="button" className="contact-ghost-btn" onClick={handleReopen}>
+                          Mở lại
+                        </button>
+                      ) : (
+                        <button type="button" className="contact-ghost-btn" onClick={handleResolve}>
+                          Đánh dấu xong
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="contact-chat-messages">
+                    {loadingThread && messages.length === 0 && (
+                      <p className="contact-empty">Đang tải tin nhắn...</p>
+                    )}
+                    {messages.map((message) => {
+                      const mine = message.sender_role === "ADMIN" || message.sender_role === "MANAGER";
+                      const system = message.sender_role === "SYSTEM";
+                      return (
+                        <div
+                          key={message.id}
+                          className={`contact-bubble ${mine ? "mine" : system ? "system" : "theirs"}`}
+                        >
+                          {!system && <small>{mine ? "Garage" : message.sender_name}</small>}
+                          <p>{message.text}</p>
+                          <span>{formatTime(message.created_at)}</span>
+                        </div>
+                      );
+                    })}
+                    <div ref={chatEndRef} />
+                  </div>
+
+                  <div className="contact-composer-wrap">
+                    <div className="contact-quick-replies">
+                      {QUICK_REPLIES.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => {
+                            setDraft(item.text);
+                            composerRef.current?.focus();
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <form className="contact-composer" onSubmit={handleSend}>
+                      <input
+                        ref={composerRef}
+                        value={draft}
+                        onChange={(event) => setDraft(event.target.value)}
+                        placeholder="Nhập câu trả lời..."
+                        disabled={sending}
+                      />
+                      <button type="submit" disabled={sending || !draft.trim()}>
+                        <Send size={16} />
+                        Gửi
+                      </button>
+                    </form>
+                  </div>
+                </>
+              )}
+            </section>
+
+            <aside className="contact-detail">
+              {activeConversation ? (
+                <>
+                  <div className="contact-detail-card profile">
+                    <div className="contact-detail-avatar">{getInitials(customer?.full_name)}</div>
+                    <h4>{customer?.full_name}</h4>
+                    <span className={`contact-status tone-${statusMeta.tone}`}>{statusMeta.label}</span>
+                  </div>
+
+                  <div className="contact-detail-card">
+                    <h5>
+                      <UserRound size={13} /> Liên hệ
+                    </h5>
+                    <div className="contact-detail-rows">
+                      <a href={customer?.phone ? `tel:${customer.phone}` : undefined}>
+                        <Phone size={14} />
+                        <span>{customer?.phone || "Chưa có SĐT"}</span>
+                      </a>
+                      <a href={customer?.email ? `mailto:${customer.email}` : undefined}>
+                        <Mail size={14} />
+                        <span>{customer?.email || "Chưa có email"}</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="contact-detail-card">
+                    <h5>
+                      <Bike size={13} /> Xe gần nhất
+                    </h5>
+                    <div className="contact-vehicle-row">
+                      <div>
+                        <strong>{vehicle?.bike || "Chưa cập nhật"}</strong>
+                        <p>{vehicle?.plate || "—"}</p>
+                        {vehicle?.odo && <p>{vehicle.odo}</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="contact-detail-hint">
+                    Khách chat từ box hỗ trợ trên website. Tin mới tự cập nhật khoảng 12 giây.
+                  </p>
+                </>
+              ) : (
+                <div className="contact-empty-state">
+                  <UserRound size={22} />
+                  <p>Chọn hội thoại để xem khách</p>
+                </div>
+              )}
+            </aside>
+          </section>
         </div>
-
-        {/* CỘT PHẢI: CHI TIẾT KHÁCH HÀNG & THÔNG TIN XE */}
-        <div className="chat-sidebar-details">
-          <div className="section-card user-profile-card">
-            <h3 className="section-title">Thông tin khách hàng</h3>
-            <div className="user-profile-summary">
-              <img src={activeChat.avatar} alt={activeChat.name} className="profile-large-avatar" />
-              <h4>{activeChat.name}</h4>
-              <span className="badge-level">{activeChat.level}</span>
-            </div>
-            
-            <div className="info-list">
-              <div className="info-item">
-                <MaterialIcon>call</MaterialIcon>
-                <span>{activeChat.phone}</span>
-              </div>
-              <div className="info-item">
-                <MaterialIcon>mail</MaterialIcon>
-                <span>{activeChat.email}</span>
-              </div>
-              <div className="info-item">
-                <MaterialIcon>location_on</MaterialIcon>
-                <span>{activeChat.address}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="section-card bike-profile-card">
-            <h3 className="section-title">Thông tin xe</h3>
-            <div className="bike-info-grid">
-              <div className="bike-info-row">
-                <span className="lbl">Hãng/Dòng</span>
-                <strong className="val">{activeChat.bikeInfo}</strong>
-              </div>
-              <div className="bike-info-row">
-                <span className="lbl">Biển số</span>
-                <strong className="val text-blue">{activeChat.plate}</strong>
-              </div>
-              <div className="bike-info-row">
-                <span className="lbl">Số km</span>
-                <strong className="val">{activeChat.odo}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div className="section-card history-card">
-            <h3 className="section-title">Lịch hẹn & Lịch sử</h3>
-            <div className="empty-history-placeholder">
-              <MaterialIcon>history</MaterialIcon>
-              <span>Chưa có lịch sử sửa chữa</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
+      </main>
     </div>
   );
 }

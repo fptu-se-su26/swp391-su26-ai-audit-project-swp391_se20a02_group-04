@@ -973,6 +973,7 @@
 
 /* Nút bong bóng chat nổi */
 .chat-badge {
+  position: relative;
   width: 60px;
   height: 60px;
   border-radius: 50%;
@@ -1130,6 +1131,48 @@
   color: #333;
   border-bottom-left-radius: 2px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.message-row.system {
+  align-self: center;
+  max-width: 95%;
+}
+
+.message-row.system .message-bubble {
+  background: #fff7ed;
+  color: #5a4136;
+  text-align: center;
+  font-size: 12.5px;
+  border-radius: 12px;
+}
+
+.chat-error-bubble {
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
+}
+
+.chat-unread-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e4282b;
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+}
+
+.chatbox-input-area button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* Thanh nhập tin nhắn */
