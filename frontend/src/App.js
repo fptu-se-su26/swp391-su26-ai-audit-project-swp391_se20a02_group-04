@@ -10,6 +10,7 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminReports from './pages/admin/AdminReports';
 import AdminInventory from './pages/admin/AdminInventory';
 import AdminContact from './pages/admin/AdminContact';
+import AdminAI from './pages/admin/AdminAI';
 import './App.css';
 import { Bell } from 'lucide-react';
 import { getNotifications, markAsRead as markNotificationAsRead, markAllAsRead as markAllNotificationsAsRead } from './services/notificationApi';
@@ -23,7 +24,8 @@ const ADMIN_PAGES = new Set([
   'reports',
   'profile',
   'inventory',
-  'contact'
+  'contact',
+  'ai'
 ]);
 
 const getAdminPageFromPath = (pathname = '') => {
@@ -147,6 +149,8 @@ function App() {
         return <AdminInventory onViewChange={handlePageChange} />;
       case 'contact':
         return <AdminContact onViewChange={handlePageChange} />;
+      case 'ai':
+        return <AdminAI onViewChange={handlePageChange} />;
       default:
         return <AdminDashboard onViewChange={handlePageChange} />;
 

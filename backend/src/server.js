@@ -24,6 +24,7 @@ const managerAppointmentRoutes = require('./routes/manager.appointment.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const chatRoutes = require('./routes/chat.routes');
 const adminChatRoutes = require('./routes/admin.chat.routes');
+const adminAiRoutes = require('./routes/admin.ai.routes');
 
 const app = express();
 
@@ -91,6 +92,7 @@ app.use('/api/manager', managerAppointmentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminChatRoutes);
+app.use('/api/admin', adminAiRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -120,6 +122,7 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);
   console.log(`🏥 Health check at http://localhost:${PORT}/health`);
+  console.log('🤖 Admin AI: plain-Vietnamese analytics reports enabled');
 });
 
 module.exports = app;

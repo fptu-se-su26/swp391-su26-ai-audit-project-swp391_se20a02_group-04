@@ -368,6 +368,22 @@ AI giúp làm nhanh hơn nhưng không thay thế việc hiểu code. Khi dùng 
 
 ---
 
+## 9.1. Cập nhật — Trợ lý AI Admin (product feature)
+
+| Mục | Nội dung |
+|---|---|
+| Ngày | 19/07/2026 |
+| Mục tiêu | Thêm trợ lý vận hành cho Admin: hỏi lịch/đơn, dịch vụ đặt nhiều-ít, kho sắp hết / tồn ít dùng |
+| Kiến trúc | `POST /api/admin/ai/ask` + tool calling (Gemini) hoặc fallback query MongoDB thật |
+| Backend | `ai.service.js`, `ai.tools.js`, `ai.controller.js`, `admin.ai.routes.js` |
+| Frontend | Trang `/admin/ai` — `AdminAI.js`, nav sidebar “Trợ lý AI” |
+| Guardrail | AI chỉ đọc dữ liệu; không đổi status / trừ kho |
+| Cấu hình | `GEMINI_API_KEY`, `GEMINI_MODEL` trong `.env` backend |
+
+System prompt (rút gọn): *Bạn là trợ lý vận hành MOTOCORE cho Admin. Chỉ trả lời dựa trên tool. Không bịa tồn kho/giá/số đơn. Chỉ đọc, không ghi.*
+
+---
+
 ## 10. Cam kết học thuật
 
 Nhóm cam kết:

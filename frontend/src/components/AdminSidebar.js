@@ -10,7 +10,8 @@ import {
   Package,
   User,
   LogOut,
-  CircleHelp, // thêm dòng này
+  CircleHelp,
+  Bot,
 } from "lucide-react";
 import { getAuthSession, clearAuthSession } from "../services/authApi";
 import "../styles/admin/AdminDashboard.css";
@@ -37,9 +38,10 @@ export default function AdminSidebar({ activeView, onViewChange }) {
   ["customers", Users, "Khách hàng"],
   ["users", Shield, "Người dùng"],
   ["inventory", Package, "Kho"],
+  ["ai", Bot, "Trợ lý AI"],
   ["reports", BarChart2, "Báo cáo"],
   ["profile", User, "Hồ sơ"],
-  ["contact", CircleHelp, "Liên hệ"], // sửa dòng này
+  ["contact", CircleHelp, "Liên hệ"],
 ];
   return (
     <aside className="sidebar">
