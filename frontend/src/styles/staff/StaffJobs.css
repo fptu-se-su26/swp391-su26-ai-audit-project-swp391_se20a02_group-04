@@ -4,6 +4,32 @@
   gap: 8px;
 }
 
+.job-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  padding: 14px 0;
+}
+
+.job-filter-bar label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.job-filter-bar input,
+.job-filter-bar select {
+  min-height: 38px;
+  padding: 0 9px;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
 .filter {
   display: inline-flex;
   align-items: center;
@@ -86,4 +112,8 @@
   .assignment-list {
     grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 640px) {
+  .job-filter-bar label { flex: 1 1 140px; }
 }

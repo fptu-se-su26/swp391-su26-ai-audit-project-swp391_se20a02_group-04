@@ -4,6 +4,7 @@ const UserAudit = require('../models/UserAudit.model');
 const StaffAttendance = require('../models/StaffAttendance.model');
 const WorkSchedule = require('../models/WorkSchedule.model');
 const InventoryTransaction = require('../models/InventoryTransaction.model');
+const payosService = require('../services/payos.service');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const { hasFullAssignment, validateAppointmentTransition } = require('../utils/appointmentStateMachine');
 const mongoose = require('mongoose');
@@ -12,13 +13,70 @@ const toDateString = (date = new Date()) => {
   return date.toISOString().slice(0, 10);
 };
 
-const STAFF_APPOINTMENT_SORT_FIELDS = new Set(['appointment_date', 'start_time', 'time_slot', 'status', 'created_at']);
+const STAFF_APPOINTMENT_SORT_FIELDS = new Set(['appointment_date', 'start_time', 'time_slot', 'status', 'created_at', 'assigned_at']);
 
-const normalizeAppointmentSort = (sortBy = 'appointment_date', sortOrder = 'asc') => {
-  const safeSortBy = STAFF_APPOINTMENT_SORT_FIELDS.has(sortBy) ? sortBy : 'appointment_date';
+const normalizeAppointmentSort = (sortBy = 'assigned_at', sortOrder = 'asc') => {
+  const safeSortBy = STAFF_APPOINTMENT_SORT_FIELDS.has(sortBy) ? sortBy : 'assigned_at';
   const normalizedOrder = String(sortOrder).toLowerCase();
   const safeSortOrder = normalizedOrder === 'desc' || normalizedOrder === '-1' ? -1 : 1;
   return { safeSortBy, safeSortOrder };
+};
+
+const getStaffAppointmentSort = (sortBy, sortOrder) => ({
+  [sortBy]: sortOrder,
+  appointment_date: 1,
+  start_time: 1
+});
+
+const ensureInProgressAppointment = (appointment, user) => {
+  const ownership = checkStaffAppointmentOwnership(appointment, user);
+  if (!ownership.ok) return ownership;
+  if (appointment.status !== 'IN_PROGRESS') {
+    return { ok: false, statusCode: 422, message: 'Workflow actions are only available for in-progress appointments' };
+  }
+  return { ok: true };
+};
+
+const getBillDetails = async (appointment) => {
+  const service = appointment.service_id && typeof appointment.service_id === 'object'
+    ? appointment.service_id
+    : null;
+  const basePrice = Number(service?.base_price || appointment.service?.estimated_price || 0);
+  const materials = await InventoryTransaction.find({
+    reference_type: 'APPOINTMENT',
+    reference_id: appointment._id,
+    transaction_type: 'STOCK_OUT'
+  }).select('total_cost');
+  const materialsTotal = materials.reduce((sum, transaction) => sum + Number(transaction.total_cost || 0), 0);
+
+  return {
+    basePrice,
+    materialsTotal,
+    total: Math.round(basePrice + materialsTotal)
+  };
+};
+
+// PayOS requires a positive safe integer order code. The ObjectId-derived code is stable
+// per appointment and is persisted in payment_info for webhook/status lookups.
+const getPayOSOrderCode = (appointment) => {
+  const existing = Number(appointment.payment_info?.order_code);
+  if (Number.isSafeInteger(existing) && existing > 0) return existing;
+  return parseInt(String(appointment._id).slice(-12), 16) || Date.now();
+};
+
+const applyPaidPayment = async (appointment, payment) => {
+  const now = payment.paid_at ? new Date(payment.paid_at) : new Date();
+  appointment.payment_info = {
+    ...(appointment.payment_info?.toObject?.() || appointment.payment_info || {}),
+    status: 'PAID',
+    paid_at: now,
+    amount: Number(payment.amount || appointment.payment_info?.amount || 0)
+  };
+  appointment.final_cost = Number(payment.amount || appointment.payment_info?.amount || 0);
+  appointment.status = 'COMPLETED';
+  appointment.completed_at = appointment.completed_at || now;
+  appointment.actual_end_time = appointment.actual_end_time || now;
+  await appointment.save();
 };
 
 const getDateDaysAgo = (days) => {
@@ -47,10 +105,16 @@ const createAuditSafely = async (req, action, metadata = {}, userId = req.user.u
   }
 };
 
+const getEntityId = (value) => {
+  if (!value) return null;
+  return value._id || value.id || value;
+};
+
 const checkStaffAppointmentOwnership = (appointment, user) => {
   if (!appointment) return { ok: false, statusCode: 404, message: 'Appointment not found' };
   if (isPrivileged(user)) return { ok: true };
-  if (appointment.staff_id && appointment.staff_id.toString() === user.userId.toString()) {
+  const assignedStaffId = getEntityId(appointment.staff_id);
+  if (assignedStaffId && String(assignedStaffId) === String(user.userId)) {
     return { ok: true };
   }
   return { ok: false, statusCode: 403, message: 'You can only access appointments assigned to you' };
@@ -255,7 +319,8 @@ const getMyAssignedAppointments = async (req, res) => {
       status = '',
       date_from = '',
       date_to = '',
-      sort_by = 'appointment_date',
+      service_category = '',
+      sort_by = 'assigned_at',
       sort_order = 'asc'
     } = req.query;
 
@@ -279,13 +344,36 @@ const getMyAssignedAppointments = async (req, res) => {
     const skip = (page - 1) * limit;
     const { safeSortBy, safeSortOrder } = normalizeAppointmentSort(sort_by, sort_order);
 
-    const [appointments, total] = await Promise.all([
-      populateStaffAppointment(Appointment.find(query))
-        .sort({ [safeSortBy]: safeSortOrder, start_time: safeSortOrder })
-        .limit(parseInt(limit))
-        .skip(skip),
-      Appointment.countDocuments(query)
-    ]);
+    let appointments;
+    let total;
+    const sort = getStaffAppointmentSort(safeSortBy, safeSortOrder);
+
+    if (service_category) {
+      const staffObjectId = new mongoose.Types.ObjectId(req.user.userId);
+      const category = String(service_category).toUpperCase();
+      const pipeline = [
+        { $match: { ...query, staff_id: staffObjectId } },
+        { $lookup: { from: 'services', localField: 'service_id', foreignField: '_id', as: 'svc' } },
+        { $match: { 'svc.category': category } }
+      ];
+      const [rows, countRows] = await Promise.all([
+        Appointment.aggregate([...pipeline, { $sort: sort }, { $skip: skip }, { $limit: Number(limit) }]),
+        Appointment.aggregate([...pipeline, { $count: 'total' }])
+      ]);
+      const ids = rows.map((row) => row._id);
+      const populated = await populateStaffAppointment(Appointment.find({ _id: { $in: ids } }));
+      const byId = new Map(populated.map((item) => [String(item._id), item]));
+      appointments = ids.map((id) => byId.get(String(id))).filter(Boolean);
+      total = countRows[0]?.total || 0;
+    } else {
+      [appointments, total] = await Promise.all([
+        populateStaffAppointment(Appointment.find(query))
+          .sort(sort)
+          .limit(parseInt(limit, 10))
+          .skip(skip),
+        Appointment.countDocuments(query)
+      ]);
+    }
 
     return successResponse(res, 200, 'Assigned appointments retrieved successfully', {
       appointments,
@@ -623,7 +711,7 @@ const startAppointment = async (req, res) => {
 
 const completeAppointment = async (req, res) => {
   try {
-    const { completion_notes = '', actual_duration } = req.body;
+    const { completion_notes = '', actual_duration, final_cost } = req.body;
     const appointment = await Appointment.findById(req.params.id);
     if (!appointment) return errorResponse(res, 404, 'Appointment not found');
 
@@ -648,6 +736,9 @@ const completeAppointment = async (req, res) => {
     } else if (appointment.actual_start_time) {
       appointment.actual_duration = Math.max(1, Math.round((now - appointment.actual_start_time) / 60000));
     }
+    if (final_cost !== undefined) {
+      appointment.final_cost = Number(final_cost);
+    }
     await appointment.save();
 
     await createAuditSafely(req, 'APPOINTMENT_STATUS_CHANGED', {
@@ -662,6 +753,150 @@ const completeAppointment = async (req, res) => {
   } catch (error) {
     console.error('Complete appointment error:', error);
     return errorResponse(res, 500, 'Failed to complete appointment');
+  }
+};
+
+const saveDiagnosis = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const access = ensureInProgressAppointment(appointment, req.user);
+    if (!access.ok) return errorResponse(res, access.statusCode, access.message);
+
+    appointment.diagnosis_notes = req.body.diagnosis_notes.trim();
+    await appointment.save();
+    await createAuditSafely(req, 'APPOINTMENT_DIAGNOSIS_SAVED', { appointment_id: appointment._id });
+
+    return successResponse(res, 200, 'Diagnosis saved successfully', {
+      appointment: {
+        _id: appointment._id,
+        diagnosis_notes: appointment.diagnosis_notes
+      }
+    });
+  } catch (error) {
+    console.error('Save appointment diagnosis error:', error);
+    return errorResponse(res, 500, 'Failed to save diagnosis');
+  }
+};
+
+const saveContactLog = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const access = ensureInProgressAppointment(appointment, req.user);
+    if (!access.ok) return errorResponse(res, access.statusCode, access.message);
+
+    appointment.contact_log = {
+      status: req.body.status,
+      notes: (req.body.notes || '').trim(),
+      contacted_at: new Date()
+    };
+    await appointment.save();
+    await createAuditSafely(req, 'APPOINTMENT_CONTACT_LOG_SAVED', {
+      appointment_id: appointment._id,
+      status: appointment.contact_log.status
+    });
+
+    return successResponse(res, 200, 'Customer contact result saved successfully', {
+      appointment: {
+        _id: appointment._id,
+        contact_log: appointment.contact_log
+      }
+    });
+  } catch (error) {
+    console.error('Save appointment contact log error:', error);
+    return errorResponse(res, 500, 'Failed to save customer contact result');
+  }
+};
+
+const createPayment = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id).populate('service_id', 'service_name base_price');
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const access = ensureInProgressAppointment(appointment, req.user);
+    if (!access.ok) return errorResponse(res, access.statusCode, access.message);
+
+    if (appointment.payment_info?.status === 'PENDING' && appointment.payment_info.payment_url) {
+      return successResponse(res, 200, 'Payment link already created', {
+        payment_url: appointment.payment_info.payment_url,
+        qr_code: appointment.payment_info.qr_code,
+        order_code: appointment.payment_info.order_code
+      });
+    }
+
+    const bill = await getBillDetails(appointment);
+    if (!Number.isSafeInteger(bill.total) || bill.total <= 0) {
+      return errorResponse(res, 422, 'Payment amount must be greater than zero');
+    }
+
+    const orderCode = getPayOSOrderCode(appointment);
+    const serviceName = appointment.service_id?.service_name || appointment.service?.name || 'Repair service';
+    const plate = appointment.vehicle?.license_plate || appointment.vehicle_info?.license_plate || '';
+    const appUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const payment = await payosService.createPaymentLink(
+      orderCode,
+      bill.total,
+      `${serviceName} ${plate}`.trim(),
+      `${appUrl}/staff/jobs/${appointment._id}`,
+      `${appUrl}/staff/jobs/${appointment._id}`
+    );
+
+    appointment.payment_info = {
+      order_code: String(orderCode),
+      payment_url: payment.payment_url,
+      qr_code: payment.qr_code,
+      status: 'PENDING',
+      paid_at: null,
+      amount: bill.total
+    };
+    await appointment.save();
+    await createAuditSafely(req, 'APPOINTMENT_PAYMENT_CREATED', {
+      appointment_id: appointment._id,
+      order_code: String(orderCode),
+      amount: bill.total
+    });
+
+    return successResponse(res, 200, 'Payment link created successfully', {
+      payment_url: payment.payment_url,
+      qr_code: payment.qr_code,
+      order_code: String(orderCode)
+    });
+  } catch (error) {
+    console.error('Create PayOS payment error:', error);
+    const isConfigurationError = error.code === 'PAYOS_NOT_CONFIGURED';
+    return errorResponse(res, isConfigurationError ? 500 : 502,
+      isConfigurationError ? error.message : 'Unable to create payment link. Please try again.');
+  }
+};
+
+const getPaymentStatus = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const ownership = checkStaffAppointmentOwnership(appointment, req.user);
+    if (!ownership.ok) return errorResponse(res, ownership.statusCode, ownership.message);
+    if (!appointment.payment_info?.order_code) {
+      return errorResponse(res, 404, 'No payment has been created for this appointment');
+    }
+
+    const payment = await payosService.getPaymentStatus(appointment.payment_info.order_code);
+    if (payment.status === 'PAID' && appointment.status !== 'COMPLETED') {
+      await applyPaidPayment(appointment, payment);
+    } else if (payment.status === 'CANCELLED' && appointment.payment_info.status !== 'PAID') {
+      appointment.payment_info.status = 'CANCELLED';
+      await appointment.save();
+    }
+
+    return successResponse(res, 200, 'Payment status retrieved successfully', payment);
+  } catch (error) {
+    console.error('Get PayOS payment status error:', error);
+    const isConfigurationError = error.code === 'PAYOS_NOT_CONFIGURED';
+    return errorResponse(res, isConfigurationError ? 500 : 502,
+      isConfigurationError ? error.message : 'Unable to retrieve payment status. Please try again.');
   }
 };
 
@@ -950,6 +1185,10 @@ module.exports = {
   updateAppointmentStatus,
   updateProfile,
   addAppointmentNotes,
+  saveDiagnosis,
+  saveContactLog,
+  createPayment,
+  getPaymentStatus,
   markNoShow,
   startAppointment,
   getTodaySchedule,

@@ -19,12 +19,19 @@ const countFilters = [
   { value: "COMPLETED", status: "COMPLETED" },
 ];
 
+const serviceCategories = [
+  "WASH_CARE", "MAINTENANCE", "LUBRICANT", "TIRE_WHEEL", "BRAKE", "ELECTRICAL",
+  "ENGINE_TRANSMISSION", "SUSPENSION_FRAME", "ACCESSORY", "INSPECTION", "EMERGENCY", "REPAIR", "OTHER",
+];
+
 export default function StaffJobs() {
   const [jobs, setJobs] = useState([]);
   const [nextJob, setNextJob] = useState(null);
   const [pagination, setPagination] = useState({});
   const [tabTotals, setTabTotals] = useState({});
   const [activeFilter, setActiveFilter] = useState("ALL");
+  const [filterValues, setFilterValues] = useState({ date_from: "", date_to: "", service_category: "" });
+  const [appliedFilters, setAppliedFilters] = useState({ date_from: "", date_to: "", service_category: "" });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -33,7 +40,7 @@ export default function StaffJobs() {
     [activeFilter]
   );
 
-  const loadJobs = async (filterValue = activeFilter) => {
+  const loadJobs = async (filterValue = activeFilter, params = appliedFilters) => {
     const config = filters.find((filter) => filter.value === filterValue) || filters[0];
     setIsLoading(true);
     setError("");
@@ -42,16 +49,17 @@ export default function StaffJobs() {
       const [listResponse, nextResponse, ...countResponses] = await Promise.all([
         getStaffAppointments({
           ...(config.status ? { status: config.status } : {}),
+          ...params,
           page: 1,
           limit: 20,
-          sort_by: "appointment_date",
+          sort_by: "assigned_at",
           sort_order: "asc",
         }),
         getStaffAppointments({
           status: "CONFIRMED",
           page: 1,
           limit: 1,
-          sort_by: "appointment_date",
+          sort_by: "assigned_at",
           sort_order: "asc",
         }),
         ...countFilters.map((filter) =>
@@ -59,7 +67,7 @@ export default function StaffJobs() {
             ...(filter.status ? { status: filter.status } : {}),
             page: 1,
             limit: 1,
-            sort_by: "appointment_date",
+            sort_by: "assigned_at",
             sort_order: "asc",
           })
         ),
@@ -95,6 +103,19 @@ export default function StaffJobs() {
     loadJobs(activeFilter);
   }, [activeFilter]);
 
+  const applyFilters = (event) => {
+    event.preventDefault();
+    setAppliedFilters(filterValues);
+    loadJobs(activeFilter, filterValues);
+  };
+
+  const clearFilters = () => {
+    const defaults = { date_from: "", date_to: "", service_category: "" };
+    setFilterValues(defaults);
+    setAppliedFilters(defaults);
+    loadJobs(activeFilter, defaults);
+  };
+
   const activeJobForNote = jobs.find((job) => job.status === "IN_PROGRESS") || nextJob;
 
   return (
@@ -127,6 +148,13 @@ export default function StaffJobs() {
               </button>
             </div>
           </div>
+          <form className="job-filter-bar" onSubmit={applyFilters}>
+            <label>Từ ngày<input onChange={(event) => setFilterValues((current) => ({ ...current, date_from: event.target.value }))} type="date" value={filterValues.date_from} /></label>
+            <label>Đến ngày<input onChange={(event) => setFilterValues((current) => ({ ...current, date_to: event.target.value }))} type="date" value={filterValues.date_to} /></label>
+            <label>Loại dịch vụ<select onChange={(event) => setFilterValues((current) => ({ ...current, service_category: event.target.value }))} value={filterValues.service_category}><option value="">Tất cả</option>{serviceCategories.map((category) => <option key={category} value={category}>{category.replace(/_/g, " ")}</option>)}</select></label>
+            <button className="secondary-button" type="submit"><Icon name="filter_alt" />Lọc</button>
+            <button className="text-button" onClick={clearFilters} type="button">Xóa lọc</button>
+          </form>
 
           {isLoading && (
             <div className="state-box">

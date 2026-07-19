@@ -37,7 +37,9 @@ const completeValidation = [
   body('completion_notes').optional().trim().isLength({ max: 1000 })
     .withMessage('Completion notes cannot exceed 1000 characters'),
   body('actual_duration').optional().isInt({ min: 1, max: 480 })
-    .withMessage('Actual duration must be between 1 and 480 minutes')
+    .withMessage('Actual duration must be between 1 and 480 minutes'),
+  body('final_cost').optional().isFloat({ min: 0 })
+    .withMessage('Final cost cannot be negative')
 ];
 
 const profileValidation = [
@@ -55,10 +57,12 @@ const appointmentListQueryValidation = [
   query('status').optional().isIn(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
   query('date_from').optional().isISO8601(),
   query('date_to').optional().isISO8601(),
-  query('sort_by').optional().isIn(['appointment_date', 'start_time', 'time_slot', 'status', 'created_at'])
+  query('sort_by').optional().isIn(['appointment_date', 'start_time', 'time_slot', 'status', 'created_at', 'assigned_at'])
     .withMessage('Invalid sort_by'),
   query('sort_order').optional().isIn(['asc', 'desc', '1', '-1'])
-    .withMessage('Invalid sort_order')
+    .withMessage('Invalid sort_order'),
+  query('service_category').optional().trim().isLength({ min: 1, max: 80 })
+    .withMessage('Invalid service_category')
 ];
 
 router.get('/dashboard',
@@ -233,6 +237,44 @@ router.put('/appointments/:id/notes',
   addNotesValidation,
   validate,
   staffAppointmentController.addAppointmentNotes
+);
+
+router.put('/appointments/:id/diagnosis',
+  authenticate,
+  authorize('STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('diagnosis_notes').trim().notEmpty().isLength({ max: 2000 })
+    .withMessage('Diagnosis notes are required and cannot exceed 2000 characters'),
+  validate,
+  staffAppointmentController.saveDiagnosis
+);
+
+router.put('/appointments/:id/contact-log',
+  authenticate,
+  authorize('STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('status').isIn(['AGREED', 'DECLINED', 'NO_ANSWER'])
+    .withMessage('Contact status must be AGREED, DECLINED, or NO_ANSWER'),
+  body('notes').optional().trim().isLength({ max: 500 })
+    .withMessage('Contact notes cannot exceed 500 characters'),
+  validate,
+  staffAppointmentController.saveContactLog
+);
+
+router.post('/appointments/:id/payment',
+  authenticate,
+  authorize('STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  validate,
+  staffAppointmentController.createPayment
+);
+
+router.get('/appointments/:id/payment/status',
+  authenticate,
+  authorize('STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  validate,
+  staffAppointmentController.getPaymentStatus
 );
 
 module.exports = router;

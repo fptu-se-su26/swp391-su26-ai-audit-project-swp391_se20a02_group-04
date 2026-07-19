@@ -25,6 +25,8 @@ import {
   mapAppointmentToJob,
 } from "./staffAppointmentMapper";
 import { getAuthSession } from "../../services/authApi";
+import WorkflowStepper from "./WorkflowStepper";
+import { formatAssignedAt } from "./staffAppointmentMapper";
 import "../../styles/staff/StaffJobDetail.css";
 
 function useStaffJob() {
@@ -70,7 +72,7 @@ function useStaffJob() {
 function JobPageState({ error, isLoading, onRetry }) {
   if (isLoading) {
     return (
-      <div className="state-box">
+      <div className="detail-skeleton">
         <div>
           <strong>Đang tải chi tiết</strong>
           <p>Hệ thống đang lấy thông tin lịch hẹn và phiếu công việc từ máy chủ.</p>
@@ -114,6 +116,10 @@ function JobSummary({ job }) {
         <div>
           <span>Dự kiến</span>
           <strong>{job.estimate}</strong>
+        </div>
+        <div>
+          <span>Duoc giao</span>
+          <strong>{formatAssignedAt(job.assignedAt)}</strong>
         </div>
       </div>
     </section>
@@ -317,7 +323,7 @@ function MaterialUsageList({ transactions }) {
 }
 
 export default function StaffJobDetail() {
-  const { error, isLoading, job, reload, setJob } = useStaffJob();
+  const { error, isLoading, job, reload } = useStaffJob();
 
   if (!isLoading && !error && !job) {
     return <Navigate to="/staff/jobs" replace />;
@@ -333,12 +339,14 @@ export default function StaffJobDetail() {
           <div className="page-grid">
             <div className="detail-main-stack">
               <InfoList job={job} />
-              <TechnicalNotePanel
-                job={job}
-                onSaved={(staffNotes) => setJob((current) => ({ ...current, staffNotes, note: staffNotes, recommendation: staffNotes }))}
-              />
+              <WorkflowStepper job={job} onChanged={reload} />
             </div>
-            <ActionRail job={job} onChanged={reload} />
+            <aside className="side-column">
+              <section className="panel">
+                <h3><Icon name="assignment" />Thong tin cong viec</h3>
+                <p className="muted-copy">Thuc hien cac buoc theo thu tu de luu day du ket qua kiem tra, lien he, vat tu va thanh toan.</p>
+              </section>
+            </aside>
           </div>
         </>
       )}
