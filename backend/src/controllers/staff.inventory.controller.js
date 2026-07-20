@@ -7,7 +7,8 @@ const { successResponse, errorResponse } = require('../utils/response.util');
 const canAccessAppointment = (appointment, userId, roles = []) => {
   if (!appointment) return false;
   if (roles.includes('ADMIN') || roles.includes('MANAGER')) return true;
-  return appointment.staff_id && appointment.staff_id.toString() === userId.toString();
+  const assignedStaffId = appointment.staff_id?._id || appointment.staff_id;
+  return assignedStaffId && String(assignedStaffId) === String(userId);
 };
 
 const getStaffInventoryItems = async (req, res) => {

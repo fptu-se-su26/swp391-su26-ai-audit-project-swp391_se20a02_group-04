@@ -25,6 +25,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const chatRoutes = require('./routes/chat.routes');
 const adminChatRoutes = require('./routes/admin.chat.routes');
 const adminAiRoutes = require('./routes/admin.ai.routes');
+const webhookRoutes = require('./routes/webhook.routes');
 
 const app = express();
 
@@ -60,6 +61,8 @@ app.use('/api', (req, res, next) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   next();
 });
+
+app.use('/api/webhooks', webhookRoutes);
 
 // Apply rate limiting to all routes
 app.use('/api/', apiLimiter);

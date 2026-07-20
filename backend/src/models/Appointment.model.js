@@ -183,6 +183,57 @@ const appointmentSchema = new mongoose.Schema({
     trim: true,
     maxlength: [1000, 'Staff notes cannot exceed 1000 characters']
   },
+  diagnosis_notes: {
+    type: String,
+    trim: true,
+    maxlength: [2000, 'Diagnosis notes cannot exceed 2000 characters'],
+    default: null
+  },
+  contact_log: {
+    status: {
+      type: String,
+      enum: ['AGREED', 'DECLINED', 'NO_ANSWER'],
+      default: null
+    },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Contact log notes cannot exceed 500 characters'],
+      default: null
+    },
+    contacted_at: {
+      type: Date,
+      default: null
+    }
+  },
+  payment_info: {
+    order_code: {
+      type: String,
+      default: null
+    },
+    payment_url: {
+      type: String,
+      default: null
+    },
+    qr_code: {
+      type: String,
+      default: null
+    },
+    status: {
+      type: String,
+      enum: ['PENDING', 'PAID', 'CANCELLED'],
+      default: null
+    },
+    paid_at: {
+      type: Date,
+      default: null
+    },
+    amount: {
+      type: Number,
+      min: [0, 'Payment amount cannot be negative'],
+      default: null
+    }
+  },
   cancel_reason: {
     type: String,
     trim: true,
@@ -269,6 +320,8 @@ appointmentSchema.index({ 'vehicle.license_plate': 1, appointment_start_at: 1 })
 appointmentSchema.index({ repair_bay_id: 1, appointment_start_at: 1 });
 appointmentSchema.index({ assignment_id: 1 });
 appointmentSchema.index({ estimated_end_time: 1 });
+appointmentSchema.index({ assigned_at: 1 });
+appointmentSchema.index({ 'payment_info.order_code': 1 });
 
 appointmentSchema.pre('validate', function(next) {
   if (this.appointment_date != null) {

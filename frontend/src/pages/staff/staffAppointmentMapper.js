@@ -70,6 +70,19 @@ export function formatDuration(minutes) {
   return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
+export function formatAssignedAt(value) {
+  if (!value) return "Chua cap nhat";
+  const assignedAt = new Date(value);
+  if (Number.isNaN(assignedAt.getTime())) return "Chua cap nhat";
+  const now = new Date();
+  const minutes = Math.max(0, Math.floor((now - assignedAt) / 60000));
+  if (minutes < 60) return minutes < 1 ? "Vua duoc giao" : `Duoc giao ${minutes} phut truoc`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Duoc giao ${hours} gio truoc`;
+  const days = Math.floor(hours / 24);
+  return `Duoc giao ${days} ngay truoc`;
+}
+
 function getCustomer(appointment) {
   return appointment.customer_id || appointment.customer_snapshot || {};
 }
@@ -142,6 +155,11 @@ export function mapAppointmentToJob(appointment = {}) {
     estimatedDuration,
     laborCost: formatCurrency(estimatedPrice),
     laborCostValue: estimatedPrice,
+    diagnosisNotes: appointment.diagnosis_notes || "",
+    contactLog: appointment.contact_log?.status ? appointment.contact_log : null,
+    paymentInfo: appointment.payment_info?.order_code ? appointment.payment_info : null,
+    assignedAt: appointment.assigned_at || null,
+    priceType: String(serviceDoc.price_type || service.price_type || "FIXED").toUpperCase(),
     recommendation:
       appointment.staff_notes ||
       service.description ||

@@ -240,6 +240,50 @@
   font-size: 20px;
 }
 
+.detail-skeleton {
+  display: grid;
+  gap: 14px;
+  min-height: 220px;
+  padding: 24px;
+  background: linear-gradient(90deg, #e2e8f0 20%, #f8fafc 40%, #e2e8f0 60%);
+  background-size: 200% 100%;
+  border-radius: 12px;
+  animation: detail-skeleton-loading 1.4s infinite;
+}
+
+.workflow-stepper { display: grid; gap: 20px; }
+.workflow-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.workflow-step { display: grid; justify-items: center; gap: 7px; padding: 12px 8px; color: var(--muted); background: var(--surface-muted); border: 1px solid var(--border-soft); border-radius: 10px; font-weight: 800; }
+.workflow-step span { display: grid; width: 28px; height: 28px; place-items: center; color: #64748b; background: #e2e8f0; border-radius: 50%; }
+.workflow-step small { font: inherit; font-size: 12px; }
+.workflow-step.active { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
+.workflow-step.done span { color: #fff; background: #16a34a; }
+.workflow-panel { padding: 22px; background: #fff; border: 1px solid var(--border-soft); border-radius: 12px; }
+.workflow-panel-heading, .workflow-skip, .workflow-start { display: flex; gap: 12px; align-items: flex-start; }
+.workflow-panel-heading > .material-symbols-outlined, .workflow-skip > .material-symbols-outlined, .workflow-start > .material-symbols-outlined { color: var(--primary); font-size: 28px; }
+.workflow-panel h3 { margin: 0 0 5px; }
+.workflow-panel-heading p, .workflow-skip p, .workflow-start p { margin: 0; color: var(--muted); }
+.workflow-panel form { margin-top: 18px; }
+.workflow-panel textarea, .workflow-search, .cash-form input { width: 100%; min-height: 104px; padding: 12px; color: var(--text); background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; resize: vertical; }
+.workflow-search, .cash-form input { min-height: 42px; margin-bottom: 14px; resize: none; }
+.workflow-counter { margin: 6px 0 0; color: var(--muted); font-size: 12px; text-align: right; }
+.contact-outcomes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.contact-outcome { display: flex; gap: 7px; align-items: center; justify-content: center; min-height: 44px; color: var(--text); background: var(--surface-muted); border: 1px solid var(--border-soft); border-radius: 9px; font-weight: 800; }
+.contact-outcome.selected { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
+.workflow-total { display: flex; justify-content: space-between; padding: 14px 0; margin-top: 14px; border-top: 1px solid var(--border-soft); }
+.workflow-total span { color: var(--muted); }
+.workflow-total strong { color: var(--primary); }
+.payment-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.text-button { padding: 0; color: var(--primary); background: transparent; border: 0; font-weight: 800; text-decoration: underline; }
+.payment-qr { display: flex; gap: 18px; align-items: center; padding: 16px; margin-top: 16px; background: var(--surface-muted); border-radius: 10px; }
+.payment-qr-code { display: grid; width: 166px; height: 166px; padding: 8px; place-items: center; background: #fff; border-radius: 8px; }
+.payment-qr a { display: block; margin-top: 8px; color: var(--primary); font-weight: 800; }
+.cash-form { display: grid; gap: 8px; max-width: 320px; }
+.cash-form label { color: var(--muted); font-size: 13px; font-weight: 800; }
+.workflow-readonly { display: grid; gap: 16px; }
+
+@keyframes detail-skeleton-loading { to { background-position: -200% 0; } }
+
 @media (max-width: 900px) {
   .job-detail-hero {
     flex-direction: column;
@@ -265,4 +309,8 @@
   .detail-item strong {
     grid-column: 1 / -1;
   }
+
+  .workflow-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .contact-outcomes { grid-template-columns: 1fr; }
+  .payment-qr { align-items: flex-start; flex-direction: column; }
 }

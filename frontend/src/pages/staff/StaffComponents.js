@@ -7,7 +7,7 @@ import {
   getTodayAttendance,
   saveStaffAppointmentNote,
 } from "../../services/staffAppointmentApi";
-import { canCompleteJob, canStartJob, canUseMaterials, getJobRouteId } from "./staffAppointmentMapper";
+import { canCompleteJob, canStartJob, canUseMaterials, formatAssignedAt, getJobRouteId } from "./staffAppointmentMapper";
 
 export function Icon({ name, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -208,18 +208,12 @@ export function JobCard({ job, compact = false }) {
 
       <div className="job-info">
         <div>
-          <Icon name="person" />
-          <span>
-            {job.customer} - {job.time}
-          </span>
+          <Icon name="schedule" />
+          <span>{job.time} - {formatAssignedAt(job.assignedAt)}</span>
         </div>
         <div>
           <Icon name={job.serviceIcon} />
           <span>{job.service}</span>
-        </div>
-        <div>
-          <Icon name={job.statusKey === "in_progress" ? "inventory_2" : job.statusKey === "completed" ? "payments" : "sticky_note_2"} />
-          <span>{job.note}</span>
         </div>
       </div>
 

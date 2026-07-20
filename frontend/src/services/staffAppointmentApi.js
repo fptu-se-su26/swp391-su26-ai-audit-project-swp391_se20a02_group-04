@@ -231,6 +231,31 @@ export function saveStaffAppointmentNote(appointmentId, notes) {
   });
 }
 
+export function saveDiagnosis(appointmentId, diagnosis_notes) {
+  return staffRequest(`/staff/appointments/${appointmentId}/diagnosis`, {
+    method: "PUT",
+    body: JSON.stringify({ diagnosis_notes }),
+  });
+}
+
+export function saveContactLog(appointmentId, { status, notes = "" } = {}) {
+  return staffRequest(`/staff/appointments/${appointmentId}/contact-log`, {
+    method: "PUT",
+    body: JSON.stringify({ status, notes }),
+  });
+}
+
+export function createPayment(appointmentId) {
+  return staffRequest(`/staff/appointments/${appointmentId}/payment`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function getPaymentStatus(appointmentId) {
+  return staffRequest(`/staff/appointments/${appointmentId}/payment/status`);
+}
+
 export function getStaffInventory(params = {}) {
   return staffRequest(withQuery("/staff/inventory", params));
 }

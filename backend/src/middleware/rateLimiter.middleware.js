@@ -1,6 +1,8 @@
 const rateLimit = require('express-rate-limit');
 
 const isDev = process.env.NODE_ENV !== 'production';
+const shouldSkipRateLimit = () => process.env.NODE_ENV === 'test'
+  || (isDev && process.env.RATE_LIMIT_DISABLED === 'true');
 
 /**
  * General API rate limiter
@@ -17,12 +19,7 @@ const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => {
-    // Skip in test; optionally disable entirely in local development
-    if (process.env.NODE_ENV === 'test') return true;
-    if (isDev && process.env.RATE_LIMIT_DISABLED === 'true') return true;
-    return false;
-  }
+  skip: shouldSkipRateLimit
 });
 
 /**
@@ -38,7 +35,8 @@ const authLimiter = rateLimit({
     retryAfter: '15 minutes'
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: shouldSkipRateLimit
 });
 
 /**
@@ -53,7 +51,8 @@ const passwordResetLimiter = rateLimit({
     retryAfter: '1 hour'
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: shouldSkipRateLimit
 });
 
 /**
@@ -68,7 +67,8 @@ const emailVerificationLimiter = rateLimit({
     retryAfter: '1 hour'
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: shouldSkipRateLimit
 });
 
 module.exports = {
