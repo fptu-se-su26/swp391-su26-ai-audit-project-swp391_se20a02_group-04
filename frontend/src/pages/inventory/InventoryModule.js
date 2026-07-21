@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -24,6 +24,7 @@ import {
   SlidersHorizontal,
   Trash2,
   TrendingDown,
+  Upload,
   X,
 } from "lucide-react";
 import {
@@ -36,9 +37,11 @@ import {
   getInventoryItems,
   getInventoryStatistics,
   getInventoryTransactions,
+  resolveInventoryMediaUrl,
   stockInItem,
   stockOutItem,
   updateInventoryItem,
+  uploadInventoryImage,
 } from "../../services/inventoryApi";
 import {
   calculateInventoryValue,
@@ -131,6 +134,16 @@ function priceRangeToParams(range) {
   if (min) params.price_min = min;
   if (max) params.price_max = max;
   return params;
+}
+
+function formatVehicleSummary(vehicles = []) {
+  const list = vehicles.filter(Boolean);
+  if (!list.length) return { label: "—", title: "" };
+  if (list.length === 1) return { label: list[0], title: list[0] };
+  return {
+    label: `${list[0]} +${list.length - 1}`,
+    title: list.join(", "),
+  };
 }
 
 /**
@@ -278,7 +291,7 @@ function KpiCard({ icon: Icon, label, value, sub, tone = "" }) {
 
 function ProductThumb({ product }) {
   const [broken, setBroken] = useState(false);
-  const src = product.image_url;
+  const src = resolveInventoryMediaUrl(product.image_url);
 
   if (src && !broken) {
     return (
@@ -291,6 +304,88 @@ function ProductThumb({ product }) {
     );
   }
   return <div className="inventory-thumb placeholder"><Package size={18} /></div>;
+}
+
+function ProductImageField({ value, onChange, disabled = false }) {
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const previewSrc = resolveInventoryMediaUrl(value);
+
+  const handlePick = () => {
+    if (disabled || uploading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Vui lòng chọn file ảnh (JPG, PNG, WEBP, GIF).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Ảnh tối đa 5MB.");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+    try {
+      const response = await uploadInventoryImage(file);
+      const imageUrl = response.data?.image_url || "";
+      if (!imageUrl) throw new Error("Máy chủ không trả về đường dẫn ảnh.");
+      onChange(imageUrl);
+    } catch (uploadError) {
+      setError(uploadError.message || "Không thể tải ảnh lên.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="inventory-image-field">
+      <input
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        hidden
+        onChange={handleFileChange}
+        ref={fileInputRef}
+        type="file"
+      />
+      <div className={`inventory-image-dropzone ${previewSrc ? "has-image" : ""}`}>
+        {previewSrc ? (
+          <img alt="Ảnh sản phẩm" className="inventory-image-dropzone-preview" src={previewSrc} />
+        ) : (
+          <div className="inventory-image-dropzone-empty">
+            <Upload size={22} />
+            <strong>Chưa có ảnh</strong>
+            <span>Chọn ảnh từ máy tính (JPG, PNG, tối đa 5MB)</span>
+          </div>
+        )}
+        <div className="inventory-image-dropzone-actions">
+          <button className="inventory-btn secondary" disabled={disabled || uploading} onClick={handlePick} type="button">
+            <Upload size={15} />
+            {uploading ? "Đang tải..." : previewSrc ? "Đổi ảnh" : "Chọn ảnh từ máy"}
+          </button>
+          {previewSrc && (
+            <button
+              className="inventory-btn secondary"
+              disabled={disabled || uploading}
+              onClick={() => onChange("")}
+              type="button"
+            >
+              <Trash2 size={15} />
+              Xóa ảnh
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="inventory-image-field-hint">Ảnh dùng chung cho tất cả loại hàng của sản phẩm.</p>
+      {error && <div className="inventory-form-error">{error}</div>}
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -827,25 +922,13 @@ function ProductModal({ mode, product, onClose, onSuccess }) {
               <input onChange={(event) => updateShared("supplier_name", event.target.value)} value={shared.supplier_name} />
             </FormField>
           </div>
-          <FormField hint="Dán đường dẫn ảnh (URL). Ảnh dùng chung cho cả sản phẩm." label="Hình ảnh sản phẩm">
-            <input
-              onChange={(event) => updateShared("image_url", event.target.value)}
-              placeholder="VD: https://example.com/lop-michelin.jpg"
-              type="url"
+          <FormField label="Hình ảnh sản phẩm">
+            <ProductImageField
+              disabled={state.saving}
+              onChange={(nextUrl) => updateShared("image_url", nextUrl)}
               value={shared.image_url}
             />
           </FormField>
-          {shared.image_url.trim() && (
-            <div className="inventory-image-preview">
-              <img
-                alt="Xem trước sản phẩm"
-                onError={(event) => { event.currentTarget.style.display = "none"; }}
-                onLoad={(event) => { event.currentTarget.style.display = ""; }}
-                src={shared.image_url.trim()}
-              />
-              <span>Ảnh xem trước — nếu không hiện, kiểm tra lại đường dẫn.</span>
-            </div>
-          )}
           <FormField label="Mô tả">
             <textarea maxLength={1000} onChange={(event) => updateShared("description", event.target.value)} value={shared.description} />
           </FormField>
@@ -1090,6 +1173,8 @@ function ProductDrawer({ product, readOnly, onClose, onAction }) {
 /* ------------------------------------------------------------------ */
 
 function ProductRow({ product, expanded, readOnly, onToggle, onAction }) {
+  const vehicles = formatVehicleSummary(product.vehicles);
+
   return (
     <>
       <tr className={`inventory-product-row ${product.allInactive ? "inactive" : ""}`} onClick={() => onAction("view", product)}>
@@ -1099,26 +1184,27 @@ function ProductRow({ product, expanded, readOnly, onToggle, onAction }) {
         <td className="inventory-name-cell">
           <strong title={product.name}>{product.name}</strong>
           <span className="inventory-muted">
-            {product.brand || "Chưa có thương hiệu"}
+            {[product.brand, product.supplier].filter(Boolean).join(" · ") || "Chưa có thương hiệu / NCC"}
             {product.allInactive ? " · Đã khóa" : ""}
           </span>
         </td>
         <td onClick={(event) => { event.stopPropagation(); onToggle(product.key); }}>
-          <button className="inventory-variant-toggle" type="button">
+          <button
+            aria-expanded={expanded}
+            aria-label={`${expanded ? "Thu gọn" : "Mở"} ${product.variants.length} loại hàng`}
+            className={`inventory-variant-toggle ${expanded ? "open" : ""}`}
+            type="button"
+          >
             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-            {product.variants.length} loại hàng
+            <span>{product.variants.length}</span>
+            <small>loại</small>
           </button>
         </td>
         <td><span title={getCategoryLabel(product.category)}>{getCategoryLabel(product.category)}</span></td>
-        <td><span title={product.brand || "--"}>{product.brand || "--"}</span></td>
-        <td><span title={product.vehicles.join(", ") || "--"}>{product.vehicles.join(", ") || "--"}</span></td>
-        <td className="inventory-supplier-cell"><span title={product.supplier || "--"}>{product.supplier || "--"}</span></td>
-        <td><InventoryStatusBadge status={product.status} /></td>
-        <td>
-          <span className={`inventory-badge ${product.allInactive ? "muted" : "success"}`}>
-            {product.allInactive ? "Đã khóa" : "Hoạt động"}
-          </span>
+        <td className="inventory-vehicle-cell">
+          <span title={vehicles.title || vehicles.label}>{vehicles.label}</span>
         </td>
+        <td><InventoryStatusBadge status={product.status} /></td>
         <td className="inventory-actions-cell" onClick={(event) => event.stopPropagation()}>
           <div className="inventory-row-actions">
             <button aria-label="Xem chi tiết" onClick={() => onAction("view", product)} title="Xem chi tiết" type="button"><Eye size={16} /></button>
@@ -1141,7 +1227,7 @@ function ProductRow({ product, expanded, readOnly, onToggle, onAction }) {
       </tr>
       {expanded && (
         <tr className="inventory-variant-expansion">
-          <td colSpan={10}>
+          <td colSpan={7}>
             <table className="inventory-variant-table">
               <thead>
                 <tr>
@@ -1213,6 +1299,7 @@ export default function InventoryModule({ readOnly = false }) {
   const [txState, setTxState] = useState({ loading: true, error: "", transactions: [] });
 
   const [expanded, setExpanded] = useState(() => new Set());
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [drawerKey, setDrawerKey] = useState("");
   const [productModal, setProductModal] = useState(null); // {mode, product}
   const [variantModal, setVariantModal] = useState(null); // {mode, item, productDefaults}
@@ -1296,6 +1383,59 @@ export default function InventoryModule({ readOnly = false }) {
   const resetFilters = () => { setFilters(DEFAULT_FILTERS); setDraftSearch(""); };
   const hasActiveFilter = draftSearch
     || Object.entries(filters).some(([key, value]) => key !== "search" && value !== "");
+
+  const advancedFilterCount = ["brand", "supplier", "car_model", "quality", "is_active"]
+    .filter((key) => filters[key]).length;
+
+  useEffect(() => {
+    if (advancedFilterCount > 0) setShowMoreFilters(true);
+  }, [advancedFilterCount]);
+
+  const filterChips = useMemo(() => {
+    const chips = [];
+    if (draftSearch.trim()) chips.push({ key: "search", label: `“${draftSearch.trim()}”`, clear: () => setDraftSearch("") });
+    if (filters.category) {
+      chips.push({
+        key: "category",
+        label: getCategoryLabel(filters.category),
+        clear: () => updateFilter("category", ""),
+      });
+    }
+    if (filters.stock_status) {
+      const stockLabels = {
+        IN_STOCK: "Còn hàng",
+        LOW_STOCK: "Sắp hết",
+        BELOW_MIN: "Dưới mức tối thiểu",
+        OUT_OF_STOCK: "Hết hàng",
+        OVERSTOCK: "Tồn kho cao",
+      };
+      chips.push({
+        key: "stock_status",
+        label: stockLabels[filters.stock_status] || filters.stock_status,
+        clear: () => updateFilter("stock_status", ""),
+      });
+    }
+    if (filters.price_range) {
+      chips.push({
+        key: "price_range",
+        label: PRICE_RANGES.find(([value]) => value === filters.price_range)?.[1] || filters.price_range,
+        clear: () => updateFilter("price_range", ""),
+      });
+    }
+    if (filters.brand) chips.push({ key: "brand", label: filters.brand, clear: () => updateFilter("brand", "") });
+    if (filters.supplier) chips.push({ key: "supplier", label: filters.supplier, clear: () => updateFilter("supplier", "") });
+    if (filters.car_model) chips.push({ key: "car_model", label: filters.car_model, clear: () => updateFilter("car_model", "") });
+    if (filters.quality) {
+      chips.push({
+        key: "quality",
+        label: INVENTORY_QUALITIES.find(([value]) => value === filters.quality)?.[1] || filters.quality,
+        clear: () => updateFilter("quality", ""),
+      });
+    }
+    if (filters.is_active === "true") chips.push({ key: "is_active", label: "Đang hoạt động", clear: () => updateFilter("is_active", "") });
+    if (filters.is_active === "false") chips.push({ key: "is_active", label: "Đã khóa", clear: () => updateFilter("is_active", "") });
+    return chips;
+  }, [draftSearch, filters]);
 
   const toggleExpanded = (key) => {
     setExpanded((prev) => {
@@ -1553,58 +1693,57 @@ export default function InventoryModule({ readOnly = false }) {
       <section className="inventory-panel inventory-filter-panel">
         <div className="inventory-filter-head">
           <span className="inventory-filter-label"><SlidersHorizontal size={16} /> Tìm kiếm & bộ lọc</span>
-          {hasActiveFilter && (
-            <button className="inventory-link-btn" onClick={resetFilters} type="button">
-              <RefreshCcw size={13} /> Xóa bộ lọc
+          <div className="inventory-filter-head-actions">
+            <button
+              aria-expanded={showMoreFilters}
+              className={`inventory-link-btn ${showMoreFilters || advancedFilterCount ? "active" : ""}`}
+              onClick={() => setShowMoreFilters((open) => !open)}
+              type="button"
+            >
+              {showMoreFilters ? <ChevronDown size={13} /> : <Filter size={13} />}
+              {showMoreFilters ? "Thu gọn" : "Bộ lọc thêm"}
+              {advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
             </button>
-          )}
+            {hasActiveFilter && (
+              <button className="inventory-link-btn" onClick={resetFilters} type="button">
+                <RefreshCcw size={13} /> Xóa tất cả
+              </button>
+            )}
+          </div>
         </div>
-        <div className="inventory-filter-grid">
+
+        <div className="inventory-filter-primary">
           <label className="inventory-search inventory-filter-search">
             <Search size={17} />
             <input
               onChange={(event) => setDraftSearch(event.target.value)}
-              placeholder="Tìm theo tên sản phẩm, mã hàng (SKU) hoặc mã vạch..."
+              placeholder="Tìm tên sản phẩm, SKU hoặc mã vạch..."
               value={draftSearch}
             />
+            {draftSearch && (
+              <button
+                aria-label="Xóa tìm kiếm"
+                className="inventory-search-clear"
+                onClick={() => setDraftSearch("")}
+                type="button"
+              >
+                <X size={14} />
+              </button>
+            )}
           </label>
-          <select onChange={(event) => updateFilter("category", event.target.value)} value={filters.category}>
+          <select
+            aria-label="Danh mục"
+            onChange={(event) => updateFilter("category", event.target.value)}
+            value={filters.category}
+          >
             <option value="">Tất cả danh mục</option>
             {INVENTORY_CATEGORIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <input
-            list="inventory-brand-list"
-            onChange={(event) => updateFilter("brand", event.target.value)}
-            placeholder="Thương hiệu"
-            value={filters.brand}
-          />
-          <datalist id="inventory-brand-list">
-            {[...new Set(itemsState.items.map((item) => item.brand).filter(Boolean))].map((brand) => (
-              <option key={brand} value={brand} />
-            ))}
-          </datalist>
-          <input
-            list="inventory-supplier-list"
-            onChange={(event) => updateFilter("supplier", event.target.value)}
-            placeholder="Nhà cung cấp"
-            value={filters.supplier}
-          />
-          <datalist id="inventory-supplier-list">
-            {[...new Set(itemsState.items.map((item) => item.supplier_name).filter(Boolean))].map((supplier) => (
-              <option key={supplier} value={supplier} />
-            ))}
-          </datalist>
-          <input
-            list="inventory-vehicle-list"
-            onChange={(event) => updateFilter("car_model", event.target.value)}
-            placeholder="Dòng xe"
-            value={filters.car_model}
-          />
-          <select onChange={(event) => updateFilter("quality", event.target.value)} value={filters.quality}>
-            <option value="">Tất cả chất lượng</option>
-            {INVENTORY_QUALITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-          <select onChange={(event) => updateFilter("stock_status", event.target.value)} value={filters.stock_status}>
+          <select
+            aria-label="Tồn kho"
+            onChange={(event) => updateFilter("stock_status", event.target.value)}
+            value={filters.stock_status}
+          >
             <option value="">Tất cả tồn kho</option>
             <option value="IN_STOCK">Còn hàng</option>
             <option value="LOW_STOCK">Sắp hết</option>
@@ -1612,21 +1751,89 @@ export default function InventoryModule({ readOnly = false }) {
             <option value="OUT_OF_STOCK">Hết hàng</option>
             <option value="OVERSTOCK">Tồn kho cao</option>
           </select>
-          <select onChange={(event) => updateFilter("price_range", event.target.value)} value={filters.price_range}>
+          <select
+            aria-label="Mức giá"
+            onChange={(event) => updateFilter("price_range", event.target.value)}
+            value={filters.price_range}
+          >
             {PRICE_RANGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <select onChange={(event) => updateFilter("is_active", event.target.value)} value={filters.is_active}>
-            <option value="">Hoạt động & đã khóa</option>
-            <option value="true">Đang hoạt động</option>
-            <option value="false">Đã khóa</option>
-          </select>
         </div>
+
+        {showMoreFilters && (
+          <div className="inventory-filter-advanced">
+            <input
+              aria-label="Thương hiệu"
+              list="inventory-brand-list"
+              onChange={(event) => updateFilter("brand", event.target.value)}
+              placeholder="Tất cả thương hiệu"
+              value={filters.brand}
+            />
+            <datalist id="inventory-brand-list">
+              {[...new Set(itemsState.items.map((item) => item.brand).filter(Boolean))].map((brand) => (
+                <option key={brand} value={brand} />
+              ))}
+            </datalist>
+            <input
+              aria-label="Nhà cung cấp"
+              list="inventory-supplier-list"
+              onChange={(event) => updateFilter("supplier", event.target.value)}
+              placeholder="Tất cả nhà cung cấp"
+              value={filters.supplier}
+            />
+            <datalist id="inventory-supplier-list">
+              {[...new Set(itemsState.items.map((item) => item.supplier_name).filter(Boolean))].map((supplier) => (
+                <option key={supplier} value={supplier} />
+              ))}
+            </datalist>
+            <input
+              aria-label="Dòng xe"
+              list="inventory-vehicle-list"
+              onChange={(event) => updateFilter("car_model", event.target.value)}
+              placeholder="Tất cả dòng xe"
+              value={filters.car_model}
+            />
+            <datalist id="inventory-vehicle-list">
+              {[...new Set(itemsState.items.map((item) => item.car_model).filter(Boolean))].map((model) => (
+                <option key={model} value={model} />
+              ))}
+            </datalist>
+            <select
+              aria-label="Chất lượng"
+              onChange={(event) => updateFilter("quality", event.target.value)}
+              value={filters.quality}
+            >
+              <option value="">Tất cả chất lượng</option>
+              {INVENTORY_QUALITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <select
+              aria-label="Trạng thái hoạt động"
+              onChange={(event) => updateFilter("is_active", event.target.value)}
+              value={filters.is_active}
+            >
+              <option value="">Hoạt động & đã khóa</option>
+              <option value="true">Đang hoạt động</option>
+              <option value="false">Đã khóa</option>
+            </select>
+          </div>
+        )}
+
+        {filterChips.length > 0 && (
+          <div className="inventory-filter-chips" aria-label="Bộ lọc đang áp dụng">
+            {filterChips.map((chip) => (
+              <button className="inventory-filter-chip" key={chip.key + chip.label} onClick={chip.clear} type="button">
+                <span>{chip.label}</span>
+                <X size={12} />
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* --------------------- INVENTORY TABLE --------------------- */}
       <section className="inventory-panel inventory-list-panel">
         <div className="inventory-panel-head">
-          <h3><Filter size={16} /> Danh sách sản phẩm ({products.length})</h3>
+          <h3><Package size={16} /> Danh sách sản phẩm ({products.length})</h3>
           <span className="inventory-muted-inline">{itemsState.total.toLocaleString("vi-VN")} mã hàng</span>
         </div>
         {itemsState.loading ? (
@@ -1645,13 +1852,10 @@ export default function InventoryModule({ readOnly = false }) {
                 <tr>
                   <th>Ảnh</th>
                   <th>Sản phẩm</th>
-                  <th>Loại hàng</th>
+                  <th>Loại</th>
                   <th>Danh mục</th>
-                  <th>Thương hiệu</th>
                   <th>Dòng xe</th>
-                  <th>Nhà cung cấp</th>
                   <th>Tồn kho</th>
-                  <th>Hoạt động</th>
                   <th>Thao tác</th>
                 </tr>
               </thead>

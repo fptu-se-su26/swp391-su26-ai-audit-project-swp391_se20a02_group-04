@@ -6,7 +6,7 @@ import {
   getStaffAppointmentStats,
   getStaffLowStock,
 } from "../../services/staffAppointmentApi";
-import { mapAppointmentToJob } from "./staffAppointmentMapper";
+import { mapAppointmentToJob, sortStaffJobsByPriority } from "./staffAppointmentMapper";
 import "../../styles/staff/StaffDashboard.css";
 
 function buildHistoryRows(chartRows = []) {
@@ -61,13 +61,14 @@ export default function StaffDashboard() {
 
   const overview = stats?.overview || {};
   const historyRows = useMemo(() => buildHistoryRows(stats?.charts?.appointments_by_date || []), [stats]);
-  const assignedCount = jobs.filter((job) => job.statusKey === "assigned").length;
-  const inProgressCount = jobs.filter((job) => job.statusKey === "in_progress").length;
-  const completedCount = jobs.filter((job) => job.statusKey === "completed").length;
+  const sortedJobs = useMemo(() => sortStaffJobsByPriority(jobs), [jobs]);
+  const assignedCount = sortedJobs.filter((job) => job.statusKey === "assigned").length;
+  const inProgressCount = sortedJobs.filter((job) => job.statusKey === "in_progress").length;
+  const completedCount = sortedJobs.filter((job) => job.statusKey === "completed").length;
 
   return (
     <>
-      <PageHeader title="Công việc của nhân viên" subtitle="Tổng quan lịch hẹn, vật tư và chấm công từ dữ liệu hệ thống" />
+      <PageHeader title="Tổng quan" subtitle="Lịch hẹn được giao, vật tư cần chú ý và tóm tắt chấm công" />
 
       {isLoading && (
         <div className="state-box">
@@ -107,7 +108,7 @@ export default function StaffDashboard() {
                 icon="build_circle"
                 label="Đang thực hiện"
                 value={overview.in_progress ?? inProgressCount}
-                helper="Xe đang được xử lý trong ca"
+                helper="Xe đang được xử lý"
                 tone="text-yellow"
               />
               <StatCard
@@ -125,9 +126,9 @@ export default function StaffDashboard() {
               <button type="button">Hoàn thành ({completedCount})</button>
             </div>
 
-            {jobs.length > 0 ? (
+            {sortedJobs.length > 0 ? (
               <div className="jobs-grid">
-                {jobs.slice(0, 3).map((job) => (
+                {sortedJobs.slice(0, 3).map((job) => (
                   <JobCard job={job} key={job.id} />
                 ))}
               </div>

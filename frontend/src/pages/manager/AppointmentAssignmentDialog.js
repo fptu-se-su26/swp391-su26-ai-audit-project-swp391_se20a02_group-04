@@ -3,16 +3,13 @@ import {
   AlertCircle,
   CheckCircle,
   Loader,
-  MapPin,
   User,
-  Wrench,
   X
 } from "lucide-react";
 import useAvailabilityCheck from "../../hooks/useAvailabilityCheck";
 import {
   assignAppointment,
   getAvailableTechnicians,
-  getRepairBays,
   getTechnicians
 } from "../../services/appointmentAssignmentApi";
 import "../../styles/manager/AppointmentAssignmentDialog.css";
@@ -79,16 +76,13 @@ export default function AppointmentAssignmentDialog({
     end_time: appointmentEndTime,
   }), [appointmentDate, appointmentStartTime, appointmentEndTime]);
   const [technicians, setTechnicians] = useState([]);
-  const [repairBays, setRepairBays] = useState([]);
   const [selectedTechnician, setSelectedTechnician] = useState(null);
-  const [selectedBay, setSelectedBay] = useState(null);
   const [techAvailability, setTechAvailability] = useState(null);
-  const [bayAvailability, setBayAvailability] = useState(null);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [localError, setLocalError] = useState("");
-  const { checkTechnician, checkRepairBay, loading: checking, error: availabilityError } = useAvailabilityCheck(appointmentId, availabilityParams);
+  const { checkTechnician, loading: checking, error: availabilityError } = useAvailabilityCheck(appointmentId, availabilityParams);
 
   const workingTechnicians = useMemo(
     () => technicians.filter((tech) => tech.on_duty || tech.available || tech.selectable),
@@ -99,10 +93,9 @@ export default function AppointmentAssignmentDialog({
 
   const isValid = useMemo(() => (
     selectedTechnician &&
-    selectedBay &&
     (selectedTechnician.on_duty || selectedTechnician.available || selectedTechnician.selectable) &&
-    bayAvailability?.available
-  ), [selectedTechnician, selectedBay, bayAvailability]);
+    (techAvailability?.available !== false)
+  ), [selectedTechnician, techAvailability]);
 
   useEffect(() => {
     let active = true;
@@ -112,14 +105,12 @@ export default function AppointmentAssignmentDialog({
       setLocalError("");
 
       try {
-        const [technicianList, bayList] = await Promise.all([
-          appointmentDate ? getAvailableTechnicians({ ...availabilityParams, appointment_id: appointmentId }).catch(() => getTechnicians()) : getTechnicians(),
-          getRepairBays(),
-        ]);
+        const technicianList = appointmentDate
+          ? await getAvailableTechnicians({ ...availabilityParams, appointment_id: appointmentId }).catch(() => getTechnicians())
+          : await getTechnicians();
 
         if (!active) return;
         setTechnicians(technicianList);
-        setRepairBays(bayList.filter((bay) => bay.is_active !== false));
       } catch (error) {
         if (!active) return;
         setLocalError(error.message || "Cannot load assignment options.");
@@ -142,13 +133,6 @@ export default function AppointmentAssignmentDialog({
     if (availability) setTechAvailability(availability);
   };
 
-  const selectBay = async (bay) => {
-    setSelectedBay(bay);
-    setBayAvailability(null);
-    const availability = await checkRepairBay(bay._id);
-    if (availability) setBayAvailability(availability);
-  };
-
   const handleConfirm = async () => {
     if (!appointmentId) {
       const message = "This appointment is not linked to a database record.";
@@ -165,7 +149,6 @@ export default function AppointmentAssignmentDialog({
     try {
       const response = await assignAppointment(appointmentId, {
         staff_id: selectedTechnician._id,
-        repair_bay_id: selectedBay._id,
         start_time: appointmentStartTime,
         note: notes.trim(),
       });
@@ -185,7 +168,7 @@ export default function AppointmentAssignmentDialog({
         <div className="assignment-dialog-header">
           <div>
             <p>Điều phối lịch hẹn</p>
-            <h2>Chọn nhân viên theo tải việc</h2>
+            <h2>Chọn kỹ thuật viên phụ trách</h2>
           </div>
           <button className="assignment-close-btn" onClick={onClose} disabled={loading} aria-label="Close">
             <X size={20} />
@@ -227,7 +210,7 @@ export default function AppointmentAssignmentDialog({
                   <User size={16} /> Nhân viên đang làm ngày này
                 </label>
                 <p className="form-hint">
-                  Ưu tiên người rảnh (🟢). Vẫn có thể chọn người quá tải (🔴) nếu cần.
+                  Chỉ cần chọn kỹ thuật viên. Hệ thống không yêu cầu phân kệ sửa chữa.
                 </p>
                 <div className="workload-assign-table">
                   <div className="workload-assign-row head">
@@ -275,43 +258,6 @@ export default function AppointmentAssignmentDialog({
                     available={techAvailability.available || selectedTechnician.on_duty}
                     label="Nhân viên"
                   />
-                )}
-              </div>
-
-              <div className="form-section">
-                <label className="form-label">
-                  <Wrench size={16} /> Kệ sửa
-                </label>
-                <div className="repair-bay-list">
-                  {repairBays.length === 0 ? (
-                    <p className="empty-message">Chưa có kệ sửa khả dụng.</p>
-                  ) : repairBays.map((bay) => (
-                    <button
-                      type="button"
-                      key={bay._id}
-                      className={`repair-bay-item ${selectedBay?._id === bay._id ? "selected" : ""}`}
-                      onClick={() => selectBay(bay)}
-                      disabled={loading || checking || bay.status !== "AVAILABLE"}
-                    >
-                      <div className="bay-info">
-                        <h4>{bay.name} ({bay.code})</h4>
-                        <p><MapPin size={13} /> {bay.location || "Workshop"}</p>
-                        {bay.equipment?.length > 0 && (
-                          <div className="equipment-tags">
-                            {bay.equipment.slice(0, 3).map((item) => (
-                              <span className="tag" key={item}>{item}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <span className={`availability ${bay.status === "AVAILABLE" ? "available" : "busy"}`}>
-                        {bay.status}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                {selectedBay && bayAvailability && (
-                  <AvailabilityResult available={bayAvailability.available} label="Kệ sửa" />
                 )}
               </div>
 

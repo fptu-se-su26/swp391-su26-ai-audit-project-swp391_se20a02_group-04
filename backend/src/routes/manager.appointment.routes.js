@@ -52,8 +52,8 @@ const assignStaffValidation = [
 const assignAppointmentValidation = [
   body('technician_id').notEmpty().isMongoId()
     .withMessage('Valid technician ID is required'),
-  body('repair_bay_id').notEmpty().isMongoId()
-    .withMessage('Valid repair bay ID is required'),
+  body('repair_bay_id').optional({ nullable: true }).isMongoId()
+    .withMessage('Invalid repair bay ID'),
   body('force').optional().isBoolean()
     .withMessage('force must be boolean'),
   body('notes').optional().trim().isLength({ max: 500 })

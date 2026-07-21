@@ -14,6 +14,41 @@ const {
 } = require('../utils/email.util');
 
 /**
+ * Resolve role names for a user. Repairs missing CUSTOMER assignment when needed.
+ * @param {import('mongoose').Types.ObjectId|string} userId
+ * @returns {Promise<string[]>}
+ */
+const getUserRoleNames = async (userId) => {
+  const userRoles = await UserRole.find({ user_id: userId })
+    .populate('role_id', 'role_name');
+
+  let roles = userRoles
+    .map((entry) => entry.role_id?.role_name)
+    .filter(Boolean);
+
+  if (roles.length > 0) {
+    return roles;
+  }
+
+  let customerRole = await Role.findOne({ role_name: 'CUSTOMER' });
+  if (!customerRole) {
+    customerRole = await Role.create({
+      role_name: 'CUSTOMER',
+      description: 'Default customer role',
+      permissions: []
+    });
+  }
+
+  await UserRole.findOneAndUpdate(
+    { user_id: userId, role_id: customerRole._id },
+    { user_id: userId, role_id: customerRole._id, assigned_at: new Date() },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  return ['CUSTOMER'];
+};
+
+/**
  * Register new user with email verification
  * POST /api/auth/register
  */
@@ -179,10 +214,7 @@ const login = async (req, res) => {
     await user.save();
 
     // Get user roles
-    const userRoles = await UserRole.find({ user_id: user._id })
-      .populate('role_id', 'role_name');
-    
-    const roles = userRoles.map(ur => ur.role_id.role_name);
+    const roles = await getUserRoleNames(user._id);
 
     // Generate tokens
     const accessToken = generateAccessToken({ 
@@ -252,14 +284,18 @@ const googleAuth = async (req, res) => {
       isNewUser = true;
 
       // Assign default CUSTOMER role
-      const customerRole = await Role.findOne({ role_name: 'CUSTOMER' });
-      
-      if (customerRole) {
-        await UserRole.create({
-          user_id: user._id,
-          role_id: customerRole._id
+      const customerRole = await Role.findOne({ role_name: 'CUSTOMER' })
+        || await Role.create({
+          role_name: 'CUSTOMER',
+          description: 'Default customer role',
+          permissions: []
         });
-      }
+
+      await UserRole.findOneAndUpdate(
+        { user_id: user._id, role_id: customerRole._id },
+        { user_id: user._id, role_id: customerRole._id, assigned_at: new Date() },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
 
       // Send welcome email if verified
       if (googleUser.email_verified) {
@@ -303,10 +339,7 @@ const googleAuth = async (req, res) => {
     }
 
     // Get user roles
-    const userRoles = await UserRole.find({ user_id: user._id })
-      .populate('role_id', 'role_name');
-    
-    const roles = userRoles.map(ur => ur.role_id.role_name);
+    const roles = await getUserRoleNames(user._id);
 
     // Generate tokens
     const accessToken = generateAccessToken({ 
@@ -706,14 +739,14 @@ const getMe = async (req, res) => {
     }
 
     // Get user roles
-    const userRoles = await UserRole.find({ user_id: user._id })
-      .populate('role_id', 'role_name description');
+    const roleNames = await getUserRoleNames(user._id);
+    const roleDocs = await Role.find({ role_name: { $in: roleNames } }).select('role_name description');
 
     return successResponse(res, 200, 'User profile retrieved', {
       user: user.toSafeObject(),
-      roles: userRoles.map(ur => ({
-        name: ur.role_id.role_name,
-        description: ur.role_id.description
+      roles: roleDocs.map((role) => ({
+        name: role.role_name,
+        description: role.description
       }))
     });
 
@@ -747,10 +780,7 @@ const refreshToken = async (req, res) => {
     }
 
     // Get user roles
-    const userRoles = await UserRole.find({ user_id: user._id })
-      .populate('role_id', 'role_name');
-    
-    const roles = userRoles.map(ur => ur.role_id.role_name);
+    const roles = await getUserRoleNames(user._id);
 
     // Generate new access token
     const newAccessToken = generateAccessToken({ 

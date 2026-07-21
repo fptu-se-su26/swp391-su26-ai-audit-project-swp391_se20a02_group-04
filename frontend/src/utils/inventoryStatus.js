@@ -49,6 +49,46 @@ export const INVENTORY_QUALITIES = [
   ["BUDGET", "Giá rẻ"],
 ];
 
+/** Nhóm chất lượng dễ chọn khi sửa xe: Loại 1 / Loại 2 / Loại 3 */
+export const QUALITY_TIERS = [
+  {
+    id: "TIER_1",
+    label: "Loại 1",
+    hint: "Chính hãng / cao cấp",
+    qualities: ["OEM", "PREMIUM"],
+  },
+  {
+    id: "TIER_2",
+    label: "Loại 2",
+    hint: "Tiêu chuẩn",
+    qualities: ["STANDARD"],
+  },
+  {
+    id: "TIER_3",
+    label: "Loại 3",
+    hint: "Giá rẻ",
+    qualities: ["BUDGET"],
+  },
+];
+
+export function getCategoryLabel(category) {
+  return INVENTORY_CATEGORIES.find(([value]) => value === category)?.[1] || category || "Khác";
+}
+
+export function getQualityLabel(quality) {
+  return INVENTORY_QUALITIES.find(([value]) => value === quality)?.[1] || quality || "--";
+}
+
+export function getQualityTier(quality) {
+  const code = String(quality || "STANDARD").toUpperCase();
+  return QUALITY_TIERS.find((tier) => tier.qualities.includes(code)) || QUALITY_TIERS[1];
+}
+
+export function getQualityTierLabel(quality) {
+  const tier = getQualityTier(quality);
+  return `${tier.label} · ${getQualityLabel(quality)}`;
+}
+
 export const VEHICLE_MODELS = [
   "Honda Vision",
   "Honda Wave Alpha",
@@ -82,14 +122,6 @@ export const TRANSACTION_TYPES = [
   ["DAMAGE", "Hỏng hóc"],
   ["TRANSFER", "Chuyển kho"],
 ];
-
-export function getCategoryLabel(category) {
-  return INVENTORY_CATEGORIES.find(([value]) => value === category)?.[1] || category || "Khác";
-}
-
-export function getQualityLabel(quality) {
-  return INVENTORY_QUALITIES.find(([value]) => value === quality)?.[1] || quality || "--";
-}
 
 export function getInventoryStatusMeta(status) {
   return INVENTORY_STATUS[status] || {

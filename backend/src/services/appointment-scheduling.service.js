@@ -148,34 +148,34 @@ async function assignAppointment({ appointmentId, technicianId, repairBayId, ass
   }
 
   if (appointment.status !== 'CONFIRMED') {
-    const error = new Error('Appointment must be confirmed before assigning technician and repair bay');
+    const error = new Error('Appointment must be confirmed before assigning technician');
     error.statusCode = 400;
     throw error;
   }
 
   const existingAssignment = await AppointmentAssignment.findOne({ appointment_id: appointment._id });
-  const alreadyAssigned = Boolean(existingAssignment || appointment.staff_id || appointment.repair_bay_id);
+  const alreadyAssigned = Boolean(existingAssignment || appointment.staff_id);
   if (alreadyAssigned && appointment.status === 'CONFIRMED' && forceReassign !== true) {
     const error = new Error('Appointment đã được phân công. Hãy huỷ phân công hiện tại trước khi phân công lại');
     error.statusCode = 409;
     throw error;
   }
 
-  const [technician, repairBay] = await Promise.all([
-    User.findById(technicianId),
-    RepairBay.findById(repairBayId)
-  ]);
-
+  const technician = await User.findById(technicianId);
   if (!technician || !technician.is_active || !(await isStaffUser(technicianId))) {
     const error = new Error('Technician not found or inactive');
     error.statusCode = 404;
     throw error;
   }
 
-  if (!repairBay || !repairBay.is_active || repairBay.status !== 'AVAILABLE') {
-    const error = new Error('Repair bay not found or unavailable');
-    error.statusCode = 400;
-    throw error;
+  let repairBay = null;
+  if (repairBayId) {
+    repairBay = await RepairBay.findById(repairBayId);
+    if (!repairBay || !repairBay.is_active || repairBay.status !== 'AVAILABLE') {
+      const error = new Error('Repair bay not found or unavailable');
+      error.statusCode = 400;
+      throw error;
+    }
   }
 
   const estimatedStartTime = getAppointmentStart(appointment);
@@ -188,10 +188,12 @@ async function assignAppointment({ appointmentId, technicianId, repairBayId, ass
   const durationMinutes = await calculateServiceDuration(appointment);
   const estimatedEndTime = addMinutes(estimatedStartTime, durationMinutes);
 
-  const [techAvailability, bayAvailability] = await Promise.all([
-    checkTechnicianAvailability(technicianId, estimatedStartTime, estimatedEndTime, appointment._id),
-    checkRepairBayAvailability(repairBayId, estimatedStartTime, estimatedEndTime, appointment._id)
-  ]);
+  const techAvailability = await checkTechnicianAvailability(
+    technicianId,
+    estimatedStartTime,
+    estimatedEndTime,
+    appointment._id
+  );
 
   if (!techAvailability.available) {
     const error = new Error('Technician is not available for this time slot');
@@ -200,44 +202,49 @@ async function assignAppointment({ appointmentId, technicianId, repairBayId, ass
     throw error;
   }
 
-  if (!bayAvailability.available) {
-    const error = new Error(bayAvailability.reason || 'Repair bay is not available for this time slot');
-    error.statusCode = 400;
-    error.details = { conflicts: bayAvailability.conflicts };
-    throw error;
+  if (repairBay) {
+    const bayAvailability = await checkRepairBayAvailability(
+      repairBay._id,
+      estimatedStartTime,
+      estimatedEndTime,
+      appointment._id
+    );
+    if (!bayAvailability.available) {
+      const error = new Error(bayAvailability.reason || 'Repair bay is not available for this time slot');
+      error.statusCode = 400;
+      error.details = { conflicts: bayAvailability.conflicts };
+      throw error;
+    }
+  }
+
+  const assignmentPayload = {
+    technician_id: technician._id,
+    assigned_by: assignedBy,
+    assigned_at: new Date(),
+    estimated_start_time: estimatedStartTime,
+    estimated_end_time: estimatedEndTime,
+    duration_minutes: durationMinutes,
+    notes,
+    status: 'ASSIGNED'
+  };
+  if (repairBay) {
+    assignmentPayload.repair_bay_id = repairBay._id;
   }
 
   let assignment;
   if (existingAssignment) {
-    existingAssignment.set({
-      technician_id: technician._id,
-      repair_bay_id: repairBay._id,
-      assigned_by: assignedBy,
-      assigned_at: new Date(),
-      estimated_start_time: estimatedStartTime,
-      estimated_end_time: estimatedEndTime,
-      duration_minutes: durationMinutes,
-      notes,
-      status: 'ASSIGNED'
-    });
+    existingAssignment.set(assignmentPayload);
+    if (!repairBay) existingAssignment.repair_bay_id = undefined;
     assignment = await existingAssignment.save();
   } else {
     assignment = await AppointmentAssignment.create({
       appointment_id: appointment._id,
-      technician_id: technician._id,
-      repair_bay_id: repairBay._id,
-      assigned_by: assignedBy,
-      assigned_at: new Date(),
-      estimated_start_time: estimatedStartTime,
-      estimated_end_time: estimatedEndTime,
-      duration_minutes: durationMinutes,
-      notes,
-      status: 'ASSIGNED'
+      ...assignmentPayload
     });
   }
 
   appointment.staff_id = technician._id;
-  appointment.repair_bay_id = repairBay._id;
+  appointment.repair_bay_id = repairBay ? repairBay._id : null;
   appointment.assignment_id = assignment._id;
   appointment.assigned_at = assignment.assigned_at;
   appointment.appointment_start_at = estimatedStartTime;
@@ -271,8 +278,8 @@ async function startAppointment(appointmentId, userId) {
     throw error;
   }
 
-  if (!appointment.staff_id || !appointment.repair_bay_id) {
-    const error = new Error('Appointment must be assigned to a staff member and repair bay before it can be started');
+  if (!appointment.staff_id) {
+    const error = new Error('Appointment must be assigned to a staff member before it can be started');
     error.statusCode = 409;
     throw error;
   }
@@ -304,8 +311,8 @@ async function completeAppointment(appointmentId, { finalCost, completionNotes }
     throw error;
   }
 
-  if (!appointment.staff_id || !appointment.repair_bay_id) {
-    const error = new Error('Appointment chưa được phân công đầy đủ kỹ thuật viên và kệ sửa chữa');
+  if (!appointment.staff_id) {
+    const error = new Error('Appointment chưa được phân công kỹ thuật viên');
     error.statusCode = 422;
     throw error;
   }

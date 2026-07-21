@@ -7,7 +7,6 @@ import AdminProfile from './pages/admin/AdminProfile';
 import AdminServices from './pages/admin/AdminServices';
 import AdminCustomers from './pages/admin/AdminCustomers';
 import AdminUsers from './pages/admin/AdminUsers';
-import AdminReports from './pages/admin/AdminReports';
 import AdminInventory from './pages/admin/AdminInventory';
 import AdminContact from './pages/admin/AdminContact';
 import AdminAI from './pages/admin/AdminAI';
@@ -21,7 +20,6 @@ const ADMIN_PAGES = new Set([
   'services',
   'customers',
   'users',
-  'reports',
   'profile',
   'inventory',
   'contact',
@@ -141,8 +139,6 @@ function App() {
         return <AdminCustomers onViewChange={handlePageChange} />;
       case 'users':
         return <AdminUsers onViewChange={handlePageChange} />;
-      case 'reports':
-        return <AdminReports onViewChange={handlePageChange} />;
       case 'profile':
         return <AdminProfile onViewChange={handlePageChange} />;
       case 'inventory':

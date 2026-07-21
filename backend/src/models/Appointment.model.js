@@ -192,7 +192,7 @@ const appointmentSchema = new mongoose.Schema({
   contact_log: {
     status: {
       type: String,
-      enum: ['AGREED', 'DECLINED', 'NO_ANSWER'],
+      enum: ['AGREED', 'DECLINED', 'NO_ANSWER', 'PASSED'],
       default: null
     },
     notes: {
@@ -202,6 +202,23 @@ const appointmentSchema = new mongoose.Schema({
       default: null
     },
     contacted_at: {
+      type: Date,
+      default: null
+    }
+  },
+  repair_log: {
+    status: {
+      type: String,
+      enum: ['WITH_PARTS', 'NO_PARTS'],
+      default: null
+    },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Repair notes cannot exceed 500 characters'],
+      default: null
+    },
+    completed_at: {
       type: Date,
       default: null
     }
@@ -274,6 +291,24 @@ const appointmentSchema = new mongoose.Schema({
   },
   completed_at: {
     type: Date
+  },
+  review: {
+    rating: {
+      type: Number,
+      min: [1, 'Rating must be at least 1'],
+      max: [5, 'Rating must not exceed 5'],
+      default: null
+    },
+    comment: {
+      type: String,
+      trim: true,
+      maxlength: [1000, 'Review comment cannot exceed 1000 characters'],
+      default: null
+    },
+    created_at: {
+      type: Date,
+      default: null
+    }
   },
   final_cost: {
     type: Number,
@@ -367,6 +402,11 @@ appointmentSchema.methods.canBeCancelled = function() {
 
 appointmentSchema.methods.canBeModified = function() {
   return ['PENDING', 'CONFIRMED'].includes(this.status);
+};
+
+appointmentSchema.methods.canBeReviewed = function() {
+  const alreadyReviewed = Number(this.review?.rating) >= 1;
+  return ['COMPLETED', 'PAID'].includes(this.status) && !alreadyReviewed;
 };
 
 appointmentSchema.methods.toSafeObject = function() {

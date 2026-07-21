@@ -11,6 +11,7 @@ import {
   saveStaffAppointmentNote,
   startStaffAppointment,
   useAppointmentMaterials,
+  revertAppointmentMaterial,
 } from "../../services/staffAppointmentApi";
 import {
   canCompleteJob,
@@ -25,8 +26,7 @@ import {
   mapAppointmentToJob,
 } from "./staffAppointmentMapper";
 import { getAuthSession } from "../../services/authApi";
-import WorkflowStepper from "./WorkflowStepper";
-import { formatAssignedAt } from "./staffAppointmentMapper";
+import WorkflowStepper, { getStepState } from "./WorkflowStepper";
 import "../../styles/staff/StaffJobDetail.css";
 
 function useStaffJob() {
@@ -100,33 +100,85 @@ function JobPageState({ error, isLoading, onRetry }) {
   return null;
 }
 
-function JobSummary({ job }) {
+function JobSummary({ job, compact = false }) {
+  const { progressPct, completedCount } = getStepState(job);
+  const showProgress = job.status === "IN_PROGRESS";
+
   return (
-    <section className="job-detail-hero">
-      <div>
+    <section className={`job-detail-hero ${compact ? "job-detail-hero-compact" : ""}`}>
+      <div className="job-hero-main">
         <span className={`status-pill ${job.statusClass}`}>{job.statusLabel}</span>
-        <h3>{job.vehicle} - {job.plate}</h3>
+        <h3>{job.vehicle} · {job.plate}</h3>
         <p>{job.service}</p>
-      </div>
-      <div className="job-hero-meta">
-        <div>
-          <span>Giờ hẹn</span>
-          <strong>{job.time}</strong>
-        </div>
-        <div>
-          <span>Dự kiến</span>
-          <strong>{job.estimate}</strong>
-        </div>
-        <div>
-          <span>Duoc giao</span>
-          <strong>{formatAssignedAt(job.assignedAt)}</strong>
-        </div>
+        {showProgress && (
+          <div className="job-hero-progress">
+            <div className="job-hero-progress-bar" aria-hidden="true">
+              <span style={{ width: `${progressPct}%` }} />
+            </div>
+            <small>Tiến trình: {completedCount}/4 bước · {progressPct}%</small>
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-function InfoList({ job }) {
+function WorkflowGuide({ job }) {
+  const { steps, currentStep } = getStepState(job);
+
+  if (job.status === "COMPLETED") {
+    return (
+      <section className="panel workflow-guide-panel">
+        <h3><Icon name="task_alt" />Đã hoàn thành</h3>
+        <p className="muted-copy">Đơn sửa xe đã kết thúc. Bạn có thể xem lại từng bước bên trái.</p>
+      </section>
+    );
+  }
+
+  if (job.status === "CONFIRMED") {
+    return (
+      <section className="panel workflow-guide-panel">
+        <h3><Icon name="info" />Hướng dẫn</h3>
+        <p className="muted-copy">Bấm <strong>Bắt đầu công việc</strong> để mở tiến trình sửa xe theo 4 bước.</p>
+      </section>
+    );
+  }
+
+  const checklist = steps.map((step, index) => {
+    let icon = "radio_button_unchecked";
+    let tone = "pending";
+    if (step.status === "done") { icon = "check_circle"; tone = "done"; }
+    if (index === currentStep) { icon = "play_circle"; tone = "active"; }
+
+    return (
+      <li className={`workflow-check-item ${tone}`} key={step.id}>
+        <Icon name={icon} />
+        <span>
+          <strong>{index + 1}. {step.label}</strong>
+          <small>{step.short}</small>
+        </span>
+      </li>
+    );
+  });
+
+  return (
+    <section className="panel workflow-guide-panel">
+      <h3><Icon name="route" />Tiến độ hiện tại</h3>
+      <p className="muted-copy">
+        Đang ở bước <strong>{currentStep + 1}. {steps[currentStep]?.label}</strong>.
+        {currentStep === 2
+          ? " Ghi nhận phụ tùng thay thế hoặc hoàn tất sửa chữa nếu không dùng phụ tùng."
+          : currentStep === 1
+            ? " Liên hệ KH: lưu kết quả hoặc bấm Tiếp tục không gọi."
+            : " Hoàn thành từng bước theo thứ tự."}
+      </p>
+      <ul className="workflow-checklist">{checklist}</ul>
+    </section>
+  );
+}
+
+function CollapsibleInfoList({ job }) {
+  const [open, setOpen] = useState(job.status !== "IN_PROGRESS");
   const items = [
     ["person", "Khách hàng", job.customer],
     ["call", "Số điện thoại", job.phone],
@@ -137,20 +189,25 @@ function InfoList({ job }) {
   ];
 
   return (
-    <section className="panel wide-panel">
-      <h3>
-        <Icon name="fact_check" />
-        Phiếu công việc
-      </h3>
-      <div className="detail-list">
-        {items.map(([icon, label, value]) => (
-          <div className="detail-item" key={label}>
-            <Icon name={icon} />
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
-      </div>
+    <section className="panel wide-panel job-info-panel">
+      <button className="job-info-toggle" onClick={() => setOpen((value) => !value)} type="button">
+        <h3>
+          <Icon name="fact_check" />
+          Phiếu công việc
+        </h3>
+        <Icon name={open ? "expand_less" : "expand_more"} />
+      </button>
+      {open && (
+        <div className="detail-list">
+          {items.map(([icon, label, value]) => (
+            <div className="detail-item" key={label}>
+              <Icon name={icon} />
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -228,14 +285,14 @@ function ActionRail({ job, onChanged }) {
       await acknowledgeStaffAppointment(routeId);
       await onChanged?.();
     } catch (err) {
-      setError(err.message || "Khong the xac nhan nhan viec.");
+      setError(err.message || "Không thể xác nhận nhận việc.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleNoShow = async () => {
-    const notes = window.prompt("Ghi chu khach khong den", "Khach khong den theo lich hen.");
+    const notes = window.prompt("Ghi chú khách không đến", "Khách không đến theo lịch hẹn.");
     if (notes === null) return;
     setIsSubmitting(true);
     setError("");
@@ -243,7 +300,7 @@ function ActionRail({ job, onChanged }) {
       await markStaffAppointmentNoShow(routeId, { notes });
       await onChanged?.();
     } catch (err) {
-      setError(err.message || "Khong the ghi nhan no-show.");
+      setError(err.message || "Không thể ghi nhận khách không đến.");
     } finally {
       setIsSubmitting(false);
     }
@@ -259,15 +316,15 @@ function ActionRail({ job, onChanged }) {
         <div className="action-stack">
           <button className="secondary-button full" disabled={!canAcknowledge || isSubmitting} onClick={handleAcknowledge} type="button">
             <Icon name="done_all" />
-            Xac nhan nhan viec
+            Xác nhận nhận việc
           </button>
           <Link className={`primary-button full ${!canStart ? "disabled-link" : ""}`} to={canStart ? `/staff/jobs/${routeId}/start` : `/staff/jobs/${routeId}`}>
             <Icon name="play_circle" />
             Bắt đầu công việc
           </Link>
-          <Link className={`secondary-button full ${!canUseMaterial ? "disabled-link" : ""}`} to={canUseMaterial ? `/staff/jobs/${routeId}/materials` : `/staff/jobs/${routeId}`}>
-            <Icon name="inventory_2" />
-            Thêm vật tư
+          <Link className={`secondary-button full ${!canUseMaterial ? "disabled-link" : ""}`} to={`/staff/jobs/${routeId}`}>
+            <Icon name="build" />
+            Mở phiếu sửa chữa
           </Link>
           <Link className={`primary-button success full ${!canComplete ? "disabled-link" : ""}`} to={canComplete ? `/staff/jobs/${routeId}/complete` : `/staff/jobs/${routeId}`}>
             <Icon name="task_alt" />
@@ -291,7 +348,7 @@ function ActionRail({ job, onChanged }) {
   );
 }
 
-function MaterialUsageList({ transactions }) {
+function MaterialUsageList({ transactions, canRevert = false, onRevert, revertingId = "" }) {
   if (!transactions.length) {
     return (
       <div className="state-box">
@@ -307,6 +364,7 @@ function MaterialUsageList({ transactions }) {
     <div className="usage-list">
       {transactions.map((transaction) => {
         const item = transaction.inventory_item_id || {};
+        const isReverting = revertingId === transaction._id;
         return (
           <div className="usage-item" key={transaction._id}>
             <div>
@@ -314,7 +372,19 @@ function MaterialUsageList({ transactions }) {
               <span>{item.item_code || transaction._id}</span>
             </div>
             <p>{Math.abs(transaction.quantity_change)} {item.unit || ""}</p>
-            <b>{formatCurrency(transaction.total_cost || 0)}</b>
+            <div className="usage-item-actions">
+              <b>{formatCurrency(transaction.total_cost || 0)}</b>
+              {canRevert && (
+                <button
+                  className="text-button usage-undo-btn"
+                  disabled={Boolean(revertingId)}
+                  onClick={() => onRevert?.(transaction._id)}
+                  type="button"
+                >
+                  {isReverting ? "Đang hoàn..." : "Hoàn tác"}
+                </button>
+              )}
+            </div>
           </div>
         );
       })}
@@ -331,22 +401,30 @@ export default function StaffJobDetail() {
 
   return (
     <>
-      <PageHeader title="Chi tiết công việc" subtitle="Thông tin khách, xe, dịch vụ và thao tác trong ca" />
+      <PageHeader title="Chi tiết công việc" subtitle="Thông tin khách, xe, dịch vụ và quy trình xử lý đơn" />
       <JobPageState error={error} isLoading={isLoading} onRetry={reload} />
       {job && (
         <>
-          <JobSummary job={job} />
-          <div className="page-grid">
+          <JobSummary compact={job.status === "IN_PROGRESS"} job={job} />
+          <div className={`page-grid job-detail-grid ${job.status === "IN_PROGRESS" ? "job-detail-focused" : ""}`}>
             <div className="detail-main-stack">
-              <InfoList job={job} />
-              <WorkflowStepper job={job} onChanged={reload} />
+              {job.status === "IN_PROGRESS" ? (
+                <>
+                  <WorkflowStepper job={job} onChanged={reload} />
+                  <CollapsibleInfoList job={job} />
+                </>
+              ) : (
+                <>
+                  <CollapsibleInfoList job={job} />
+                  <WorkflowStepper job={job} onChanged={reload} />
+                </>
+              )}
             </div>
-            <aside className="side-column">
-              <section className="panel">
-                <h3><Icon name="assignment" />Thong tin cong viec</h3>
-                <p className="muted-copy">Thuc hien cac buoc theo thu tu de luu day du ket qua kiem tra, lien he, vat tu va thanh toan.</p>
-              </section>
-            </aside>
+            {job.status !== "IN_PROGRESS" && (
+              <aside className="side-column">
+                <WorkflowGuide job={job} />
+              </aside>
+            )}
           </div>
         </>
       )}
@@ -373,8 +451,8 @@ export function StaffJobStart() {
     if (!canStartJob(job)) {
       setSubmitError(
         hasFullJobAssignment(job)
-          ? "Chi co the bat dau cong viec da duoc giao."
-          : "Cong viec chua duoc phan cong day du ky thuat vien va ke sua chua."
+          ? "Chỉ có thể bắt đầu công việc đã được giao."
+          : "Công việc chưa được phân công kỹ thuật viên."
       );
       return;
     }
@@ -447,13 +525,14 @@ export function StaffJobMaterials() {
   const [quantities, setQuantities] = useState({});
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [revertingId, setRevertingId] = useState("");
   const [materialsError, setMaterialsError] = useState("");
   const [message, setMessage] = useState("");
 
   const loadMaterials = async () => {
     if (!job) return;
     if (!canUseMaterials(job)) {
-      setMaterialsError("Chi co the ghi nhan vat tu khi cong viec dang lam.");
+      setMaterialsError("Chỉ có thể ghi nhận vật tư khi công việc đang làm.");
       setInventory([]);
       setTransactions([]);
       return;
@@ -493,7 +572,7 @@ export function StaffJobMaterials() {
     }
 
     if (!canUseMaterials(job)) {
-      setMaterialsError("Chi co the ghi nhan vat tu khi cong viec dang lam.");
+      setMaterialsError("Chỉ có thể ghi nhận vật tư khi công việc đang làm.");
       return;
     }
 
@@ -504,7 +583,7 @@ export function StaffJobMaterials() {
 
     if (overStockItem) {
       const source = inventory.find((item) => item._id === overStockItem.inventory_item_id);
-      setMaterialsError(`So luong ${source?.item_name || "vat tu"} phai la so nguyen va khong vuot qua ton kho hien co.`);
+      setMaterialsError(`Số lượng ${source?.item_name || "vật tư"} phải là số nguyên và không vượt quá tồn kho hiện có.`);
       return;
     }
 
@@ -522,6 +601,24 @@ export function StaffJobMaterials() {
     }
   };
 
+  const handleRevertMaterial = async (transactionId) => {
+    if (!window.confirm("Hoàn tác vật tư này và trả lại kho?")) return;
+
+    setMessage("");
+    setMaterialsError("");
+    setRevertingId(transactionId);
+    try {
+      await revertAppointmentMaterial(getJobRouteId(job), transactionId);
+      setMessage("Đã hoàn tác vật tư và hoàn kho.");
+      await loadMaterials();
+      await reload();
+    } catch (err) {
+      setMaterialsError(err.message || "Không thể hoàn tác vật tư.");
+    } finally {
+      setRevertingId("");
+    }
+  };
+
   return (
     <>
       <PageHeader title="Sử dụng vật tư" subtitle="Ghi nhận vật tư dùng cho từng lịch hẹn và cập nhật chi phí" />
@@ -536,10 +633,6 @@ export function StaffJobMaterials() {
                   <Icon name="inventory_2" />
                   Bảng vật tư
                 </h3>
-                <Link className="secondary-button" to="/staff/materials">
-                  <Icon name="warehouse" />
-                  Xem kho
-                </Link>
               </div>
 
               {materialsError && <p className="form-message error">{materialsError}</p>}
@@ -594,7 +687,12 @@ export function StaffJobMaterials() {
                 <Icon name="receipt_long" />
                 Vật tư đã dùng
               </h3>
-              <MaterialUsageList transactions={transactions} />
+              <MaterialUsageList
+                canRevert={canUseMaterials(job)}
+                onRevert={handleRevertMaterial}
+                revertingId={revertingId}
+                transactions={transactions}
+              />
             </section>
             <ActionRail job={job} onChanged={reload} />
           </div>
@@ -647,12 +745,12 @@ export function StaffJobComplete() {
 
     const durationValue = actualDuration === "" ? null : Number(actualDuration);
     if (durationValue !== null && (!Number.isInteger(durationValue) || durationValue < 1 || durationValue > 480)) {
-      setSubmitError("Thoi gian thuc te phai la so nguyen tu 1 den 480 phut.");
+      setSubmitError("Thời gian thực tế phải là số nguyên từ 1 đến 480 phút.");
       return;
     }
 
     if (!notes.trim()) {
-      setSubmitError("Vui long nhap mo ta cong viec da thuc hien.");
+      setSubmitError("Vui lòng nhập mô tả công việc đã thực hiện.");
       return;
     }
 

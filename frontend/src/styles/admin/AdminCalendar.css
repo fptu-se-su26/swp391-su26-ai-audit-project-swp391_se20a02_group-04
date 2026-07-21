@@ -434,7 +434,7 @@
 
 .table-header {
   display: grid;
-  grid-template-columns: 0.82fr 2.25fr 1fr 1.05fr 1.05fr 0.8fr;
+  grid-template-columns: 2.4fr 1fr 1.05fr 1.05fr 0.85fr;
   gap: 14px;
   align-items: center;
   padding: 28px;
@@ -453,7 +453,7 @@
 
 .table-row {
   display: grid;
-  grid-template-columns: 0.82fr 2.25fr 1fr 1.05fr 1.05fr 0.8fr;
+  grid-template-columns: 2.4fr 1fr 1.05fr 1.05fr 0.85fr;
   gap: 14px;
   align-items: center;
   padding: 14px 18px;
@@ -515,12 +515,6 @@
 
 .table-row:last-child {
   border-bottom: 0;
-}
-
-.col-id {
-  color: var(--manager-muted);
-  font-size: 13px;
-  font-weight: 900;
 }
 
 .service-name-row {
@@ -701,7 +695,7 @@
 
   .table-header,
   .table-row {
-    grid-template-columns: 0.9fr 2fr 1fr 1fr;
+    grid-template-columns: 2.2fr 1fr 0.9fr;
   }
 
   .col-bay,

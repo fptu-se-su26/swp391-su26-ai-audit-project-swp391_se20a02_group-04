@@ -11,7 +11,6 @@ import {
   Bell,
   Settings,
   Check,
-  Layers,
   Boxes,
   LogOut,
   User,
@@ -29,7 +28,6 @@ import { getNotifications, markAsRead as markNotificationAsRead, markAllAsRead a
 import ManagerDashboard from "./ManagerDashboard";
 import AppointmentDetailPage from "./AppointmentDetailPage";
 import ManagerStaff from "./ManagerStaff";
-import ManagerWarehouse from "./ManagerWarehouse";
 import ManagerProfile from "./ManagerProfile";
 import ManagerRevenue from "./ManagerRevenue";
 import ManagerCustomers from "./ManagerCustomers";
@@ -157,7 +155,6 @@ const MANAGER_TABS = new Set([
   "appointment-detail",
   "staff",
   "inventory",
-  "warehouse",
   "revenue",
   "profile",
   "customers"
@@ -169,8 +166,6 @@ function getManagerTabFromPath(pathname) {
   if (pathname.startsWith("/manager/appointment-detail")) return "appointment-detail";
   if (pathname.startsWith("/manager/staff")) return "staff";
   if (pathname.startsWith("/manager/inventory")) return "inventory";
-  if (pathname.startsWith("/manager/repair-bays")) return "warehouse";
-  if (pathname.startsWith("/manager/warehouse")) return "warehouse";
   if (pathname.startsWith("/manager/revenue")) return "revenue";
   if (pathname.startsWith("/manager/profile")) return "profile";
   if (pathname.startsWith("/manager/customers")) return "customers";
@@ -183,7 +178,6 @@ function getManagerPathFromTab(tabName) {
   if (tabName === "appointment-detail") return "/manager/appointment-detail";
   if (tabName === "staff") return "/manager/staff";
   if (tabName === "inventory") return "/manager/inventory";
-  if (tabName === "warehouse") return "/manager/repair-bays/diagram";
   if (tabName === "revenue") return "/manager/revenue";
   if (tabName === "profile") return "/manager/profile";
   if (tabName === "customers") return "/manager/customers";
@@ -277,7 +271,6 @@ const ManagerLayout = () => {
       case "appointment-detail": return "Chi tiết Lịch hẹn";
       case "staff": return "Quản lý Nhân viên";
       case "inventory": return "Kho vật tư";
-      case "warehouse": return "Sơ đồ kệ";
       case "revenue": return "Báo cáo Doanh thu";
       case "profile": return "Hồ sơ cá nhân";
       case "customers": return "Thông tin Khách hàng";
@@ -617,8 +610,6 @@ const ManagerLayout = () => {
         return <ManagerStaff />;
       case "inventory":
         return <InventoryModule basePath="/manager/inventory" />;
-      case "warehouse":
-        return <ManagerWarehouse bays={bays} />;
       case "revenue":
         return <ManagerRevenue appointments={appointments} />;
       case "profile":
@@ -630,6 +621,13 @@ const ManagerLayout = () => {
         return <ManagerDashboard bays={bays} technicians={technicians} appointments={appointments} refreshData={loadManagerData} />;
     }
   };
+
+  if (
+    location.pathname.startsWith("/manager/repair-bays") ||
+    location.pathname.startsWith("/manager/warehouse")
+  ) {
+    return <Navigate to="/manager/dashboard" replace />;
+  }
 
   if (!MANAGER_TABS.has(currentTab)) {
     return <Navigate to="/manager/dashboard" replace />;
@@ -776,14 +774,6 @@ const ManagerLayout = () => {
             >
               <Boxes className="nav-icon" />
               <span>Kho</span>
-            </a>
-            <a
-              href="#"
-              className={`nav-item ${currentTab === "warehouse" ? "active" : ""}`}
-              onClick={(e) => { e.preventDefault(); handleTabChange("warehouse"); }}
-            >
-              <Layers className="nav-icon" />
-              <span>Sơ đồ kệ</span>
             </a>
             <a
               href="#"

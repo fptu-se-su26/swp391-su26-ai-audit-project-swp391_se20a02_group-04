@@ -1,13 +1,8 @@
 import React, { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { clearAuthSession, getAuthSession } from "../../services/authApi";
-import {
-  checkInStaff,
-  checkOutStaff,
-  getTodayAttendance,
-  saveStaffAppointmentNote,
-} from "../../services/staffAppointmentApi";
-import { canCompleteJob, canStartJob, canUseMaterials, formatAssignedAt, getJobRouteId } from "./staffAppointmentMapper";
+import { saveStaffAppointmentNote } from "../../services/staffAppointmentApi";
+import { canCompleteJob, canStartJob, canUseMaterials, getJobRouteId } from "./staffAppointmentMapper";
 
 export function Icon({ name, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -20,7 +15,6 @@ export function Sidebar() {
     { icon: "dashboard", label: "Tổng quan", to: "/staff/dashboard" },
     { icon: "calendar_month", label: "Lịch làm việc", to: "/staff/schedule" },
     { icon: "assignment", label: "Công việc được giao", to: "/staff/jobs" },
-    { icon: "inventory_2", label: "Sử dụng vật tư", to: "/staff/materials" },
     { icon: "schedule", label: "Chấm công", to: "/staff/attendance" },
     { icon: "person", label: "Hồ sơ", to: "/staff/profile" },
   ];
@@ -73,82 +67,13 @@ export function Sidebar() {
   );
 }
 
-export function PageHeader({ title, subtitle, actions = true }) {
-  const [attendance, setAttendance] = useState(null);
-  const [loadingAttendance, setLoadingAttendance] = useState(false);
-  const [attendanceMessage, setAttendanceMessage] = useState("");
-
-  React.useEffect(() => {
-    if (!actions) return undefined;
-    let mounted = true;
-    setLoadingAttendance(true);
-    getTodayAttendance()
-      .then((response) => mounted && setAttendance(response.data?.attendance || null))
-      .catch(() => mounted && setAttendance(null))
-      .finally(() => mounted && setLoadingAttendance(false));
-    return () => { mounted = false; };
-  }, [actions]);
-
-  const refreshAttendance = async () => {
-    const response = await getTodayAttendance();
-    setAttendance(response.data?.attendance || null);
-  };
-
-  const handleCheckIn = async () => {
-    setLoadingAttendance(true);
-    setAttendanceMessage("");
-    try {
-      const response = await checkInStaff("");
-      setAttendance(response.data?.attendance || null);
-      setAttendanceMessage("Da vao ca.");
-    } catch (error) {
-      if (/409|already|da/i.test(error.message || "")) await refreshAttendance().catch(() => {});
-      else setAttendanceMessage(error.message || "Khong the vao ca.");
-    } finally {
-      setLoadingAttendance(false);
-    }
-  };
-
-  const handleCheckOut = async () => {
-    if (!window.confirm("Xac nhan ket thuc ca lam?")) return;
-    setLoadingAttendance(true);
-    setAttendanceMessage("");
-    try {
-      const response = await checkOutStaff("");
-      setAttendance(response.data?.attendance || null);
-      setAttendanceMessage("Da ket thuc ca.");
-    } catch (error) {
-      setAttendanceMessage(error.message || "Khong the ket thuc ca.");
-      await refreshAttendance().catch(() => {});
-    } finally {
-      setLoadingAttendance(false);
-    }
-  };
-
-  const inShift = ["IN_SHIFT", "CHECKED_IN"].includes(attendance?.status);
-
+export function PageHeader({ title, subtitle }) {
   return (
     <header className="topbar">
       <div>
         <h2>{title}</h2>
         <p>{subtitle}</p>
-        {attendanceMessage && <small className="staff-header-message">{attendanceMessage}</small>}
       </div>
-      {actions && (
-        <div className="topbar-actions">
-          {inShift ? (
-            <button className="secondary-button large" disabled={loadingAttendance} onClick={handleCheckOut} type="button">
-              <Icon name="logout" />
-              Ket thuc ca
-            </button>
-          ) : (
-            <button className="primary-button large" disabled={loadingAttendance} onClick={handleCheckIn} type="button">
-              <Icon name="login" />
-              Vao ca
-            </button>
-          )}
-        </div>
-      )}
     </header>
   );
 }
@@ -183,39 +108,51 @@ function buildPrimaryJobAction(job) {
 function buildSecondaryJobAction(job) {
   const routeId = getJobRouteId(job);
 
-  if (canUseMaterials(job)) {
-    return { label: "Thêm vật tư", to: `/staff/jobs/${routeId}/materials` };
+  if (canUseMaterials(job) || job.statusKey === "in_progress") {
+    return { label: "Mở phiếu", to: `/staff/jobs/${routeId}` };
   }
 
   return null;
 }
 
+function getJobCardBorderClass(job = {}) {
+  if (job.statusKey === "assigned") return "job-card-assigned";
+  if (job.statusKey === "in_progress") return "job-card-in-progress";
+  if (job.statusKey === "completed") return "job-card-completed";
+  return "";
+}
+
 export function JobCard({ job, compact = false }) {
+  const routeId = getJobRouteId(job);
+  const detailUrl = `/staff/jobs/${routeId}`;
   const primaryAction = buildPrimaryJobAction(job);
   const secondaryAction = buildSecondaryJobAction(job);
+  const borderClass = getJobCardBorderClass(job);
 
   return (
-    <article className={`job-card ${compact ? "compact-card" : ""}`}>
-      <div className="job-card-head">
-        <div>
-          <h4>
-            {job.vehicle} - {job.plate}
-          </h4>
-          <span>#{job.code || job.id}</span>
+    <article className={`job-card ${compact ? "compact-card" : ""} ${borderClass}`}>
+      <Link className="job-card-body" to={detailUrl}>
+        <div className="job-card-head">
+          <div>
+            <h4>
+              {job.vehicle} - {job.plate}
+            </h4>
+            <span>#{job.code || job.id}</span>
+          </div>
+          <span className={`status-pill ${job.statusClass}`}>{job.statusLabel || job.status}</span>
         </div>
-        <span className={`status-pill ${job.statusClass}`}>{job.statusLabel || job.status}</span>
-      </div>
 
-      <div className="job-info">
-        <div>
-          <Icon name="schedule" />
-          <span>{job.time} - {formatAssignedAt(job.assignedAt)}</span>
+        <div className="job-info">
+          <div>
+            <Icon name="schedule" />
+            <span>{job.time}{job.estimate ? ` · ${job.estimate}` : ""}</span>
+          </div>
+          <div>
+            <Icon name={job.serviceIcon} />
+            <span>{job.service}</span>
+          </div>
         </div>
-        <div>
-          <Icon name={job.serviceIcon} />
-          <span>{job.service}</span>
-        </div>
-      </div>
+      </Link>
 
       <div className="job-actions">
         {secondaryAction && (
@@ -251,8 +188,8 @@ export function InventoryAlert({ item }) {
         <Icon name="warehouse" />
         Còn {currentQuantity} {unit}, ngưỡng tối thiểu {threshold} {unit}
       </p>
-      <Link className={urgent ? "primary-button full" : "secondary-button full"} to="/staff/materials">
-        {urgent ? "Báo quản lý" : "Xem tồn kho"}
+      <Link className={urgent ? "primary-button full" : "secondary-button full"} to="/staff/jobs">
+        Xem công việc
       </Link>
     </article>
   );
@@ -323,7 +260,7 @@ export function ShiftSummary({ attendanceSummary, todayAttendance }) {
 
   return (
     <section className="shift-panel">
-      <h3>Thống kê ca làm</h3>
+      <h3>Chấm công hôm nay</h3>
       {activeShift ? (
         <>
           <div className="mini-stats">
@@ -347,8 +284,12 @@ export function ShiftSummary({ attendanceSummary, todayAttendance }) {
       ) : (
         <div className="state-box">
           <div>
-            <strong>Chưa vào ca</strong>
-            <p>Bấm Vào ca ở trang chấm công để bắt đầu ghi nhận thời gian làm việc.</p>
+            <strong>Chưa chấm công hôm nay</strong>
+            <p>Chấm công (check-in/check-out) tách riêng với xử lý đơn sửa xe.</p>
+            <Link className="secondary-button full" to="/staff/attendance">
+              <Icon name="schedule" />
+              Đi tới trang chấm công
+            </Link>
           </div>
         </div>
       )}
@@ -373,23 +314,23 @@ export function QuickNote({ job, onSaved }) {
     setError("");
 
     if (!job) {
-      setError("Chua co cong viec de ghi chu.");
+      setError("Chưa có công việc để ghi chú.");
       return;
     }
 
     if (!note.trim()) {
-      setError("Vui long nhap ghi chu truoc khi luu.");
+      setError("Vui lòng nhập ghi chú trước khi lưu.");
       return;
     }
 
     setSaving(true);
     try {
       await saveStaffAppointmentNote(getJobRouteId(job), note.trim());
-      setMessage("Da luu ghi chu ky thuat.");
+      setMessage("Đã lưu ghi chú kỹ thuật.");
       onSaved?.();
       window.setTimeout(() => setMessage(""), 2200);
     } catch (err) {
-      setError(err.message || "Khong the luu ghi chu.");
+      setError(err.message || "Không thể lưu ghi chú.");
     } finally {
       setSaving(false);
     }
@@ -399,20 +340,24 @@ export function QuickNote({ job, onSaved }) {
     <section className="panel">
       <h3>
         <Icon name="edit_note" />
-        Ghi chu ky thuat
+        Ghi chú kỹ thuật
       </h3>
-      <label htmlFor="technical-note">Ghi chu nhanh</label>
+      <label htmlFor="technical-note">Ghi chú nhanh</label>
       <textarea
         disabled={!job || saving}
         id="technical-note"
         onChange={(event) => setNote(event.target.value)}
-        placeholder={job ? "Nhap tinh trang xe, khuyen nghi thay the hoac luu y cho quan ly..." : "Chua co cong viec dang lam hoac duoc giao."}
+        placeholder={
+          job
+            ? "Nhập tình trạng xe, khuyến nghị thay thế hoặc lưu ý cho quản lý..."
+            : "Chưa có công việc đang làm hoặc được giao."
+        }
         value={note}
       />
       {message && <p className="form-message success">{message}</p>}
       {error && <p className="form-message error">{error}</p>}
       <button className="dark-button full" disabled={!job || saving} onClick={handleSave} type="button">
-        {saving ? "Dang luu..." : "Luu ghi chu"}
+        {saving ? "Đang lưu..." : "Lưu ghi chú"}
       </button>
     </section>
   );

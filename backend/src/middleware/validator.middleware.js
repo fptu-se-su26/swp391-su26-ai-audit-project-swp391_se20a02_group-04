@@ -493,6 +493,20 @@ const cancelAppointmentValidation = [
 ];
 
 /**
+ * Validation rules for customer appointment review
+ */
+const reviewAppointmentValidation = [
+  body('rating')
+    .notEmpty().withMessage('Rating is required')
+    .isInt({ min: 1, max: 5 }).withMessage('Rating must be an integer from 1 to 5'),
+  body('comment')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isString().withMessage('Comment must be a string')
+    .isLength({ max: 1000 }).withMessage('Comment must not exceed 1000 characters')
+];
+
+/**
  * Middleware to handle validation results
  */
 const validate = (req, res, next) => {
@@ -525,6 +539,7 @@ module.exports = {
   listCustomerAppointmentsValidation,
   appointmentIdValidation,
   cancelAppointmentValidation,
+  reviewAppointmentValidation,
   validateAllowedBodyFields,
   validateAllowedQueryFields,
   validate

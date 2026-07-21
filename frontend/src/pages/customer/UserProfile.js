@@ -4,6 +4,7 @@ import {
   cancelAppointment,
   getMyAppointmentById,
   getMyAppointments,
+  reviewAppointment,
 } from "../../services/appointmentApi";
 import { clearAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
@@ -92,6 +93,23 @@ function getStatusLabel(status) {
   return labels[status] || status || "Chưa rõ";
 }
 
+const APPOINTMENT_STATUS_FILTERS = [
+  { value: "ALL", label: "Tất cả" },
+  { value: "PENDING", label: "Chờ xác nhận" },
+  { value: "CONFIRMED", label: "Đã xác nhận" },
+  { value: "IN_PROGRESS", label: "Đang xử lý" },
+  { value: "COMPLETED", label: "Hoàn thành" },
+  { value: "PAID", label: "Đã thanh toán" },
+  { value: "CANCELLED", label: "Đã hủy" },
+];
+
+function matchesAppointmentStatusFilter(status, filter) {
+  if (filter === "ALL") return true;
+  if (filter === "COMPLETED") return status === "COMPLETED" || status === "PAID";
+  if (filter === "CANCELLED") return status === "CANCELLED" || status === "REJECTED" || status === "NO_SHOW";
+  return status === filter;
+}
+
 function getStatusClass(status) {
   const classes = {
     PENDING: "pending",
@@ -105,6 +123,16 @@ function getStatusClass(status) {
   };
 
   return classes[status] || "pending";
+}
+
+function canReviewAppointment(appointment) {
+  if (!appointment) return false;
+  if (!["COMPLETED", "PAID"].includes(appointment.status)) return false;
+  return !(Number(appointment.review?.rating) >= 1);
+}
+
+function hasAppointmentReview(appointment) {
+  return Number(appointment?.review?.rating) >= 1;
 }
 
 function getAppointmentCode(appointment) {
@@ -228,11 +256,46 @@ export default function UserProfile() {
   const [appointments, setAppointments] = useState(fallbackAppointments);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [appointmentView, setAppointmentView] = useState("list");
+  const [appointmentStatusFilter, setAppointmentStatusFilter] = useState("ALL");
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewHover, setReviewHover] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const activeTabLabel = useMemo(
     () => tabs.find((tab) => tab.id === activeTab)?.label || "Thông tin",
     [activeTab]
   );
+
+  const appointmentFilterCounts = useMemo(() => {
+    const counts = { ALL: appointments.length };
+    APPOINTMENT_STATUS_FILTERS.forEach((filter) => {
+      if (filter.value === "ALL") return;
+      counts[filter.value] = appointments.filter((item) =>
+        matchesAppointmentStatusFilter(item.status, filter.value)
+      ).length;
+    });
+    return counts;
+  }, [appointments]);
+
+  const filteredAppointments = useMemo(
+    () =>
+      appointments.filter((item) =>
+        matchesAppointmentStatusFilter(item.status, appointmentStatusFilter)
+      ),
+    [appointments, appointmentStatusFilter]
+  );
+
+  useEffect(() => {
+    if (!selectedAppointment) return;
+    const stillVisible = filteredAppointments.some(
+      (item) => item._id === selectedAppointment._id || item.appointment_code === selectedAppointment.appointment_code
+    );
+    if (!stillVisible) {
+      setSelectedAppointment(null);
+      setAppointmentView("list");
+    }
+  }, [filteredAppointments, selectedAppointment]);
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get("tab");
@@ -449,6 +512,9 @@ export default function UserProfile() {
   const handleSelectAppointment = async (appointment) => {
     setSelectedAppointment(appointment);
     setAppointmentView("detail");
+    setReviewRating(Number(appointment?.review?.rating) || 0);
+    setReviewHover(0);
+    setReviewComment(appointment?.review?.comment || "");
 
     if (!appointment?._id || appointment._id.startsWith("demo-")) {
       return;
@@ -458,12 +524,75 @@ export default function UserProfile() {
     try {
       const res = await getMyAppointmentById(appointment._id);
       if (res.data?.appointment) {
-        setSelectedAppointment(res.data.appointment);
+        const detail = res.data.appointment;
+        setSelectedAppointment(detail);
+        setReviewRating(Number(detail.review?.rating) || 0);
+        setReviewComment(detail.review?.comment || "");
       }
     } catch (err) {
       showToast(err.message || "Không thể tải chi tiết lịch hẹn.", "error");
     } finally {
       setIsAppointmentDetailLoading(false);
+    }
+  };
+
+  const applyReviewedAppointment = (reviewedAppointment) => {
+    setAppointments((prev) =>
+      prev.map((item) =>
+        item._id === reviewedAppointment._id || item.appointment_code === reviewedAppointment.appointment_code
+          ? { ...item, ...reviewedAppointment }
+          : item
+      )
+    );
+    setSelectedAppointment((prev) =>
+      prev && (prev._id === reviewedAppointment._id || prev.appointment_code === reviewedAppointment.appointment_code)
+        ? { ...prev, ...reviewedAppointment }
+        : prev
+    );
+  };
+
+  const handleSubmitReview = async (event) => {
+    event.preventDefault();
+    if (!selectedAppointment) return;
+
+    if (!canReviewAppointment(selectedAppointment)) {
+      showToast("Chỉ đánh giá được sau khi đơn hoàn thành và chưa đánh giá trước đó.", "error");
+      return;
+    }
+
+    if (reviewRating < 1 || reviewRating > 5) {
+      showToast("Vui lòng chọn số sao từ 1 đến 5.", "error");
+      return;
+    }
+
+    if (!selectedAppointment._id || selectedAppointment._id.startsWith("demo-")) {
+      const demoReview = {
+        ...selectedAppointment,
+        review: {
+          rating: reviewRating,
+          comment: reviewComment.trim() || null,
+          created_at: new Date().toISOString(),
+        },
+      };
+      applyReviewedAppointment(demoReview);
+      showToast("Đã gửi đánh giá dịch vụ (demo).");
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    try {
+      const res = await reviewAppointment(selectedAppointment._id, {
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+      });
+      if (res.data?.appointment) {
+        applyReviewedAppointment(res.data.appointment);
+      }
+      showToast("Cảm ơn bạn đã đánh giá dịch vụ.");
+    } catch (err) {
+      showToast(err.message || "Không thể gửi đánh giá.", "error");
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -750,14 +879,39 @@ export default function UserProfile() {
                         {isAppointmentsLoading && <span>Đang tải...</span>}
                       </div>
 
+                      <div className="appointment-status-filters" role="tablist" aria-label="Lọc theo trạng thái">
+                        {APPOINTMENT_STATUS_FILTERS.map((filter) => {
+                          const count = appointmentFilterCounts[filter.value] ?? 0;
+                          if (filter.value !== "ALL" && count === 0) return null;
+                          return (
+                            <button
+                              aria-selected={appointmentStatusFilter === filter.value}
+                              className={`appointment-filter-chip ${appointmentStatusFilter === filter.value ? "active" : ""}`}
+                              key={filter.value}
+                              onClick={() => setAppointmentStatusFilter(filter.value)}
+                              type="button"
+                            >
+                              {filter.label}
+                              <em>{count}</em>
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       {appointments.length === 0 ? (
                         <div className="appointment-empty-state">
                           <MaterialIcon>event_busy</MaterialIcon>
                           <strong>Chưa có lịch hẹn</strong>
                           <span>Bạn có thể đặt lịch mới để garage chuẩn bị dịch vụ trước.</span>
                         </div>
+                      ) : filteredAppointments.length === 0 ? (
+                        <div className="appointment-empty-state">
+                          <MaterialIcon>filter_alt_off</MaterialIcon>
+                          <strong>Không có lịch phù hợp</strong>
+                          <span>Không có đơn nào ở trạng thái đã chọn. Thử bộ lọc khác.</span>
+                        </div>
                       ) : (
-                        appointments.map((appointment) => (
+                        filteredAppointments.map((appointment) => (
                           <button
                             className={`appointment-row ${selectedAppointment?._id === appointment._id ? "active" : ""}`}
                             key={appointment._id || appointment.appointment_code}
@@ -788,8 +942,13 @@ export default function UserProfile() {
                                   <small>Thời gian hẹn</small>
                                   <strong>{formatAppointmentTime(appointment)}</strong>
                                 </span>
-                             
                               </span>
+                              {hasAppointmentReview(appointment) && (
+                                <span className="appointment-reviewed-tag">
+                                  <MaterialIcon>star</MaterialIcon>
+                                  Đã đánh giá {appointment.review.rating}/5
+                                </span>
+                              )}
                             </span>
                           </button>
                         ))
@@ -873,6 +1032,74 @@ export default function UserProfile() {
                                 <span>{isSaving ? "Đang hủy..." : "Hủy lịch hẹn"}</span>
                               </button>
                             </div>
+                          )}
+
+                          {(canReviewAppointment(selectedAppointment) || hasAppointmentReview(selectedAppointment)) && (
+                            <section className="appointment-review-panel">
+                              <div className="appointment-review-heading">
+                                <MaterialIcon>star</MaterialIcon>
+                                <div>
+                                  <h4>{hasAppointmentReview(selectedAppointment) ? "Đánh giá của bạn" : "Đánh giá dịch vụ"}</h4>
+                                  <p>
+                                    {hasAppointmentReview(selectedAppointment)
+                                      ? "Cảm ơn bạn đã góp ý cho garage."
+                                      : "Chỉ mở sau khi đơn hoàn thành. Chọn số sao và gửi nhận xét."}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {hasAppointmentReview(selectedAppointment) ? (
+                                <div className="appointment-review-readonly">
+                                  <div className="appointment-star-row" aria-label={`${selectedAppointment.review.rating} sao`}>
+                                    {[1, 2, 3, 4, 5].map((value) => (
+                                      <MaterialIcon
+                                        key={value}
+                                        className={value <= selectedAppointment.review.rating ? "filled" : ""}
+                                      >
+                                        star
+                                      </MaterialIcon>
+                                    ))}
+                                  </div>
+                                  <p>{selectedAppointment.review.comment || "Không có nhận xét thêm."}</p>
+                                </div>
+                              ) : (
+                                <form className="appointment-review-form" onSubmit={handleSubmitReview}>
+                                  <div className="appointment-star-row" role="radiogroup" aria-label="Chọn số sao">
+                                    {[1, 2, 3, 4, 5].map((value) => {
+                                      const active = value <= (reviewHover || reviewRating);
+                                      return (
+                                        <button
+                                          aria-checked={reviewRating === value}
+                                          aria-label={`${value} sao`}
+                                          className={`appointment-star-button ${active ? "active" : ""}`}
+                                          key={value}
+                                          onClick={() => setReviewRating(value)}
+                                          onMouseEnter={() => setReviewHover(value)}
+                                          onMouseLeave={() => setReviewHover(0)}
+                                          role="radio"
+                                          type="button"
+                                        >
+                                          <MaterialIcon>star</MaterialIcon>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <label htmlFor="appointment-review-comment">Nhận xét (tuỳ chọn)</label>
+                                  <textarea
+                                    id="appointment-review-comment"
+                                    maxLength={1000}
+                                    onChange={(event) => setReviewComment(event.target.value)}
+                                    placeholder="Chất lượng sửa chữa, thái độ nhân viên, thời gian chờ..."
+                                    rows={3}
+                                    value={reviewComment}
+                                  />
+                                  <button className="appointment-review-submit" disabled={isSubmittingReview} type="submit">
+                                    <MaterialIcon>rate_review</MaterialIcon>
+                                    <span>{isSubmittingReview ? "Đang gửi..." : "Gửi đánh giá"}</span>
+                                  </button>
+                                </form>
+                              )}
+                            </section>
                           )}
                         </>
                       ) : (

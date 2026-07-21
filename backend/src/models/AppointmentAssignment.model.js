@@ -15,7 +15,7 @@ const appointmentAssignmentSchema = new mongoose.Schema({
   repair_bay_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'RepairBay',
-    required: [true, 'Repair bay ID is required']
+    default: null
   },
   assigned_by: {
     type: mongoose.Schema.Types.ObjectId,

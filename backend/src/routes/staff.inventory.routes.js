@@ -73,4 +73,13 @@ router.post('/appointments/:id/materials',
   staffInventoryController.useAppointmentMaterials
 );
 
+router.post('/appointments/:id/materials/:transactionId/revert',
+  authenticate,
+  authorize('STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  param('transactionId').isMongoId().withMessage('Invalid transaction ID'),
+  validate,
+  staffInventoryController.revertAppointmentMaterial
+);
+
 module.exports = router;

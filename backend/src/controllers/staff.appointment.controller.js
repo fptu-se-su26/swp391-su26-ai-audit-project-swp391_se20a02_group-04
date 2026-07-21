@@ -45,7 +45,8 @@ const getBillDetails = async (appointment) => {
   const materials = await InventoryTransaction.find({
     reference_type: 'APPOINTMENT',
     reference_id: appointment._id,
-    transaction_type: 'STOCK_OUT'
+    transaction_type: 'STOCK_OUT',
+    is_reversed: { $ne: true }
   }).select('total_cost');
   const materialsTotal = materials.reduce((sum, transaction) => sum + Number(transaction.total_cost || 0), 0);
 
@@ -488,7 +489,9 @@ const getAppointmentById = async (req, res) => {
 
     const materials_used = await InventoryTransaction.find({
       reference_type: 'APPOINTMENT',
-      reference_id: appointment._id
+      reference_id: appointment._id,
+      transaction_type: 'STOCK_OUT',
+      is_reversed: { $ne: true }
     })
       .populate('inventory_item_id', 'item_code item_name unit unit_price quantity')
       .populate('performed_by', 'full_name email')
@@ -686,7 +689,7 @@ const startAppointment = async (req, res) => {
       return errorResponse(res, 400, 'Only confirmed appointments can be started');
     }
     if (!hasFullAssignment(appointment)) {
-      return errorResponse(res, 422, 'Appointment chưa được phân công đầy đủ kỹ thuật viên và kệ sửa chữa');
+      return errorResponse(res, 422, 'Appointment chưa được phân công kỹ thuật viên');
     }
 
     const oldStatus = appointment.status;
@@ -721,7 +724,7 @@ const completeAppointment = async (req, res) => {
       return errorResponse(res, 400, 'Only in-progress appointments can be completed');
     }
     if (!hasFullAssignment(appointment)) {
-      return errorResponse(res, 422, 'Appointment chưa được phân công đầy đủ kỹ thuật viên và kệ sửa chữa');
+      return errorResponse(res, 422, 'Appointment chưa được phân công kỹ thuật viên');
     }
 
     const now = new Date();
@@ -808,6 +811,37 @@ const saveContactLog = async (req, res) => {
   } catch (error) {
     console.error('Save appointment contact log error:', error);
     return errorResponse(res, 500, 'Failed to save customer contact result');
+  }
+};
+
+const saveRepairLog = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const access = ensureInProgressAppointment(appointment, req.user);
+    if (!access.ok) return errorResponse(res, access.statusCode, access.message);
+
+    appointment.repair_log = {
+      status: req.body.status,
+      notes: (req.body.notes || '').trim(),
+      completed_at: new Date()
+    };
+    await appointment.save();
+    await createAuditSafely(req, 'APPOINTMENT_REPAIR_LOG_SAVED', {
+      appointment_id: appointment._id,
+      status: appointment.repair_log.status
+    });
+
+    return successResponse(res, 200, 'Repair step saved successfully', {
+      appointment: {
+        _id: appointment._id,
+        repair_log: appointment.repair_log
+      }
+    });
+  } catch (error) {
+    console.error('Save appointment repair log error:', error);
+    return errorResponse(res, 500, 'Failed to save repair step');
   }
 };
 
@@ -1187,6 +1221,7 @@ module.exports = {
   addAppointmentNotes,
   saveDiagnosis,
   saveContactLog,
+  saveRepairLog,
   createPayment,
   getPaymentStatus,
   markNoShow,

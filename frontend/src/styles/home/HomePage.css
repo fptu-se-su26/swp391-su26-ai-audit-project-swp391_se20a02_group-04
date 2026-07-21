@@ -457,6 +457,124 @@
   align-items: start;
 }
 
+.home-reviews-section {
+  width: 100%;
+  max-width: none;
+  display: grid;
+  gap: 28px;
+  padding: 72px 0 80px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f3f4f5 0%, #f8f9fa 100%);
+}
+
+.home-reviews-header {
+  width: min(100%, 1440px);
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.home-reviews-header span {
+  display: inline-block;
+  color: var(--home-primary);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.home-reviews-header h2 {
+  margin: 10px 0 12px;
+  color: var(--home-ink);
+  font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.home-reviews-header p {
+  margin: 0;
+  color: var(--home-muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.home-reviews-marquee {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+}
+
+.home-reviews-track {
+  display: flex;
+  width: max-content;
+  gap: 18px;
+  padding: 8px 24px 16px;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+}
+
+.home-review-card {
+  flex: 0 0 320px;
+  display: grid;
+  gap: 14px;
+  min-height: 210px;
+  padding: 22px;
+  border: 1px solid rgba(226, 191, 176, 0.55);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(25, 28, 29, 0.05);
+}
+
+.home-review-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.home-review-stars .material-symbols-outlined {
+  color: #d6c3b8;
+  font-size: 20px;
+  font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 20;
+}
+
+.home-review-stars .material-symbols-outlined.filled {
+  color: #eab308;
+  font-variation-settings: "FILL" 1, "wght" 600, "GRAD" 0, "opsz" 20;
+}
+
+.home-review-card p {
+  margin: 0;
+  color: var(--home-ink);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.home-review-card p.home-review-no-comment {
+  color: var(--home-muted);
+  font-weight: 600;
+  font-style: italic;
+}
+
+.home-review-meta {
+  display: grid;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.home-review-meta strong {
+  color: var(--home-ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.home-review-meta span {
+  color: var(--home-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .contact-copy p {
   max-width: 560px;
   margin: 26px 0 38px;

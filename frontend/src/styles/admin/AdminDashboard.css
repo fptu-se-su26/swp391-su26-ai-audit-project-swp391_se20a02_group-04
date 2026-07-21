@@ -140,12 +140,12 @@
   color: var(--manager-primary);
 }
 
-.main-content {
+.dashboard-layout .main-content {
   min-width: 0;
   flex: 1;
 }
 
-.header {
+.dashboard-layout .header {
   position: sticky;
   top: 0;
   z-index: 10;
@@ -159,14 +159,14 @@
   backdrop-filter: blur(14px);
 }
 
-.header h2 {
+.dashboard-layout .header h2 {
   margin: 0;
   font-size: 24px;
   line-height: 1.1;
   letter-spacing: -0.03em;
 }
 
-.header-subtitle {
+.dashboard-layout .header-subtitle {
   display: inline-flex;
   margin-top: 6px;
   color: var(--manager-muted);

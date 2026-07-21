@@ -526,7 +526,7 @@ const assignAppointmentHandler = async (req, res) => {
       return errorResponse(res, 422, 'Appointment đã kết thúc, không thể phân công');
     }
 
-    const alreadyAssigned = Boolean(currentAppointment.assignment_id || currentAppointment.staff_id || currentAppointment.repair_bay_id);
+    const alreadyAssigned = Boolean(currentAppointment.assignment_id || currentAppointment.staff_id);
     if (alreadyAssigned && ['CONFIRMED', 'IN_PROGRESS'].includes(currentAppointment.status)) {
       if (currentAppointment.status === 'IN_PROGRESS' || force !== true) {
         return errorResponse(

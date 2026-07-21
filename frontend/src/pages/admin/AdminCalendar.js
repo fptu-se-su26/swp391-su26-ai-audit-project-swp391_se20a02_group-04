@@ -333,7 +333,6 @@ const AdminCalendar = ({ onViewChange, embedded = false }) => {
 
           <section className="appointment-table">
             <div className="table-header">
-              <div className="col-id">Mã lịch</div>
               <div className="col-info">Khách hàng và dịch vụ</div>
               <div className="col-time">Thời gian</div>
               <div className="col-bay">Kệ / ưu tiên</div>
@@ -348,7 +347,6 @@ const AdminCalendar = ({ onViewChange, embedded = false }) => {
 
               {filteredAppointments.map((item) => (
                 <article className="table-row" key={item.id}>
-                  <div className="col-id font-bold">{item.id}</div>
                   <div className="col-info">
                     <div className="service-name-row">
                       <Bike size={18} />

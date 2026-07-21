@@ -1,7 +1,6 @@
 ﻿import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
-  Bell,
   Bike,
   Calendar,
   CalendarDays,
@@ -20,7 +19,6 @@ import {
   Package,
   Phone,
   Printer,
-  Search,
   Send,
   Shield,
   User,
@@ -412,30 +410,20 @@ export default function AppointmentDetailPage({
         <div className="record-main">
           <section className="record-panel">
             <div className="record-section-header">
-              <div>
-                <span>Thông tin đặt lịch</span>
-                <h3>Lịch hẹn và tiếp nhận</h3>
-              </div>
-              <StatusBadge status={detail.status} />
+              <h3>Thông tin lịch hẹn</h3>
             </div>
-            <div className="record-field-grid">
-              <DetailField label="Mã lịch" value={String(detail.id).startsWith("#") ? detail.id : `#${detail.id}`} />
-              <DetailField label="Ngày tạo" value={detail.createdDate} />
+            <div className="record-field-grid record-field-grid-compact">
               <DetailField label="Ngày hẹn" value={detail.appointmentDate} />
               <DetailField label="Giờ hẹn" value={detail.appointmentHour} />
-              <DetailField label="Kênh đặt" value={detail.channel} />
-              <DetailField label="Mức ưu tiên" value={getPriorityText(detail.priority)} tone="red" />
-              <DetailField label="Người tạo" value={detail.createdBy} />
-              <DetailField label="Cập nhật cuối" value={formatDisplayDateTime(detail.lastUpdated)} />
+              <DetailField label="Ưu tiên" value={getPriorityText(detail.priority)} tone="red" />
+              <DetailField label="Ngày tạo" value={detail.createdDate} />
+              <DetailField label="Cập nhật" value={formatDisplayDateTime(detail.lastUpdated)} />
             </div>
           </section>
 
           <section className="record-panel">
             <div className="record-section-header">
-              <div>
-                <span>Hồ sơ liên quan</span>
-                <h3>Khách hàng và xe</h3>
-              </div>
+              <h3>Khách hàng và xe</h3>
             </div>
             <div className="record-entity-grid">
               <RecordEntity
@@ -465,9 +453,9 @@ export default function AppointmentDetailPage({
 
           <ServicesRecord services={detail.services} totalPrice={totalPrice} paymentStatus={detail.paymentStatus} />
 
-          <div className="record-split">
+          <div className={`record-split ${!(detail.materials || []).length ? "record-split-single" : ""}`}>
             <AssignmentRecord assignment={detail.assignment} hasAssignment={hasAssignment} status={detail.status} />
-            <MaterialsRecord materials={detail.materials} />
+            {(detail.materials || []).length > 0 && <MaterialsRecord materials={detail.materials} />}
           </div>
 
           <div className="record-split record-split-compact">
@@ -475,15 +463,14 @@ export default function AppointmentDetailPage({
             <ActivityRecord logs={detail.activityLogs} status={detail.status} appointment={detail} hasAssignment={hasAssignment} />
           </div>
 
-          <section className="record-panel record-notes-panel">
-            <div className="record-section-header">
-              <div>
-                <span>Ghi chú nội bộ</span>
+          {detail.garageNote && detail.garageNote !== "—" && !/^chưa\s+/i.test(String(detail.garageNote).trim()) && (
+            <section className="record-panel record-notes-panel">
+              <div className="record-section-header">
                 <h3>Ghi chú garage</h3>
               </div>
-            </div>
-            <p>{detail.garageNote}</p>
-          </section>
+              <p>{detail.garageNote}</p>
+            </section>
+          )}
         </div>
 
         <aside className="record-aside">
@@ -540,51 +527,31 @@ export default function AppointmentDetailPage({
   );
 }
 
-function DetailTopBar() {
-  return (
-    <div className="appointment-detail-topbar">
-      <span className="detail-topbar-label">Điều phối garage</span>
-      <label className="detail-search">
-        <Search size={18} />
-        <input placeholder="Tìm mã lịch, khách hàng, biển số..." />
-      </label>
-      <button className="detail-notification-btn" aria-label="Thông báo">
-        <Bell size={20} />
-      </button>
-    </div>
-  );
-}
-
 function RecordHeader({ appointment, onBack }) {
   const displayId = String(appointment.id).startsWith("#") ? appointment.id : `#${appointment.id}`;
+  const shortDisplayId = getShortAppointmentId(displayId);
 
   return (
     <header className="record-header">
       <div className="record-header-main">
         <button className="record-back" type="button" onClick={onBack}>
-          <ArrowLeft size={17} /> Danh sách lịch hẹn
+          <ArrowLeft size={16} /> Danh sách
         </button>
-        <div>
+        <div className="record-header-copy">
           <div className="record-code-row">
-            <h1>{displayId}</h1>
+            <h1 title={displayId}>{shortDisplayId}</h1>
             <StatusBadge status={appointment.status} />
             <PriorityBadge priority={appointment.priority} />
           </div>
           <p>
-            {appointment.customer.name} · {appointment.vehicle.name} · {appointment.appointmentDate} lúc {appointment.appointmentHour}
+            {appointment.customer.name} · {appointment.vehicle.name} · {appointment.vehicle.plate} ·{" "}
+            {appointment.appointmentDate} {appointment.appointmentHour}
           </p>
         </div>
       </div>
-      <div className="record-header-tools">
-        <label className="record-search">
-          <Search size={17} />
-          <input placeholder="Tìm mã lịch, khách hàng, biển số" />
-        </label>
-        <button className="record-icon-button" type="button" aria-label="Thông báo">
-          <Bell size={18} />
-        </button>
-        <span className="record-updated"><Clock size={15} /> {formatDisplayDateTime(appointment.lastUpdated)}</span>
-      </div>
+      <span className="record-updated">
+        <Clock size={14} /> {formatDisplayDateTime(appointment.lastUpdated)}
+      </span>
     </header>
   );
 }
@@ -624,10 +591,7 @@ function ServicesRecord({ services, totalPrice, paymentStatus }) {
   return (
     <section className="record-panel">
       <div className="record-section-header">
-        <div>
-          <span>Dịch vụ</span>
-          <h3>Dịch vụ đã đặt</h3>
-        </div>
+        <h3>Dịch vụ đã đặt</h3>
         <em className="record-payment-status"><CreditCard size={14} /> {getPaymentText(paymentStatus)}</em>
       </div>
       <div className="record-table">
@@ -676,10 +640,7 @@ function AssignmentRecord({ assignment, hasAssignment, status }) {
   return (
     <section className="record-panel">
       <div className="record-section-header">
-        <div>
-          <span>Vận hành</span>
-          <h3>{isPending ? "Phân công sau xác nhận" : "Phân công xử lý"}</h3>
-        </div>
+        <h3>{isPending ? "Phân công sau xác nhận" : "Phân công xử lý"}</h3>
       </div>
       {isPending && !hasAssignment ? (
         <div className="record-empty record-flow-empty">
@@ -711,10 +672,7 @@ function MaterialsRecord({ materials = [] }) {
   return (
     <section className="record-panel">
       <div className="record-section-header">
-        <div>
-          <span>Kho</span>
-          <h3>Vật tư sử dụng</h3>
-        </div>
+        <h3>Vật tư sử dụng</h3>
       </div>
       {normalizedMaterials.length === 0 ? (
         <div className="record-empty">Chưa ghi nhận vật tư sử dụng</div>
@@ -780,10 +738,7 @@ function ProcessRecord({ status, appointment, hasAssignment }) {
   return (
     <section className="record-panel">
       <div className="record-section-header">
-        <div>
-          <span>Tiến độ</span>
-          <h3>Tiến trình xử lý</h3>
-        </div>
+        <h3>Tiến trình xử lý</h3>
       </div>
       <div className="record-process">
         {steps.map((step, index) => {
@@ -860,10 +815,7 @@ function ActivityRecord({ logs = [], status, appointment, hasAssignment }) {
   return (
     <section className="record-panel">
       <div className="record-section-header">
-        <div>
-          <span>Audit</span>
-          <h3>Lịch sử cập nhật</h3>
-        </div>
+        <h3>Lịch sử cập nhật</h3>
       </div>
       <ol className="record-activity">
         {displayLogs.map((log) => (
@@ -881,17 +833,16 @@ function ActivityRecord({ logs = [], status, appointment, hasAssignment }) {
 function RecordSummary({ appointment, totalPrice, progress, isApproved }) {
   return (
     <section className="record-side-panel">
-      <span className="record-side-eyebrow">Tóm tắt</span>
-      <h3>{appointment.customer.name}</h3>
-      <p>{appointment.vehicle.name} · {appointment.vehicle.plate}</p>
+      <h3>Thanh toán & phân công</h3>
       <div className="record-side-status">
-        <StatusBadge status={appointment.status} />
+        <span className="record-side-price-label">Tạm tính</span>
         <strong>{formatCurrency(totalPrice)}</strong>
       </div>
       <dl>
-        <div><dt>Dịch vụ</dt><dd>{appointment.services.length}</dd></div>
         <div><dt>Thanh toán</dt><dd>{getPaymentText(appointment.paymentStatus)}</dd></div>
-        <div><dt>KTV</dt><dd>{appointment.assignment.technician}</dd></div>
+        <div><dt>Dịch vụ</dt><dd>{appointment.services.length}</dd></div>
+        <div><dt>Kỹ thuật viên</dt><dd>{appointment.assignment.technician}</dd></div>
+        <div><dt>Kệ sửa</dt><dd>{appointment.assignment.bay}</dd></div>
         {isApproved && <div><dt>Dự kiến xong</dt><dd>{appointment.assignment.expectedDone}</dd></div>}
       </dl>
       {isApproved && (
@@ -1250,13 +1201,13 @@ function FooterActions({
             : { label: "Xác nhận lịch hẹn", onClick: onConfirm };
   const isPrimaryDisabled = !primaryAction.onClick || isLoading;
   const flowMessage = isPending
-    ? "Bước hiện tại: xác nhận lịch hẹn. Sau khi xác nhận, hệ thống gửi thông báo vào tài khoản khách hàng và gửi email, rồi mới phân công nhân viên/kệ sửa."
+    ? "Bước hiện tại: xác nhận lịch hẹn."
     : status === "confirmed" && !hasAssignment
-      ? "Bước tiếp theo: phân công kỹ thuật viên và kệ sửa. Nhân viên sẽ tiếp nhận việc, kiểm tra xe và báo lại tình trạng thực tế cho khách."
+      ? "Bước tiếp theo: phân công kỹ thuật viên."
       : status === "confirmed" && hasAssignment
-        ? "Lịch đã được phân công. Nhân viên tiếp nhận đơn, sau đó kiểm tra xe khi khách mang xe đến garage."
+        ? "Đã phân công. Nhân viên sẽ tiếp nhận và kiểm tra xe."
         : status === "processing"
-          ? "Nhân viên đang xử lý/kiểm tra xe. Các hạng mục cần sửa và vật tư thay thế sẽ được báo lại khách trước khi thực hiện."
+          ? "Nhân viên đang xử lý / kiểm tra xe."
           : "";
 
   return (

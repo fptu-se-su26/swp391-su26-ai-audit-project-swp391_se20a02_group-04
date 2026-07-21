@@ -7,6 +7,7 @@ const {
   cancelAppointmentValidation,
   createAppointmentValidation,
   listCustomerAppointmentsValidation,
+  reviewAppointmentValidation,
   validate,
   validateAllowedBodyFields,
   validateAllowedQueryFields
@@ -26,6 +27,13 @@ const createAppointmentFields = [
   'contact_phone',
   'note'
 ];
+
+/**
+ * @route   GET /api/appointments/reviews
+ * @desc    Public list of customer service reviews
+ * @access  Public
+ */
+router.get('/reviews', appointmentController.getPublicReviews);
 
 router.use(authenticate, authorize('CUSTOMER'));
 
@@ -79,6 +87,20 @@ router.patch(
   cancelAppointmentValidation,
   validate,
   appointmentController.cancelMyAppointment
+);
+
+/**
+ * @route   POST /api/appointments/:id/review
+ * @desc    Review a completed appointment
+ * @access  Private - CUSTOMER
+ */
+router.post(
+  '/:id/review',
+  validateAllowedBodyFields(['rating', 'comment']),
+  appointmentIdValidation,
+  reviewAppointmentValidation,
+  validate,
+  appointmentController.reviewMyAppointment
 );
 
 module.exports = router;

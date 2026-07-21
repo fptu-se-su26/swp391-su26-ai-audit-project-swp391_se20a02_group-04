@@ -253,12 +253,24 @@ router.put('/appointments/:id/contact-log',
   authenticate,
   authorize('STAFF'),
   param('id').isMongoId().withMessage('Invalid appointment ID'),
-  body('status').isIn(['AGREED', 'DECLINED', 'NO_ANSWER'])
-    .withMessage('Contact status must be AGREED, DECLINED, or NO_ANSWER'),
+  body('status').isIn(['AGREED', 'DECLINED', 'NO_ANSWER', 'PASSED'])
+    .withMessage('Contact status must be AGREED, DECLINED, NO_ANSWER, or PASSED'),
   body('notes').optional().trim().isLength({ max: 500 })
     .withMessage('Contact notes cannot exceed 500 characters'),
   validate,
   staffAppointmentController.saveContactLog
+);
+
+router.put('/appointments/:id/repair-log',
+  authenticate,
+  authorize('STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('status').isIn(['WITH_PARTS', 'NO_PARTS'])
+    .withMessage('Repair status must be WITH_PARTS or NO_PARTS'),
+  body('notes').optional().trim().isLength({ max: 500 })
+    .withMessage('Repair notes cannot exceed 500 characters'),
+  validate,
+  staffAppointmentController.saveRepairLog
 );
 
 router.post('/appointments/:id/payment',
