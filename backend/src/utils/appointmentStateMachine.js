@@ -12,7 +12,7 @@ const ALLOWED_TRANSITIONS = {
 const VALID_STATUSES = Object.keys(ALLOWED_TRANSITIONS);
 
 function hasFullAssignment(appointment) {
-  return Boolean(appointment?.staff_id && appointment?.repair_bay_id);
+  return Boolean(appointment?.staff_id);
 }
 
 function validateAppointmentTransition(appointment, nextStatus) {
@@ -47,7 +47,7 @@ function validateAppointmentTransition(appointment, nextStatus) {
     return {
       ok: false,
       statusCode: 422,
-      message: 'Appointment must be assigned to a technician and repair bay before it can be started'
+      message: 'Appointment must be assigned to a technician before it can be started'
     };
   }
 

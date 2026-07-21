@@ -4,56 +4,40 @@
   gap: 8px;
 }
 
-.job-filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: end;
-  padding: 14px 0;
+.jobs-panel-head {
+  margin-bottom: 4px;
 }
 
-.job-filter-bar label {
-  display: grid;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.job-filter-bar input,
-.job-filter-bar select {
-  min-height: 38px;
-  padding: 0 9px;
-  color: var(--text);
-  background: #fff;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+.jobs-tabs {
+  margin: 4px 0 10px;
 }
 
 .filter {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
+  gap: 6px;
+  min-height: 34px;
   padding: 0 12px;
   color: var(--muted);
+  font-size: 13px;
   font-weight: 800;
   background: #fff;
   border: 1px solid #cbd5e1;
   border-radius: 999px;
+  cursor: pointer;
 }
 
 .filter-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
   border-radius: 999px;
   background: #f1f5f9;
   color: #475569;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
 }
 
@@ -63,12 +47,12 @@
 }
 
 .compact-refresh {
-  min-height: 36px;
+  min-height: 34px;
   padding: 0 12px;
 }
 
 .jobs-pagination-copy {
-  margin: 16px 0 0;
+  margin: 14px 0 0;
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
@@ -83,37 +67,64 @@
 .assignment-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
+  margin-top: 14px;
 }
 
-.compact-card {
+.assignment-list .job-card.compact-card {
+  padding: 12px 14px;
   box-shadow: none;
 }
 
+.assignment-list .job-card.compact-card h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.assignment-list .job-card.compact-card .job-info {
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+.assignment-list .job-card.compact-card .job-info div {
+  font-size: 13px;
+}
+
+.assignment-list .job-card.compact-card .job-actions {
+  margin-top: 12px;
+  gap: 8px;
+}
+
+.assignment-list .job-card.compact-card .job-actions .primary-button,
+.assignment-list .job-card.compact-card .job-actions .secondary-button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
 .next-job {
-  padding: 16px;
+  padding: 14px;
   background: var(--surface-muted);
   border: 1px solid var(--border-soft);
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .next-job h4 {
-  margin: 14px 0 8px;
-  font-size: 18px;
+  margin: 10px 0 6px;
+  font-size: 16px;
+  line-height: 1.3;
 }
 
 .next-job p {
-  margin: 0;
+  margin: 0 0 12px;
   color: var(--muted);
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 @media (max-width: 900px) {
   .assignment-list {
     grid-template-columns: 1fr;
   }
-}
-
-@media (max-width: 640px) {
-  .job-filter-bar label { flex: 1 1 140px; }
 }

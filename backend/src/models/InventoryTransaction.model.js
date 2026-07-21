@@ -58,6 +58,17 @@ const inventoryTransactionSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Marks a STOCK_OUT that was undone by staff (compensating RETURN exists).
+  is_reversed: {
+    type: Boolean,
+    default: false
+  },
+  // On RETURN txs: points to the original STOCK_OUT being undone.
+  reverses_transaction_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'InventoryTransaction',
+    default: null
+  },
   created_at: {
     type: Date,
     default: Date.now

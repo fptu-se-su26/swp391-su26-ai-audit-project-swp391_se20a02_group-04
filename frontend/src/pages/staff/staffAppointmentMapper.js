@@ -1,12 +1,12 @@
 const STATUS_META = {
-  PENDING: { label: "CHO XAC NHAN", key: "pending", className: "status-blue" },
-  CONFIRMED: { label: "DUOC GIAO", key: "assigned", className: "status-blue" },
-  IN_PROGRESS: { label: "DANG LAM", key: "in_progress", className: "status-yellow" },
-  COMPLETED: { label: "HOAN THANH", key: "completed", className: "status-green" },
-  PAID: { label: "HOAN THANH", key: "completed", className: "status-green" },
-  CANCELLED: { label: "DA HUY", key: "cancelled", className: "status-red" },
-  REJECTED: { label: "TU CHOI", key: "cancelled", className: "status-red" },
-  NO_SHOW: { label: "KHONG DEN", key: "cancelled", className: "status-red" },
+  PENDING: { label: "CHỜ XÁC NHẬN", key: "pending", className: "status-blue" },
+  CONFIRMED: { label: "ĐƯỢC GIAO", key: "assigned", className: "status-blue" },
+  IN_PROGRESS: { label: "ĐANG LÀM", key: "in_progress", className: "status-yellow" },
+  COMPLETED: { label: "HOÀN THÀNH", key: "completed", className: "status-green" },
+  PAID: { label: "HOÀN THÀNH", key: "completed", className: "status-green" },
+  CANCELLED: { label: "ĐÃ HỦY", key: "cancelled", className: "status-red" },
+  REJECTED: { label: "TỪ CHỐI", key: "cancelled", className: "status-red" },
+  NO_SHOW: { label: "KHÔNG ĐẾN", key: "cancelled", className: "status-red" },
 };
 
 const SERVICE_ICON = {
@@ -36,8 +36,7 @@ export function isJobAssignedToUser(job, user) {
 }
 
 export function hasFullJobAssignment(job = {}) {
-  const raw = job.raw || {};
-  return Boolean(job.staffId && getEntityId(raw.repair_bay_id));
+  return Boolean(job.staffId);
 }
 
 export function canStartJob(job = {}) {
@@ -62,8 +61,8 @@ export function formatCurrency(value) {
 }
 
 export function formatDuration(minutes) {
-  if (!minutes) return "Chua co";
-  if (minutes < 60) return `${minutes} phut`;
+  if (!minutes) return "Chưa có";
+  if (minutes < 60) return `${minutes} phút`;
 
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
@@ -71,16 +70,23 @@ export function formatDuration(minutes) {
 }
 
 export function formatAssignedAt(value) {
-  if (!value) return "Chua cap nhat";
+  if (!value) return "Chưa cập nhật";
   const assignedAt = new Date(value);
-  if (Number.isNaN(assignedAt.getTime())) return "Chua cap nhat";
+  if (Number.isNaN(assignedAt.getTime())) return "Chưa cập nhật";
   const now = new Date();
   const minutes = Math.max(0, Math.floor((now - assignedAt) / 60000));
-  if (minutes < 60) return minutes < 1 ? "Vua duoc giao" : `Duoc giao ${minutes} phut truoc`;
+  if (minutes < 60) return minutes < 1 ? "Vừa giao" : `Giao ${minutes} phút trước`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `Duoc giao ${hours} gio truoc`;
+  if (hours < 24) return `Giao ${hours} giờ trước`;
   const days = Math.floor(hours / 24);
-  return `Duoc giao ${days} ngay truoc`;
+  return `Giao ${days} ngày trước`;
+}
+
+export function formatAppointmentDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" });
 }
 
 function getCustomer(appointment) {
@@ -109,13 +115,13 @@ export function mapAppointmentToJob(appointment = {}) {
   const status = String(appointment.status || "PENDING").toUpperCase();
   const meta = STATUS_META[status] || STATUS_META.PENDING;
   const vehicleName = [vehicle.brand, vehicle.model].filter(Boolean).join(" ").trim() || "Xe may";
-  const serviceName = service.name || serviceDoc.service_name || "Dich vu sua xe";
+  const serviceName = service.name || serviceDoc.service_name || "Dịch vụ sửa xe";
   const issue =
     service.repair_issue ||
     service.issue_description ||
     appointment.customer_note ||
     appointment.customer_notes ||
-    "Chua co ghi chu tu khach.";
+    "Chưa có ghi chú từ khách.";
   const estimatedDuration =
     service.estimated_duration_minutes ||
     serviceDoc.estimated_duration ||
@@ -131,9 +137,9 @@ export function mapAppointmentToJob(appointment = {}) {
     staffId,
     code: appointment.appointment_code || appointmentId,
     vehicle: vehicleName,
-    plate: vehicle.license_plate || "Chua cap nhat",
-    customer: customer.full_name || "Khach hang",
-    phone: customer.phone || "Chua cap nhat",
+    plate: vehicle.license_plate || "Chưa cập nhật",
+    customer: customer.full_name || "Khách hàng",
+    phone: customer.phone || "Chưa cập nhật",
     email: customer.email || "",
     time: appointment.start_time || appointment.time_slot || "--:--",
     date: appointment.appointment_date || "",
@@ -148,30 +154,65 @@ export function mapAppointmentToJob(appointment = {}) {
     statusKey: meta.key,
     statusClass: meta.className,
     actions: getJobActions(meta.key),
-    model: [vehicle.brand, vehicle.model].filter(Boolean).join(" ") || "Chua cap nhat",
-    mileage: typeof vehicle.odometer === "number" ? `${vehicle.odometer.toLocaleString("vi-VN")} km` : "Chua cap nhat",
+    model: [vehicle.brand, vehicle.model].filter(Boolean).join(" ") || "Chưa cập nhật",
+    mileage: typeof vehicle.odometer === "number" ? `${vehicle.odometer.toLocaleString("vi-VN")} km` : "Chưa cập nhật",
     issue,
     estimate: formatDuration(estimatedDuration),
     estimatedDuration,
     laborCost: formatCurrency(estimatedPrice),
     laborCostValue: estimatedPrice,
     diagnosisNotes: appointment.diagnosis_notes || "",
-    contactLog: appointment.contact_log?.status ? appointment.contact_log : null,
+    contactLog: appointment.contact_log?.status
+      ? {
+          status: appointment.contact_log.status,
+          notes: appointment.contact_log.notes || "",
+          contacted_at: appointment.contact_log.contacted_at || null,
+        }
+      : null,
+    repairLog: appointment.repair_log?.status
+      ? {
+          status: appointment.repair_log.status,
+          notes: appointment.repair_log.notes || "",
+          completed_at: appointment.repair_log.completed_at || null,
+        }
+      : null,
     paymentInfo: appointment.payment_info?.order_code ? appointment.payment_info : null,
     assignedAt: appointment.assigned_at || null,
     priceType: String(serviceDoc.price_type || service.price_type || "FIXED").toUpperCase(),
     recommendation:
       appointment.staff_notes ||
       service.description ||
-      "Kiem tra, cap nhat ghi chu ky thuat va gui quan ly xac nhan khi hoan thanh.",
+      "Kiểm tra, cập nhật ghi chú kỹ thuật và gửi quản lý xác nhận khi hoàn thành.",
     raw: appointment,
   };
 }
 
 function getJobActions(statusKey) {
-  if (statusKey === "assigned") return ["Chi tiet", "Bat dau"];
-  if (statusKey === "in_progress") return ["Them vat tu", "Hoan thanh"];
-  return ["Chi tiet"];
+  if (statusKey === "assigned") return ["Chi tiết", "Bắt đầu"];
+  if (statusKey === "in_progress") return ["Thêm vật tư", "Hoàn thành"];
+  return ["Chi tiết"];
+}
+
+const JOB_PRIORITY_ORDER = {
+  assigned: 0,
+  in_progress: 1,
+  pending: 2,
+  completed: 3,
+  cancelled: 4,
+};
+
+export function sortStaffJobsByPriority(jobs = []) {
+  return [...jobs].sort((left, right) => {
+    const leftOrder = JOB_PRIORITY_ORDER[left.statusKey] ?? 99;
+    const rightOrder = JOB_PRIORITY_ORDER[right.statusKey] ?? 99;
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+
+    const leftDate = left.raw?.appointment_date || left.date || "";
+    const rightDate = right.raw?.appointment_date || right.date || "";
+    if (leftDate !== rightDate) return String(leftDate).localeCompare(String(rightDate));
+
+    return String(left.time || "").localeCompare(String(right.time || ""));
+  });
 }
 
 export function filterJobsByUiStatus(jobs, filter) {

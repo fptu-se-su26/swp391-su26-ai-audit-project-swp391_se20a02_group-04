@@ -203,8 +203,7 @@ export default function StaffAttendance() {
     <>
       <PageHeader
         title="Chấm công"
-        subtitle="Check-in, check-out và xem lịch sử ca làm của bạn"
-        actions={false}
+        subtitle="Check-in, check-out và lịch sử điểm danh — không liên quan đến nhận/xử lý đơn sửa xe"
       />
 
       {isLoading ? (

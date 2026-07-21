@@ -126,6 +126,29 @@ router.get('/inventory/statistics',
 );
 
 /**
+ * @route   POST /api/admin/inventory/upload-image
+ * @desc    Upload product image from local file
+ * @access  Private/Admin
+ */
+router.post('/inventory/upload-image',
+  authenticate,
+  authorize('ADMIN', 'MANAGER'),
+  (req, res, next) => {
+    const { uploadInventoryImage } = require('../middleware/upload.middleware');
+    uploadInventoryImage(req, res, (error) => {
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          message: error.message || 'Không thể tải ảnh lên'
+        });
+      }
+      return next();
+    });
+  },
+  adminInventoryController.uploadInventoryImage
+);
+
+/**
  * @route   GET /api/admin/inventory/low-stock
  * @desc    Get low stock items
  * @access  Private/Admin

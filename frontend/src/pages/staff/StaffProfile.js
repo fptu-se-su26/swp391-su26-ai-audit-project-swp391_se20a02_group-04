@@ -92,7 +92,7 @@ export default function StaffProfile() {
 
   return (
     <>
-      <PageHeader title="Hồ sơ nhân viên" subtitle="Thông tin cá nhân và hoạt động tài khoản từ hệ thống" actions={false} />
+      <PageHeader title="Hồ sơ nhân viên" subtitle="Thông tin cá nhân và hoạt động tài khoản từ hệ thống" />
 
       {isLoading && (
         <div className="state-box">

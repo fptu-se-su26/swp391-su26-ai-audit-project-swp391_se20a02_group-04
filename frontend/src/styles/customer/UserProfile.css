@@ -511,6 +511,63 @@
   font-weight: 900;
 }
 
+.appointment-status-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(226, 191, 176, 0.4);
+  background: #fff;
+}
+
+.appointment-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(226, 191, 176, 0.7);
+  border-radius: 999px;
+  background: #fffdfb;
+  color: #5a4136;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.appointment-filter-chip em {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(160, 65, 0, 0.1);
+  color: #a04100;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.appointment-filter-chip:hover {
+  border-color: rgba(160, 65, 0, 0.45);
+  color: #a04100;
+}
+
+.appointment-filter-chip.active {
+  border-color: transparent;
+  background: #a04100;
+  color: #fff;
+}
+
+.appointment-filter-chip.active em {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
 .appointment-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -795,6 +852,130 @@
 .appointment-cancel-button:disabled {
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+.appointment-review-panel {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid rgba(226, 191, 176, 0.55);
+  border-radius: 14px;
+  background: #fffdfb;
+}
+
+.appointment-review-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.appointment-review-heading .material-symbols-outlined {
+  color: #a04100;
+  font-size: 22px;
+}
+
+.appointment-review-heading h4 {
+  margin: 0 0 4px;
+  color: #191c1d;
+  font-size: 15px;
+}
+
+.appointment-review-heading p {
+  margin: 0;
+  color: #5a4136;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.appointment-star-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.appointment-star-row .material-symbols-outlined {
+  color: #d6c3b8;
+  font-size: 28px;
+  font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
+}
+
+.appointment-star-row .material-symbols-outlined.filled,
+.appointment-star-button.active .material-symbols-outlined {
+  color: #eab308;
+  font-variation-settings: "FILL" 1, "wght" 600, "GRAD" 0, "opsz" 24;
+}
+
+.appointment-star-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.appointment-review-form label {
+  display: block;
+  margin-bottom: 6px;
+  color: #5a4136;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.appointment-review-form textarea {
+  width: 100%;
+  min-height: 88px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid rgba(226, 191, 176, 0.7);
+  border-radius: 12px;
+  background: #fff;
+  color: #191c1d;
+  font: inherit;
+  resize: vertical;
+}
+
+.appointment-review-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #a04100;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+}
+
+.appointment-review-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.appointment-review-readonly p {
+  margin: 0;
+  color: #5a4136;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.appointment-reviewed-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  color: #a04100;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.appointment-reviewed-tag .material-symbols-outlined {
+  font-size: 16px;
+  font-variation-settings: "FILL" 1, "wght" 500, "GRAD" 0, "opsz" 20;
 }
 
 .appointment-empty-state {

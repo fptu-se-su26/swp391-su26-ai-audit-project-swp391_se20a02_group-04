@@ -5,7 +5,6 @@ import {
   Calendar,
   Wrench,
   Users,
-  BarChart2,
   Shield,
   Package,
   User,
@@ -39,7 +38,6 @@ export default function AdminSidebar({ activeView, onViewChange }) {
   ["users", Shield, "Người dùng"],
   ["inventory", Package, "Kho"],
   ["ai", Bot, "Trợ lý AI"],
-  ["reports", BarChart2, "Báo cáo"],
   ["profile", User, "Hồ sơ"],
   ["contact", CircleHelp, "Liên hệ"],
 ];

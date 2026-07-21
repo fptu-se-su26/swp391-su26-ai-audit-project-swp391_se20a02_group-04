@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import "../../styles/home/HomePage.css";
 import { clearAuthSession, getAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
+import { getPublicReviews } from "../../services/appointmentApi";
 import CustomerChatWidget from "../../components/CustomerChatWidget";
 
 const services = [
@@ -60,12 +61,98 @@ function MaterialIcon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
 }
 
+function ReviewStars({ rating = 5 }) {
+  return (
+    <div className="home-review-stars" aria-label={`${rating} trên 5 sao`}>
+      {[1, 2, 3, 4, 5].map((value) => (
+        <MaterialIcon key={value} className={value <= rating ? "filled" : ""}>
+          star
+        </MaterialIcon>
+      ))}
+    </div>
+  );
+}
+
+function ReviewCard({ review }) {
+  return (
+    <article className="home-review-card">
+      <ReviewStars rating={review.rating} />
+      {review.comment ? <p>“{review.comment}”</p> : <p className="home-review-no-comment">Không có nhận xét chi tiết.</p>}
+      <div className="home-review-meta">
+        <strong>{review.customer_name}</strong>
+        <span>
+          {review.service_name}
+          {review.vehicle_label ? ` · ${review.vehicle_label}` : ""}
+        </span>
+      </div>
+    </article>
+  );
+}
+
 const DEFAULT_AVATAR =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6d1f"/></svg>';
 
 export default function HomePage() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [user, setUser] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoaded, setReviewsLoaded] = useState(false);
+  const [isMarqueePaused, setIsMarqueePaused] = useState(false);
+  const marqueeTrackRef = useRef(null);
+  const marqueeOffsetRef = useRef(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getPublicReviews(20)
+      .then((payload) => {
+        if (cancelled) return;
+        const nextReviews = (payload?.data?.reviews || []).filter(
+          (item) => Number(item.rating) >= 1 && Number(item.rating) <= 5
+        );
+        setReviews(nextReviews);
+      })
+      .catch(() => {
+        if (!cancelled) setReviews([]);
+      })
+      .finally(() => {
+        if (!cancelled) setReviewsLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const reviewLoop = useMemo(() => {
+    if (!reviews.length) return [];
+    if (reviews.length >= 4) return reviews;
+    return [...reviews, ...reviews, ...reviews];
+  }, [reviews]);
+
+  useEffect(() => {
+    const track = marqueeTrackRef.current;
+    if (!track || reviewLoop.length === 0) return undefined;
+
+    let frameId = 0;
+    const speed = 0.85;
+    marqueeOffsetRef.current = 0;
+
+    const tick = () => {
+      if (!isMarqueePaused) {
+        marqueeOffsetRef.current -= speed;
+        const loopWidth = track.scrollWidth / 2;
+        if (loopWidth > 0 && Math.abs(marqueeOffsetRef.current) >= loopWidth) {
+          marqueeOffsetRef.current += loopWidth;
+        }
+        track.style.transform = `translate3d(${marqueeOffsetRef.current}px, 0, 0)`;
+      }
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isMarqueePaused, reviewLoop]);
 
   useEffect(() => {
     const normalizeUser = (sourceUser) => ({
@@ -347,6 +434,28 @@ export default function HomePage() {
             <button type="submit">Gửi yêu cầu tư vấn</button>
           </form>
         </section>
+
+        {reviewsLoaded && reviews.length > 0 && (
+          <section className="home-section home-reviews-section" id="reviews" aria-label="Đánh giá khách hàng">
+            <div className="home-reviews-header">
+              <span>Đánh giá</span>
+              <h2>Khách Hàng Nói Gì Về MOTOCORE</h2>
+              <p>Những phản hồi thật từ khách đã hoàn thành dịch vụ tại garage.</p>
+            </div>
+
+            <div
+              className="home-reviews-marquee"
+              onMouseEnter={() => setIsMarqueePaused(true)}
+              onMouseLeave={() => setIsMarqueePaused(false)}
+            >
+              <div className="home-reviews-track" ref={marqueeTrackRef}>
+                {[...reviewLoop, ...reviewLoop].map((review, index) => (
+                  <ReviewCard key={`${review.id}-${index}`} review={review} />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
       <footer className="home-footer">

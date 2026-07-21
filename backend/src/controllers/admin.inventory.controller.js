@@ -949,6 +949,30 @@ const getInventoryStatistics = async (req, res) => {
   }
 };
 
+/**
+ * Upload product image from local file
+ * POST /api/admin/inventory/upload-image
+ */
+const uploadInventoryImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return errorResponse(res, 400, 'Vui lòng chọn ảnh từ máy tính');
+    }
+
+    const imageUrl = `/uploads/inventory/${req.file.filename}`;
+
+    return successResponse(res, 200, 'Đã tải ảnh lên thành công', {
+      image_url: imageUrl,
+      filename: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+  } catch (error) {
+    console.error('Upload inventory image error:', error);
+    return errorResponse(res, 500, error.message || 'Không thể tải ảnh lên');
+  }
+};
+
 module.exports = {
   getAllInventoryItems,
   getInventoryItemById,
@@ -960,5 +984,6 @@ module.exports = {
   adjustStock,
   getLowStockItems,
   getInventoryTransactions,
-  getInventoryStatistics
+  getInventoryStatistics,
+  uploadInventoryImage
 };

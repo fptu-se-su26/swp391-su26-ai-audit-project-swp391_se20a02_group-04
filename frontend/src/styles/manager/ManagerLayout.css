@@ -174,12 +174,24 @@
 
 /* HEADER */
 .manager-layout .header {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 32px;
+    flex-shrink: 0;
+    padding: 16px 32px;
     border-bottom: 1px solid #e2e8f0;
     background-color: #ffffff;
+}
+
+/* Chi tiết lịch hẹn đã có header riêng — tránh thanh trắng đè nội dung */
+.manager-layout:has(.calendar-detail-body) > .main-content > .header {
+    display: none;
+}
+
+.manager-layout:has(.calendar-detail-body) > .main-content > .manager-body {
+    padding-top: 16px;
 }
 
 .manager-layout .header-left {

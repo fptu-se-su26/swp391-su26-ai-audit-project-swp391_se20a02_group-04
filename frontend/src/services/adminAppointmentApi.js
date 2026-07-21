@@ -178,7 +178,7 @@ export function mapAdminAppointment(appointment = {}) {
     time: formatDate(appointment.appointment_date),
     apiDate: appointment.appointment_date,
     hour: appointment.start_time || appointment.time_slot || "--:--",
-    bay: repairBay.name || (staff.full_name ? `KTV ${staff.full_name}` : "Chưa phân kệ"),
+    bay: repairBay.name || (staff.full_name ? `KTV ${staff.full_name}` : "Chưa phân công"),
     repairBayCode: repairBay.code || "",
     repairBayLocation: repairBay.location || "",
     techAssigned: staff.full_name || "Chưa phân công",

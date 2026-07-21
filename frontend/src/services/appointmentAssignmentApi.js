@@ -73,7 +73,6 @@ export async function assignAppointment(appointmentId, payload = {}) {
     method: "POST",
     body: JSON.stringify({
       staff_id: payload.staff_id || payload.technician_id,
-      repair_bay_id: payload.repair_bay_id,
       start_time: payload.start_time,
       note: payload.note || payload.notes || "",
     }),

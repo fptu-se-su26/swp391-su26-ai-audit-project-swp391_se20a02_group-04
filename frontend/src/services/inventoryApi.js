@@ -1,19 +1,32 @@
 import { getAuthSession } from "./authApi";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+
+export function resolveInventoryMediaUrl(url = "") {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (/^(https?:|data:|blob:)/i.test(value)) return value;
+  return `${API_ORIGIN}${value.startsWith("/") ? "" : "/"}${value}`;
+}
 
 async function inventoryRequest(path, options = {}) {
   const { accessToken } = getAuthSession();
+  const headers = {
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    ...options.headers,
+  };
+
+  // Only set JSON content-type when body is not FormData.
+  if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
 
   let response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        ...options.headers,
-      },
       ...options,
+      headers,
     });
   } catch {
     throw new Error(`Không kết nối được máy chủ tại ${API_BASE_URL}.`);
@@ -60,6 +73,15 @@ export function createInventoryItem(payload) {
   return inventoryRequest("/admin/inventory", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function uploadInventoryImage(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+  return inventoryRequest("/admin/inventory/upload-image", {
+    method: "POST",
+    body: formData,
   });
 }
 

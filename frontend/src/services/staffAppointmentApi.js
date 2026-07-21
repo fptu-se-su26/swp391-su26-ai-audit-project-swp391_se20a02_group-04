@@ -245,6 +245,13 @@ export function saveContactLog(appointmentId, { status, notes = "" } = {}) {
   });
 }
 
+export function saveRepairLog(appointmentId, { status, notes = "" } = {}) {
+  return staffRequest(`/staff/appointments/${appointmentId}/repair-log`, {
+    method: "PUT",
+    body: JSON.stringify({ status, notes }),
+  });
+}
+
 export function createPayment(appointmentId) {
   return staffRequest(`/staff/appointments/${appointmentId}/payment`, {
     method: "POST",
@@ -272,6 +279,12 @@ export function useAppointmentMaterials(appointmentId, { items, notes } = {}) {
   return staffRequest(`/staff/appointments/${appointmentId}/materials`, {
     method: "POST",
     body: JSON.stringify({ items, notes }),
+  });
+}
+
+export function revertAppointmentMaterial(appointmentId, transactionId) {
+  return staffRequest(`/staff/appointments/${appointmentId}/materials/${transactionId}/revert`, {
+    method: "POST",
   });
 }
 

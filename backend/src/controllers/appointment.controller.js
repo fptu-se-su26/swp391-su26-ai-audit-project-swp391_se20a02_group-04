@@ -37,6 +37,67 @@ const buildDateRangeQuery = (fromDate, toDate) => {
   return Object.keys(range).length ? range : null;
 };
 
+const maskCustomerName = (fullName = '') => {
+  const parts = String(fullName || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!parts.length) return 'Khách hàng MOTOCORE';
+  if (parts.length === 1) return `${parts[0].slice(0, 1)}***`;
+  return `${parts[0]} ${parts[parts.length - 1].slice(0, 1)}.`;
+};
+
+/**
+ * Public customer reviews for homepage
+ * GET /api/appointments/reviews
+ */
+const getPublicReviews = async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 30);
+
+    const appointments = await Appointment.find({
+      'review.rating': { $gte: 1, $lte: 5 },
+      status: { $in: ['COMPLETED', 'PAID'] }
+    })
+      .sort({ 'review.created_at': -1, updated_at: -1 })
+      .limit(limit)
+      .select('review service customer_snapshot vehicle vehicle_info appointment_code')
+      .lean();
+
+    const reviews = appointments
+      .map((item) => {
+        const rating = Number(item.review?.rating) || 0;
+        if (rating < 1 || rating > 5) return null;
+
+        const serviceName =
+          item.service?.name ||
+          item.service?.service_package ||
+          item.service?.type ||
+          'Dịch vụ garage';
+        const vehicleBrand = item.vehicle?.brand || item.vehicle_info?.brand || '';
+        const vehicleModel = item.vehicle?.model || item.vehicle_info?.model || '';
+
+        return {
+          id: String(item._id),
+          rating,
+          comment: String(item.review?.comment || '').trim(),
+          created_at: item.review?.created_at || null,
+          customer_name: maskCustomerName(item.customer_snapshot?.full_name),
+          service_name: serviceName,
+          vehicle_label: [vehicleBrand, vehicleModel].filter(Boolean).join(' ') || 'Xe máy',
+          appointment_code: item.appointment_code || null
+        };
+      })
+      .filter(Boolean);
+
+    return successResponse(res, 200, 'Reviews retrieved successfully', { reviews });
+  } catch (error) {
+    console.error('Get public reviews error:', error);
+    return errorResponse(res, 500, 'Failed to retrieve reviews');
+  }
+};
+
 /**
  * Create customer appointment
  * POST /api/appointments
@@ -320,9 +381,54 @@ const cancelMyAppointment = async (req, res) => {
   }
 };
 
+/**
+ * Submit review for a completed appointment
+ * POST /api/appointments/:id/review
+ */
+const reviewMyAppointment = async (req, res) => {
+  try {
+    const appointment = await Appointment.findOne({
+      _id: req.params.id,
+      customer_id: req.user.userId
+    });
+
+    if (!appointment) {
+      return errorResponse(res, 404, 'Appointment not found');
+    }
+
+    if (!['COMPLETED', 'PAID'].includes(appointment.status)) {
+      return errorResponse(res, 400, 'Only completed appointments can be reviewed');
+    }
+
+    if (Number(appointment.review?.rating) >= 1) {
+      return errorResponse(res, 400, 'This appointment has already been reviewed');
+    }
+
+    const rating = Number(req.body.rating);
+    const comment = typeof req.body.comment === 'string' ? req.body.comment.trim() : '';
+
+    appointment.review = {
+      rating,
+      comment: comment || null,
+      created_at: new Date()
+    };
+
+    await appointment.save();
+
+    return successResponse(res, 200, 'Review submitted successfully', {
+      appointment: appointment.toSafeObject()
+    });
+  } catch (error) {
+    console.error('Review appointment error:', error);
+    return errorResponse(res, 500, 'Failed to submit review');
+  }
+};
+
 module.exports = {
   createAppointment,
   getMyAppointments,
   getMyAppointmentById,
-  cancelMyAppointment
+  cancelMyAppointment,
+  reviewMyAppointment,
+  getPublicReviews
 };

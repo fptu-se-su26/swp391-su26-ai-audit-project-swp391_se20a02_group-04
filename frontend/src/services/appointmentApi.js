@@ -57,3 +57,23 @@ export function cancelAppointment(appointmentId, cancelReason = "") {
     body: JSON.stringify(cancelReason ? { cancel_reason: cancelReason } : {}),
   });
 }
+
+export function reviewAppointment(appointmentId, { rating, comment = "" } = {}) {
+  return appointmentRequest(`/appointments/${appointmentId}/review`, {
+    method: "POST",
+    body: JSON.stringify({ rating, comment }),
+  });
+}
+
+export async function getPublicReviews(limit = 12) {
+  const response = await fetch(
+    `${API_BASE_URL}/appointments/reviews?limit=${encodeURIComponent(limit)}`
+  );
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.success === false) {
+    throw new Error(payload.message || "Không thể tải đánh giá");
+  }
+
+  return payload;
+}

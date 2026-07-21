@@ -5,8 +5,8 @@ import { Sidebar } from "./StaffComponents";
 import StaffAttendance from "./StaffAttendance";
 import StaffDashboard from "./StaffDashboard";
 import StaffJobDetail, { StaffJobComplete, StaffJobMaterials, StaffJobStart } from "./StaffJobDetail";
+import StaffJobPayment from "./StaffJobPayment";
 import StaffJobs from "./StaffJobs";
-import StaffMaterials from "./StaffMaterials";
 import StaffProfile from "./StaffProfile";
 import StaffSchedule from "./StaffSchedule";
 
@@ -26,7 +26,7 @@ export default function StaffLayout() {
           <Route path="jobs/:jobId/start" element={<StaffJobStart />} />
           <Route path="jobs/:jobId/materials" element={<StaffJobMaterials />} />
           <Route path="jobs/:jobId/complete" element={<StaffJobComplete />} />
-          <Route path="materials" element={<StaffMaterials />} />
+          <Route path="jobs/:jobId/payment" element={<StaffJobPayment />} />
           <Route path="attendance" element={<StaffAttendance />} />
           <Route path="profile" element={<StaffProfile />} />
         </Routes>

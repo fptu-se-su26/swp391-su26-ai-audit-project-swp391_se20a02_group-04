@@ -12,6 +12,7 @@ const Notification = require('../models/Notification.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const {
   addMinutes,
+  assignAppointment,
   buildDateTime,
   calculateServiceDuration,
   checkRepairBayAvailability,
@@ -1034,14 +1035,13 @@ async function assignAppointmentWithSchedule(req, res) {
     }
 
     if (appointment.status !== 'CONFIRMED') {
-      return errorResponse(res, 400, 'Appointment must be confirmed before assigning technician and repair bay');
+      return errorResponse(res, 400, 'Appointment must be confirmed before assigning technician');
     }
 
     const staffId = req.body.staff_id || req.body.technician_id;
-    const repairBayId = req.body.repair_bay_id;
     const startTime = req.body.start_time || appointment.start_time || appointment.time_slot;
-    if (!staffId || !repairBayId || !startTime) {
-      return errorResponse(res, 400, 'staff_id, repair_bay_id và start_time là bắt buộc');
+    if (!staffId || !startTime) {
+      return errorResponse(res, 400, 'staff_id và start_time là bắt buộc');
     }
 
     const duration = await calculateServiceDuration(appointment);
@@ -1063,56 +1063,31 @@ async function assignAppointmentWithSchedule(req, res) {
 
     const startAt = buildDateTime(appointment.appointment_date, startTime);
     const endAt = addMinutes(startAt, duration);
-    const bayAvailability = await checkRepairBayAvailability(repairBayId, startAt, endAt, appointment._id);
-    if (!bayAvailability.available) {
-      return errorResponse(res, 409, bayAvailability.reason || 'Kệ sửa đã bận trong khung giờ này');
-    }
-
-    const previousStaffId = appointment.staff_id ? String(appointment.staff_id) : null;
-    const previousBayId = appointment.repair_bay_id ? String(appointment.repair_bay_id) : null;
-    const action = previousStaffId || previousBayId ? 'APPOINTMENT_REASSIGNED' : 'APPOINTMENT_ASSIGNED';
-
-    const assignment = await AppointmentAssignment.findOneAndUpdate(
-      { appointment_id: appointment._id },
-      {
-        appointment_id: appointment._id,
-        technician_id: staffId,
-        repair_bay_id: repairBayId,
-        assigned_by: req.user.userId,
-        assigned_at: new Date(),
-        estimated_start_time: startAt,
-        estimated_end_time: endAt,
-        duration_minutes: duration,
-        notes: req.body.note || req.body.notes || '',
-        status: 'ASSIGNED'
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
-
-    appointment.staff_id = staffId;
-    appointment.repair_bay_id = repairBayId;
-    appointment.assignment_id = assignment._id;
     appointment.start_time = startTime;
     appointment.time_slot = appointment.time_slot || startTime;
     appointment.appointment_start_at = startAt;
     appointment.estimated_end_time = endAt;
     appointment.total_service_duration_minutes = duration;
-    if (req.body.note || req.body.notes) appointment.staff_notes = req.body.note || req.body.notes;
     await appointment.save();
+
+    const previousStaffId = appointment.staff_id ? String(appointment.staff_id) : null;
+    const action = previousStaffId ? 'APPOINTMENT_REASSIGNED' : 'APPOINTMENT_ASSIGNED';
+
+    const updated = await assignAppointment({
+      appointmentId: appointment._id,
+      technicianId: staffId,
+      repairBayId: req.body.repair_bay_id || null,
+      assignedBy: req.user.userId,
+      notes: req.body.note || req.body.notes || '',
+      force: req.body.force
+    });
 
     await createAudit(req, action, {
       appointment_id: appointment._id,
       staff_id: staffId,
-      repair_bay_id: repairBayId,
       estimated_start_time: startAt,
       estimated_end_time: endAt
     });
-
-    const updated = await Appointment.findById(appointment._id)
-      .populate('customer_id', 'full_name email phone avatar_url')
-      .populate('staff_id', 'full_name email phone specialization')
-      .populate('repair_bay_id', 'name code location equipment status')
-      .populate('assignment_id');
 
     return successResponse(res, 200, 'Phân công appointment thành công', updated);
   } catch (error) {
