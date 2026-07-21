@@ -37,6 +37,9 @@ Nhóm sử dụng AI cho các mục tiêu chính sau:
 - Xây dựng trang đặt lịch cho customer.
 - Rà lại luồng chính của role Staff: xem việc, bắt đầu việc, ghi vật tư, hoàn thành việc, chấm công và hồ sơ.
 - Hỗ trợ phần API đặt lịch ở backend và service gọi API ở frontend.
+- Nâng cấp workflow Staff theo 4 bước: kiểm tra, liên hệ khách, vật tư và thanh toán.
+- Tích hợp luồng tạo QR PayOS ở backend, đồng thời giữ phương án xác nhận thanh toán tiền mặt.
+- Debug các lỗi thực tế khi test local: giới hạn request theo IP và quyền xem chi tiết công việc của Staff.
 - Sửa lỗi hiển thị tiếng Việt, lỗi route và lỗi build.
 - Viết lại file audit log để ghi nhận việc sử dụng AI minh bạch hơn.
 
@@ -282,6 +285,54 @@ Kết quả AI hỗ trợ:
 - Rút gọn các đoạn quá dài và quá giống mẫu.
 - Bổ sung phần Staff use case và Appointment API theo source hiện tại.
 - Giữ cách viết gần với nhật ký làm việc của nhóm hơn.
+
+---
+
+### Lần 8 - Nâng cấp workflow Staff và thanh toán PayOS
+
+| Nội dung | Thông tin |
+|---|---|
+| Ngày | 20/07/2026 |
+| Công cụ | ChatGPT / Codex |
+| Phần việc | Staff workflow, backend Appointment API, PayOS, frontend React |
+| Mức độ sử dụng | AI hỗ trợ đọc source, đề xuất và tạo nháp; nhóm kiểm tra luồng, chạy build/test |
+
+Prompt tiêu biểu:
+
+```text
+đọc design.md, requirements.md, tasks.md và thực hiện staff-workflow-enhancement
+tôi là dev tôi đang test hệ thống, giúp tôi mở giới hạn lần đăng nhập ip ra
+tôi đang ở phần công việc được giao tại sao không xem chi tiết được
+```
+
+Kết quả AI hỗ trợ:
+
+- Đọc codebase trước khi sửa để xác định module Staff đã có: `staff.appointment.controller`, `staff.inventory.controller`, `StaffJobs`, `StaffJobDetail`, mapper và service gọi API.
+- Mở rộng `Appointment` với `diagnosis_notes`, `contact_log`, `payment_info`; thêm index cho `assigned_at` và `payment_info.order_code` để phục vụ workflow và tra cứu thanh toán.
+- Bổ sung API Staff để lưu chẩn đoán, ghi nhận liên hệ khách, tạo payment link và kiểm tra trạng thái thanh toán.
+- Tạo `payos.service.js` và webhook `/api/webhooks/payos`. Credentials được đọc từ biến môi trường, không hard-code vào source.
+- Cập nhật giao diện Staff: danh sách job sort theo thời điểm được giao, có lọc ngày/loại dịch vụ; trang chi tiết dùng stepper 4 bước và có QR thực tế từ dữ liệu PayOS.
+- Giữ lại các route Staff cũ (`start`, `materials`, `complete`) để không làm ảnh hưởng demo/luồng hiện có.
+- Sửa limiter local development bằng `RATE_LIMIT_DISABLED=true`; production không tự tắt giới hạn request.
+- Phát hiện lỗi ownership khi xem chi tiết: sau khi populate, `staff_id` là User document nên không thể so sánh trực tiếp bằng `.toString()`. Nhóm đổi sang lấy `_id` trước khi so sánh với user trong JWT.
+
+Nhóm đã kiểm tra lại nghiệp vụ theo source. Ví dụ PayOS yêu cầu `orderCode` là số, trong khi `appointment_code` hiện tại là chuỗi `STAFFTEST-...`/`APT-...`; vì vậy code lưu một mã số ổn định trong `payment_info.order_code` để polling và webhook có thể tra ngược đúng Appointment, không thay đổi mã lịch hẹn đang dùng ở hệ thống.
+
+Minh chứng:
+
+| Nội dung | File/lệnh kiểm tra |
+|---|---|
+| Appointment workflow fields và index | `backend/src/models/Appointment.model.js` |
+| Staff workflow API | `backend/src/controllers/staff.appointment.controller.js`, `backend/src/routes/staff.appointment.routes.js` |
+| PayOS và webhook | `backend/src/services/payos.service.js`, `backend/src/routes/webhook.routes.js`, `backend/src/server.js` |
+| Biến môi trường mẫu | `backend/.env.example` |
+| Staff UI | `frontend/src/pages/staff/WorkflowStepper.js`, `frontend/src/pages/staff/steps/*`, `StaffJobs.js`, `StaffJobDetail.js` |
+| API client/mapper | `frontend/src/services/staffAppointmentApi.js`, `frontend/src/pages/staff/staffAppointmentMapper.js` |
+| Rate limit và lỗi ownership | `backend/src/middleware/rateLimiter.middleware.js`, `staff.appointment.controller.js`, `staff.inventory.controller.js` |
+| Frontend build | `cd frontend && npm run build` - thành công |
+| Backend test | `cd backend && npm test -- --runInBand` - 2 test suites, 6 tests pass |
+
+Hạn chế còn lại khi test PayOS: nhóm cần tự cấu hình `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` và đăng ký webhook public trên PayOS để kiểm tra QR/thanh toán thật. Các key này không được đưa vào Git hay audit log.
 
 ---
 
