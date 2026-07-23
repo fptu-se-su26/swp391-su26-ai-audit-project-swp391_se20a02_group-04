@@ -822,6 +822,71 @@
   gap: 14px;
 }
 
+.appointment-bill-panel {
+  margin-top: 4px;
+  padding: 16px;
+  border: 1px solid rgba(226, 191, 176, 0.52);
+  border-radius: 14px;
+  background: #fffaf7;
+}
+
+.appointment-bill-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.appointment-bill-heading span {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b6b5c;
+}
+
+.appointment-bill-heading strong {
+  font-size: 13px;
+  color: #116b33;
+}
+
+.appointment-bill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.appointment-bill-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.appointment-bill-row span {
+  color: #5a4136;
+}
+
+.appointment-bill-row strong {
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.appointment-bill-row.total {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(226, 191, 176, 0.7);
+  font-size: 15px;
+}
+
+.appointment-bill-meta {
+  margin: 10px 0 0;
+  color: #8b6b5c;
+  font-size: 12px;
+}
+
 .appointment-detail-actions {
   display: flex;
   justify-content: flex-end;

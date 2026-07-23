@@ -24,6 +24,7 @@ router.post('/payos', async (req, res) => {
       appointment.payment_info.status = 'PAID';
       appointment.payment_info.paid_at = safePaidAt;
       appointment.payment_info.amount = Number(data.amount || appointment.payment_info.amount || 0);
+      appointment.payment_info.method = 'PAYOS';
       appointment.final_cost = appointment.payment_info.amount;
       appointment.status = 'COMPLETED';
       appointment.completed_at = appointment.completed_at || safePaidAt;

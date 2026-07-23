@@ -4,6 +4,7 @@ const UserAudit = require('../models/UserAudit.model');
 const StaffAttendance = require('../models/StaffAttendance.model');
 const WorkSchedule = require('../models/WorkSchedule.model');
 const InventoryTransaction = require('../models/InventoryTransaction.model');
+const Service = require('../models/Service.model');
 const payosService = require('../services/payos.service');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const { hasFullAssignment, validateAppointmentTransition } = require('../utils/appointmentStateMachine');
@@ -37,11 +38,37 @@ const ensureInProgressAppointment = (appointment, user) => {
   return { ok: true };
 };
 
-const getBillDetails = async (appointment) => {
-  const service = appointment.service_id && typeof appointment.service_id === 'object'
+const getAddonServicesTotal = (appointment) => {
+  const addons = Array.isArray(appointment.addon_services) ? appointment.addon_services : [];
+  return addons.reduce((sum, item) => {
+    const qty = Math.max(1, Number(item.quantity) || 1);
+    return sum + Number(item.price || 0) * qty;
+  }, 0);
+};
+
+// REPAIR is booked as "quote after inspection" (estimated_price null).
+// Do not fall back to catalog base_price for REPAIR — that invents a fake labor line.
+const getLaborPrice = (appointment) => {
+  const serviceSnap = appointment.service || {};
+  const serviceType = String(serviceSnap.type || '').toUpperCase();
+  const quoted = serviceSnap.estimated_price;
+
+  if (quoted !== null && quoted !== undefined && quoted !== '') {
+    return Number(quoted) || 0;
+  }
+
+  if (serviceType === 'REPAIR') {
+    return 0;
+  }
+
+  const serviceDoc = appointment.service_id && typeof appointment.service_id === 'object'
     ? appointment.service_id
     : null;
-  const basePrice = Number(service?.base_price || appointment.service?.estimated_price || 0);
+  return Number(serviceDoc?.base_price || 0);
+};
+
+const getBillDetails = async (appointment) => {
+  const basePrice = getLaborPrice(appointment);
   const materials = await InventoryTransaction.find({
     reference_type: 'APPOINTMENT',
     reference_id: appointment._id,
@@ -49,11 +76,13 @@ const getBillDetails = async (appointment) => {
     is_reversed: { $ne: true }
   }).select('total_cost');
   const materialsTotal = materials.reduce((sum, transaction) => sum + Number(transaction.total_cost || 0), 0);
+  const addonTotal = getAddonServicesTotal(appointment);
 
   return {
     basePrice,
     materialsTotal,
-    total: Math.round(basePrice + materialsTotal)
+    addonTotal,
+    total: Math.round(basePrice + materialsTotal + addonTotal)
   };
 };
 
@@ -71,7 +100,8 @@ const applyPaidPayment = async (appointment, payment) => {
     ...(appointment.payment_info?.toObject?.() || appointment.payment_info || {}),
     status: 'PAID',
     paid_at: now,
-    amount: Number(payment.amount || appointment.payment_info?.amount || 0)
+    amount: Number(payment.amount || appointment.payment_info?.amount || 0),
+    method: 'PAYOS'
   };
   appointment.final_cost = Number(payment.amount || appointment.payment_info?.amount || 0);
   appointment.status = 'COMPLETED';
@@ -715,7 +745,7 @@ const startAppointment = async (req, res) => {
 const completeAppointment = async (req, res) => {
   try {
     const { completion_notes = '', actual_duration, final_cost } = req.body;
-    const appointment = await Appointment.findById(req.params.id);
+    const appointment = await Appointment.findById(req.params.id).populate('service_id', 'service_name base_price');
     if (!appointment) return errorResponse(res, 404, 'Appointment not found');
 
     const ownership = checkStaffAppointmentOwnership(appointment, req.user);
@@ -729,6 +759,15 @@ const completeAppointment = async (req, res) => {
 
     const now = new Date();
     const oldStatus = appointment.status;
+    const bill = await getBillDetails(appointment);
+    const paidAmount = final_cost !== undefined && final_cost !== null && final_cost !== ''
+      ? Number(final_cost)
+      : bill.total;
+
+    if (!Number.isFinite(paidAmount) || paidAmount < 0) {
+      return errorResponse(res, 400, 'Final cost must be a non-negative number');
+    }
+
     appointment.status = 'COMPLETED';
     appointment.completed_at = now;
     appointment.actual_end_time = now;
@@ -739,16 +778,30 @@ const completeAppointment = async (req, res) => {
     } else if (appointment.actual_start_time) {
       appointment.actual_duration = Math.max(1, Math.round((now - appointment.actual_start_time) / 60000));
     }
-    if (final_cost !== undefined) {
-      appointment.final_cost = Number(final_cost);
+
+    appointment.final_cost = paidAmount;
+    const existingPayment = appointment.payment_info?.toObject?.() || appointment.payment_info || {};
+    appointment.payment_info = {
+      ...existingPayment,
+      status: 'PAID',
+      paid_at: now,
+      amount: paidAmount,
+      method: existingPayment.method === 'PAYOS' || existingPayment.order_code ? (existingPayment.method || 'PAYOS') : 'CASH'
+    };
+    // Cash path always records CASH unless this was already a PayOS order that got settled at counter
+    if (!existingPayment.order_code) {
+      appointment.payment_info.method = 'CASH';
     }
+
     await appointment.save();
 
     await createAuditSafely(req, 'APPOINTMENT_STATUS_CHANGED', {
       appointment_id: appointment._id,
       old_status: oldStatus,
       new_status: appointment.status,
-      actual_duration: appointment.actual_duration
+      actual_duration: appointment.actual_duration,
+      payment_method: appointment.payment_info.method,
+      final_cost: appointment.final_cost
     });
 
     const updated = await populateStaffAppointment(Appointment.findById(appointment._id));
@@ -768,13 +821,29 @@ const saveDiagnosis = async (req, res) => {
     if (!access.ok) return errorResponse(res, access.statusCode, access.message);
 
     appointment.diagnosis_notes = req.body.diagnosis_notes.trim();
+
+    // Staff sets labor quote after inspection (especially for REPAIR bookings).
+    if (req.body.quoted_price !== undefined && req.body.quoted_price !== null && req.body.quoted_price !== '') {
+      const quotedPrice = Number(req.body.quoted_price);
+      if (!Number.isFinite(quotedPrice) || quotedPrice < 0) {
+        return errorResponse(res, 400, 'Quoted labor price must be a non-negative number');
+      }
+      if (!appointment.service) appointment.service = {};
+      appointment.service.estimated_price = quotedPrice;
+      appointment.markModified('service');
+    }
+
     await appointment.save();
-    await createAuditSafely(req, 'APPOINTMENT_DIAGNOSIS_SAVED', { appointment_id: appointment._id });
+    await createAuditSafely(req, 'APPOINTMENT_DIAGNOSIS_SAVED', {
+      appointment_id: appointment._id,
+      quoted_price: appointment.service?.estimated_price ?? null
+    });
 
     return successResponse(res, 200, 'Diagnosis saved successfully', {
       appointment: {
         _id: appointment._id,
-        diagnosis_notes: appointment.diagnosis_notes
+        diagnosis_notes: appointment.diagnosis_notes,
+        service: appointment.service
       }
     });
   } catch (error) {
@@ -845,6 +914,92 @@ const saveRepairLog = async (req, res) => {
   }
 };
 
+const saveAddonServices = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const access = ensureInProgressAppointment(appointment, req.user);
+    if (!access.ok) return errorResponse(res, access.statusCode, access.message);
+
+    const paymentStatus = appointment.payment_info?.status;
+    if (paymentStatus === 'PENDING' || paymentStatus === 'PAID') {
+      return errorResponse(
+        res,
+        422,
+        'Không thể đổi dịch vụ bổ sung sau khi đã tạo QR PayOS hoặc đã thanh toán (tránh lệch số tiền hóa đơn).'
+      );
+    }
+
+    const items = Array.isArray(req.body.items) ? req.body.items : [];
+    if (items.length > 20) {
+      return errorResponse(res, 400, 'Cannot add more than 20 add-on services');
+    }
+
+    if (items.length === 0) {
+      appointment.addon_services = [];
+      await appointment.save();
+      await createAuditSafely(req, 'APPOINTMENT_ADDON_SERVICES_CLEARED', {
+        appointment_id: appointment._id
+      });
+      return successResponse(res, 200, 'Add-on services cleared successfully', {
+        appointment: {
+          _id: appointment._id,
+          addon_services: appointment.addon_services
+        }
+      });
+    }
+
+    const serviceIds = [...new Set(items.map((item) => String(item.service_id || '')).filter(Boolean))];
+    if (serviceIds.length !== items.length) {
+      return errorResponse(res, 400, 'Each add-on item requires a valid service_id');
+    }
+
+    const services = await Service.find({
+      _id: { $in: serviceIds },
+      is_active: true
+    }).select('service_name base_price');
+
+    if (services.length !== serviceIds.length) {
+      return errorResponse(res, 400, 'One or more add-on services were not found or inactive');
+    }
+
+    const serviceMap = new Map(services.map((service) => [String(service._id), service]));
+    const now = new Date();
+    const staffId = req.user.userId || req.user._id || null;
+
+    appointment.addon_services = items.map((item) => {
+      const service = serviceMap.get(String(item.service_id));
+      const quantity = Math.min(20, Math.max(1, Number.parseInt(item.quantity, 10) || 1));
+      return {
+        service_id: service._id,
+        name: service.service_name,
+        price: Number(service.base_price || 0),
+        quantity,
+        added_at: now,
+        added_by: staffId
+      };
+    });
+
+    await appointment.save();
+    await createAuditSafely(req, 'APPOINTMENT_ADDON_SERVICES_SAVED', {
+      appointment_id: appointment._id,
+      count: appointment.addon_services.length,
+      total: getAddonServicesTotal(appointment)
+    });
+
+    return successResponse(res, 200, 'Add-on services saved successfully', {
+      appointment: {
+        _id: appointment._id,
+        addon_services: appointment.addon_services
+      }
+    });
+  } catch (error) {
+    console.error('Save appointment add-on services error:', error);
+    return errorResponse(res, 500, 'Failed to save add-on services');
+  }
+};
+
 const createPayment = async (req, res) => {
   try {
     const appointment = await Appointment.findById(req.params.id).populate('service_id', 'service_name base_price');
@@ -884,7 +1039,8 @@ const createPayment = async (req, res) => {
       qr_code: payment.qr_code,
       status: 'PENDING',
       paid_at: null,
-      amount: bill.total
+      amount: bill.total,
+      method: 'PAYOS'
     };
     await appointment.save();
     await createAuditSafely(req, 'APPOINTMENT_PAYMENT_CREATED', {
@@ -1222,6 +1378,7 @@ module.exports = {
   saveDiagnosis,
   saveContactLog,
   saveRepairLog,
+  saveAddonServices,
   createPayment,
   getPaymentStatus,
   markNoShow,

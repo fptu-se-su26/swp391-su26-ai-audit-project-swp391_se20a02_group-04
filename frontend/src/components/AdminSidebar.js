@@ -9,8 +9,8 @@ import {
   Package,
   User,
   LogOut,
-  CircleHelp,
   Bot,
+  BellRing,
 } from "lucide-react";
 import { getAuthSession, clearAuthSession } from "../services/authApi";
 import "../styles/admin/AdminDashboard.css";
@@ -34,12 +34,12 @@ export default function AdminSidebar({ activeView, onViewChange }) {
   ["dashboard", LayoutDashboard, "Tổng quan"],
   ["calendar", Calendar, "Lịch hẹn"],
   ["services", Wrench, "Dịch vụ"],
+  ["reminders", BellRing, "Nhắc bảo dưỡng"],
   ["customers", Users, "Khách hàng"],
   ["users", Shield, "Người dùng"],
   ["inventory", Package, "Kho"],
   ["ai", Bot, "Trợ lý AI"],
   ["profile", User, "Hồ sơ"],
-  ["contact", CircleHelp, "Liên hệ"],
 ];
   return (
     <aside className="sidebar">

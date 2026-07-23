@@ -203,6 +203,68 @@ function formatMoney(value) {
   }).format(value);
 }
 
+function getCustomerLaborCost(appointment = {}) {
+  const service = appointment.service || {};
+  const serviceDoc = appointment.service_id || {};
+  if (service.estimated_price !== null && service.estimated_price !== undefined && service.estimated_price !== "") {
+    return Number(service.estimated_price) || 0;
+  }
+  if (String(service.type || "").toUpperCase() === "REPAIR") {
+    return null;
+  }
+  if (serviceDoc.base_price !== null && serviceDoc.base_price !== undefined) {
+    return Number(serviceDoc.base_price) || 0;
+  }
+  return null;
+}
+
+function getCustomerBillBreakdown(appointment = {}) {
+  const materials = appointment.materials_used || [];
+  const addons = Array.isArray(appointment.addon_services) ? appointment.addon_services : [];
+  const labor = getCustomerLaborCost(appointment);
+  const materialsTotal = materials.reduce((sum, row) => sum + Number(row.total_cost || 0), 0);
+  const addonTotal = addons.reduce(
+    (sum, item) => sum + Number(item.price || 0) * Math.max(1, Number(item.quantity) || 1),
+    0
+  );
+  const computed = (labor === null ? 0 : Number(labor) || 0) + materialsTotal + addonTotal;
+  const finalCost =
+    appointment.final_cost !== null && appointment.final_cost !== undefined
+      ? Number(appointment.final_cost)
+      : null;
+  const paymentAmount =
+    appointment.payment_info?.amount !== null && appointment.payment_info?.amount !== undefined
+      ? Number(appointment.payment_info.amount)
+      : null;
+
+  return {
+    labor,
+    materials,
+    addons,
+    materialsTotal,
+    addonTotal,
+    computedTotal: computed,
+    displayTotal:
+      finalCost ??
+      paymentAmount ??
+      (labor === null && !materials.length && !addons.length ? null : computed),
+    paymentStatus: appointment.payment_info?.status || null,
+    paymentMethod: appointment.payment_info?.method || null,
+    paidAt: appointment.payment_info?.paid_at || null,
+  };
+}
+
+function getPaymentStatusLabel(status, method) {
+  if (status === "PAID") {
+    if (method === "CASH") return "Đã thanh toán (tiền mặt)";
+    if (method === "PAYOS" || method === "ONLINE") return "Đã thanh toán (trực tuyến)";
+    return "Đã thanh toán";
+  }
+  if (status === "PENDING") return "Đang chờ thanh toán";
+  if (status === "CANCELLED") return "Thanh toán đã hủy";
+  return "Chưa thanh toán";
+}
+
 export default function UserProfile() {
   const [activeTab, setActiveTab] = useState("info");
   const [isSaving, setIsSaving] = useState(false);
@@ -524,7 +586,10 @@ export default function UserProfile() {
     try {
       const res = await getMyAppointmentById(appointment._id);
       if (res.data?.appointment) {
-        const detail = res.data.appointment;
+        const detail = {
+          ...res.data.appointment,
+          materials_used: res.data.materials_used || [],
+        };
         setSelectedAppointment(detail);
         setReviewRating(Number(detail.review?.rating) || 0);
         setReviewComment(detail.review?.comment || "");
@@ -987,9 +1052,30 @@ export default function UserProfile() {
                               <p>{selectedAppointment.service?.description || selectedAppointment.service?.repair_issue || "Chưa có mô tả dịch vụ."}</p>
                             </div>
                             <div className="appointment-detail-block">
-                              <span>Chi phí dự kiến</span>
-                              <strong>{formatMoney(selectedAppointment.service?.estimated_price)}</strong>
-                              <p>{selectedAppointment.service?.estimated_duration_minutes || selectedAppointment.estimated_duration || 60} phút xử lý dự kiến</p>
+                              <span>Chi phí</span>
+                              <strong>
+                                {formatMoney(
+                                  selectedAppointment.final_cost ??
+                                    selectedAppointment.payment_info?.amount ??
+                                    getCustomerLaborCost(selectedAppointment)
+                                )}
+                              </strong>
+                              <p>
+                                {selectedAppointment.final_cost != null ||
+                                selectedAppointment.payment_info?.status === "PAID"
+                                  ? "Tổng thanh toán"
+                                  : selectedAppointment.service?.estimated_price != null
+                                    ? "Công dịch vụ đã báo giá / ước tính"
+                                    : "Báo giá sau kiểm tra"}
+                                {selectedAppointment.service?.estimated_duration_minutes ||
+                                selectedAppointment.estimated_duration
+                                  ? ` · ${
+                                      selectedAppointment.service?.estimated_duration_minutes ||
+                                      selectedAppointment.estimated_duration ||
+                                      60
+                                    } phút dự kiến`
+                                  : ""}
+                              </p>
                             </div>
                             <div className="appointment-detail-block">
                               <span>Thông tin xe</span>
@@ -1008,6 +1094,81 @@ export default function UserProfile() {
                               <p>{selectedAppointment.customer_snapshot?.phone || user.phone}</p>
                             </div>
                           </div>
+
+                          {(() => {
+                            const bill = getCustomerBillBreakdown(selectedAppointment);
+                            const hasBillLines =
+                              bill.labor !== null ||
+                              bill.materials.length > 0 ||
+                              bill.addons.length > 0 ||
+                              bill.displayTotal !== null ||
+                              bill.paymentStatus;
+
+                            if (!hasBillLines) return null;
+
+                            return (
+                              <div className="appointment-bill-panel">
+                                <div className="appointment-bill-heading">
+                                  <span>Chi tiết thanh toán</span>
+                                  <strong>
+                                    {getPaymentStatusLabel(bill.paymentStatus, bill.paymentMethod)}
+                                  </strong>
+                                </div>
+                                <div className="appointment-bill-list">
+                                  <div className="appointment-bill-row">
+                                    <span>Công dịch vụ</span>
+                                    <strong>
+                                      {bill.labor === null ? "Chưa báo giá" : formatMoney(bill.labor)}
+                                    </strong>
+                                  </div>
+                                  {bill.materials.map((row) => {
+                                    const item = row.inventory_item_id || {};
+                                    return (
+                                      <div className="appointment-bill-row" key={row._id || `${item.item_name}-${row.total_cost}`}>
+                                        <span>
+                                          {item.item_name || "Phụ tùng"}
+                                          {row.quantity_change
+                                            ? ` × ${Math.abs(row.quantity_change)} ${item.unit || ""}`
+                                            : ""}
+                                        </span>
+                                        <strong>{formatMoney(row.total_cost)}</strong>
+                                      </div>
+                                    );
+                                  })}
+                                  {bill.addons.map((item) => (
+                                    <div
+                                      className="appointment-bill-row"
+                                      key={`${item.service_id || item.name}-${item.price}`}
+                                    >
+                                      <span>
+                                        {item.name || "Dịch vụ bổ sung"}
+                                        {Number(item.quantity) > 1 ? ` × ${item.quantity}` : ""}
+                                      </span>
+                                      <strong>
+                                        {formatMoney(
+                                          Number(item.price || 0) * Math.max(1, Number(item.quantity) || 1)
+                                        )}
+                                      </strong>
+                                    </div>
+                                  ))}
+                                  <div className="appointment-bill-row total">
+                                    <span>Tổng cộng</span>
+                                    <strong>{formatMoney(bill.displayTotal)}</strong>
+                                  </div>
+                                </div>
+                                {bill.paidAt && (
+                                  <p className="appointment-bill-meta">
+                                    Thanh toán lúc {new Date(bill.paidAt).toLocaleString("vi-VN")}
+                                    {bill.paymentMethod === "CASH"
+                                      ? " · Tiền mặt"
+                                      : bill.paymentMethod === "PAYOS" || bill.paymentMethod === "ONLINE"
+                                        ? " · PayOS"
+                                        : ""}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           <div className="appointment-note-grid">
                             <div>

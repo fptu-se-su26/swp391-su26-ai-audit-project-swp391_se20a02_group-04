@@ -5,6 +5,7 @@ const Service = require('../models/Service.model');
 const User = require('../models/User.model');
 const UserRole = require('../models/UserRole.model');
 const Role = require('../models/Role.model');
+const { notifyStaffAssigned } = require('../utils/staffNotification.util');
 
 const ACTIVE_STATUSES = ['PENDING', 'CONFIRMED', 'IN_PROGRESS'];
 
@@ -243,6 +244,8 @@ async function assignAppointment({ appointmentId, technicianId, repairBayId, ass
     });
   }
 
+  const previousStaffId = appointment.staff_id ? String(appointment.staff_id) : null;
+
   appointment.staff_id = technician._id;
   appointment.repair_bay_id = repairBay ? repairBay._id : null;
   appointment.assignment_id = assignment._id;
@@ -255,6 +258,8 @@ async function assignAppointment({ appointmentId, technicianId, repairBayId, ass
   if (notes) appointment.staff_notes = notes;
 
   await appointment.save();
+
+  await notifyStaffAssigned(appointment, technician._id, { previousStaffId });
 
   return Appointment.findById(appointment._id)
     .populate('customer_id', 'full_name email phone avatar_url')

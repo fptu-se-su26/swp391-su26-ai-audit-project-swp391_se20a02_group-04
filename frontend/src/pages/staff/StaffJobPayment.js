@@ -44,11 +44,20 @@ export default function StaffJobPayment() {
   }, [jobId]);
 
   const materials = job?.materialsUsed || [];
+  const addons = job?.addonServices || [];
   const materialTotal = useMemo(
     () => materials.reduce((sum, item) => sum + Number(item.total_cost || 0), 0),
     [materials]
   );
-  const total = Number(job?.laborCostValue || 0) + materialTotal;
+  const addonTotal = useMemo(
+    () =>
+      addons.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Math.max(1, Number(item.quantity) || 1),
+        0
+      ),
+    [addons]
+  );
+  const total = Number(job?.laborCostValue || 0) + materialTotal + addonTotal;
   const displayTotal = job?.raw?.final_cost ?? total;
   const routeId = job ? getJobRouteId(job) : jobId;
   const isCompleted =
@@ -146,9 +155,14 @@ export default function StaffJobPayment() {
             </h3>
             <div className="cost-list">
               <div>
-                <span>Công dịch vụ</span>
+                <span>Công dịch vụ{job.needsLaborQuote ? " (chưa báo giá)" : ""}</span>
                 <strong>{formatCurrency(job.laborCostValue)}</strong>
               </div>
+              {job.needsLaborQuote && (
+                <p className="form-message warning">
+                  Phiếu sửa chữa chưa có báo giá công. Quay lại bước Kiểm tra để nhập giá.
+                </p>
+              )}
               {materials.map((transaction) => {
                 const item = transaction.inventory_item_id || {};
                 return (
@@ -161,6 +175,17 @@ export default function StaffJobPayment() {
                   </div>
                 );
               })}
+              {addons.map((item) => (
+                <div key={`${item.service_id}-${item.name}`}>
+                  <span>
+                    {item.name || "Dịch vụ bổ sung"}
+                    {Number(item.quantity) > 1 ? ` × ${item.quantity}` : ""}
+                  </span>
+                  <strong>
+                    {formatCurrency(Number(item.price || 0) * Math.max(1, Number(item.quantity) || 1))}
+                  </strong>
+                </div>
+              ))}
               <div className="cost-total">
                 <span>Tổng cộng</span>
                 <strong>{formatCurrency(displayTotal)}</strong>

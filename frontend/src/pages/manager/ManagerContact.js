@@ -13,7 +13,6 @@ import {
   CircleDot,
   UserRound,
 } from "lucide-react";
-import AdminSidebar from "../../components/AdminSidebar";
 import { chatApi } from "../../services/chatApi";
 import "../../styles/admin/AdminDashboard.css";
 import "../../styles/admin/AdminContact.css";
@@ -61,7 +60,7 @@ function isRateLimitError(message = "") {
   return /too many requests/i.test(message);
 }
 
-export default function AdminContact({ onViewChange }) {
+export default function ManagerContact() {
   const [conversations, setConversations] = useState([]);
   const [stats, setStats] = useState({ total: 0, waiting_admin: 0, in_progress: 0, resolved: 0 });
   const [activeId, setActiveId] = useState("");
@@ -236,14 +235,12 @@ export default function AdminContact({ onViewChange }) {
   const statusMeta = STATUS_META[activeConversation?.status] || STATUS_META.OPEN;
 
   return (
-    <div className="contact-layout dashboard-layout">
-      <AdminSidebar activeView="contact" onViewChange={onViewChange} />
-
-      <main className="main-content contact-main">
+    <div className="contact-layout is-embedded">
+      <div className="contact-main">
         <header className="contact-topbar">
           <div className="contact-topbar-title">
             <span>Chăm sóc khách hàng</span>
-            <h2>Liên hệ</h2>
+            <h2>Hộp thư hỗ trợ</h2>
           </div>
 
           <div className="contact-kpi-strip" aria-label="Thống kê hội thoại">
@@ -494,7 +491,7 @@ export default function AdminContact({ onViewChange }) {
             </aside>
           </section>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@ const User = require('../models/User.model');
 const Notification = require('../models/Notification.model');
 const Role = require('../models/Role.model');
 const UserRole = require('../models/UserRole.model');
+const InventoryTransaction = require('../models/InventoryTransaction.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const {
   ACTIVE_APPOINTMENT_STATUSES,
@@ -326,14 +327,27 @@ const getMyAppointmentById = async (req, res) => {
     const appointment = await Appointment.findOne({
       _id: req.params.id,
       customer_id: req.user.userId
-    }).select('-__v');
+    })
+      .populate('service_id', 'service_name base_price category estimated_duration')
+      .populate('staff_id', 'full_name')
+      .select('-__v');
 
     if (!appointment) {
       return errorResponse(res, 404, 'Appointment not found');
     }
 
+    const materials_used = await InventoryTransaction.find({
+      reference_type: 'APPOINTMENT',
+      reference_id: appointment._id,
+      transaction_type: 'STOCK_OUT',
+      is_reversed: { $ne: true }
+    })
+      .populate('inventory_item_id', 'item_code item_name unit unit_price')
+      .sort({ created_at: -1 });
+
     return successResponse(res, 200, 'Appointment retrieved successfully', {
-      appointment
+      appointment,
+      materials_used
     });
 
   } catch (error) {

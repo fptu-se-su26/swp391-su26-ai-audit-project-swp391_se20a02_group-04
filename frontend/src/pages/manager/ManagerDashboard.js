@@ -50,13 +50,12 @@ function CountUp({ value, suffix = "", decimals = 0 }) {
 }
 
 export default function ManagerDashboard({ bays = [], technicians = [], appointments = [], refreshData }) {
-  const [lowStock, setLowStock] = useState([
-    { name: "Nhớt Motul 300V 10W40", amount: "Còn 5L", percent: 20, tone: "danger" },
-    { name: "Má phanh Brembo Carbon", amount: "Còn 2 bộ", percent: 14, tone: "danger" },
-    { name: "Lọc gió K&N CB650R", amount: "Còn 3 cái", percent: 28, tone: "warning" },
-  ]);
+  const [lowStock, setLowStock] = useState([]);
   const [staffPerformance, setStaffPerformance] = useState([]);
   const [timeFilter, setTimeFilter] = useState("1 tuần");
+
+  const getAppRevenue = (app) =>
+    Number(app.raw?.final_cost || app.raw?.payment_info?.amount || 0);
 
   // Load backend statistics
   useEffect(() => {
@@ -71,13 +70,13 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
           const mappedStock = stockRes.data.map(item => {
             const pct = Math.round((item.quantity / (item.min_quantity || 10)) * 100);
             return {
-              name: item.name,
+              name: item.name || item.item_name,
               amount: `Còn ${item.quantity} ${item.unit || "cái"}`,
               percent: Math.min(100, pct),
               tone: pct < 15 ? "danger" : "warning"
             };
           });
-          if (mappedStock.length > 0) setLowStock(mappedStock);
+          setLowStock(mappedStock);
         }
 
         if (Array.isArray(staffRes)) {
@@ -91,7 +90,10 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
   }, []);
 
   // Today Date details
-  const todayStr = useMemo(() => new Date().toLocaleDateString("sv-SE"), []); // YYYY-MM-DD
+  const todayStr = useMemo(() => {
+    const local = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
+  }, []);
   const todayAppointments = useMemo(() => {
     return appointments.filter(app => app.apiDate === todayStr);
   }, [appointments, todayStr]);
@@ -103,169 +105,194 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
   }, [appointments]);
 
   // Today's occupancy details
-  const totalBays = bays.length || 10;
+  const totalBays = bays.length || 0;
   const occupiedBays = bays.filter(b => b.occupied).length;
   const occupancyRate = totalBays > 0 ? Math.round((occupiedBays / totalBays) * 100) : 0;
 
-  // Monthly Revenue Sum
-  const monthlyRevenueVal = useMemo(() => {
-    const completedApps = appointments.filter(app => app.status === "COMPLETED");
-    if (completedApps.length === 0) return 186.5; // Premium mockup total in millions
+  const completedAppointments = useMemo(
+    () => appointments.filter((app) => app.status === "COMPLETED"),
+    [appointments]
+  );
 
-    const total = completedApps.reduce((sum, app) => sum + (app.raw?.final_cost || 0), 0);
+  // Monthly Revenue Sum (real data only)
+  const monthlyRevenueVal = useMemo(() => {
+    const monthPrefix = todayStr.slice(0, 7);
+    const monthCompleted = completedAppointments.filter((app) => {
+      const dateKey = String(app.raw?.completed_at || app.apiDate || "").slice(0, 7);
+      return dateKey === monthPrefix;
+    });
+    const total = monthCompleted.reduce((sum, app) => sum + getAppRevenue(app), 0);
     return Number((total / 1000000).toFixed(1));
-  }, [appointments]);
+  }, [completedAppointments, todayStr]);
 
   // Revenue chart items based on selected period
   const chartBars = useMemo(() => {
+    const toHeight = (values) => {
+      const maxVal = Math.max(0, ...values.map((row) => row[1]));
+      return values.map(([label, amount]) => {
+        const height = maxVal > 0 ? (amount / maxVal) * 80 + 10 : 8;
+        return [label, Math.round(height)];
+      });
+    };
+
     if (timeFilter === "1 tuần") {
       const weekdays = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-      const revenueMap = { "T2": 0, "T3": 0, "T4": 0, "T5": 0, "T6": 0, "T7": 0, "CN": 0 };
+      const revenueMap = { T2: 0, T3: 0, T4: 0, T5: 0, T6: 0, T7: 0, CN: 0 };
       const weekdayMap = { 0: "CN", 1: "T2", 2: "T3", 3: "T4", 4: "T5", 5: "T6", 6: "T7" };
 
-      const completed = appointments.filter(app => app.status === "COMPLETED");
-      
-      if (completed.length === 0) {
-        // Fallback mockup bar heights
-        return [
-          ["T2", 46],
-          ["T3", 58],
-          ["T4", 52],
-          ["T5", 74],
-          ["T6", 88],
-          ["T7", 65],
-          ["CN", 72],
-        ];
-      }
-
-      completed.forEach(app => {
+      completedAppointments.forEach((app) => {
         const date = new Date(app.raw?.completed_at || app.apiDate);
+        if (Number.isNaN(date.getTime())) return;
         const dayName = weekdayMap[date.getDay()];
         if (revenueMap[dayName] !== undefined) {
-          revenueMap[dayName] += Number(app.raw?.final_cost || 0);
+          revenueMap[dayName] += getAppRevenue(app);
         }
       });
 
-      const maxVal = Math.max(...Object.values(revenueMap));
-      return weekdays.map(day => {
-        const height = maxVal > 0 ? (revenueMap[day] / maxVal) * 80 + 10 : 25;
-        return [day, Math.round(height)];
-      });
+      return toHeight(weekdays.map((day) => [day, revenueMap[day]]));
     }
 
     if (timeFilter === "1 tháng") {
-      return [
-        ["Tuần 1", 35],
-        ["Tuần 2", 55],
-        ["Tuần 3", 75],
-        ["Tuần 4", 90]
+      const buckets = [
+        ["Tuần 1", 0],
+        ["Tuần 2", 0],
+        ["Tuần 3", 0],
+        ["Tuần 4", 0],
       ];
+      completedAppointments.forEach((app) => {
+        const date = new Date(app.raw?.completed_at || app.apiDate);
+        if (Number.isNaN(date.getTime())) return;
+        if (date.getMonth() !== new Date().getMonth() || date.getFullYear() !== new Date().getFullYear()) return;
+        const weekIndex = Math.min(3, Math.floor((date.getDate() - 1) / 7));
+        buckets[weekIndex][1] += getAppRevenue(app);
+      });
+      return toHeight(buckets);
     }
 
     if (timeFilter === "1 quý") {
-      return [
-        ["Tháng 1", 60],
-        ["Tháng 2", 75],
-        ["Tháng 3", 90]
+      const now = new Date();
+      const quarter = Math.floor(now.getMonth() / 3);
+      const buckets = [
+        [`Tháng ${quarter * 3 + 1}`, 0],
+        [`Tháng ${quarter * 3 + 2}`, 0],
+        [`Tháng ${quarter * 3 + 3}`, 0],
       ];
+      completedAppointments.forEach((app) => {
+        const date = new Date(app.raw?.completed_at || app.apiDate);
+        if (Number.isNaN(date.getTime()) || date.getFullYear() !== now.getFullYear()) return;
+        const appQuarter = Math.floor(date.getMonth() / 3);
+        if (appQuarter !== quarter) return;
+        const index = date.getMonth() % 3;
+        buckets[index][1] += getAppRevenue(app);
+      });
+      return toHeight(buckets);
     }
 
-    // 1 năm
-    return [
-      ["Q1", 50],
-      ["Q2", 65],
-      ["Q3", 80],
-      ["Q4", 95]
+    const yearBuckets = [
+      ["Q1", 0],
+      ["Q2", 0],
+      ["Q3", 0],
+      ["Q4", 0],
     ];
-  }, [appointments, timeFilter]);
+    completedAppointments.forEach((app) => {
+      const date = new Date(app.raw?.completed_at || app.apiDate);
+      if (Number.isNaN(date.getTime()) || date.getFullYear() !== new Date().getFullYear()) return;
+      yearBuckets[Math.floor(date.getMonth() / 3)][1] += getAppRevenue(app);
+    });
+    return toHeight(yearBuckets);
+  }, [completedAppointments, timeFilter]);
 
   // Report statistics summary table
   const reportsSummary = useMemo(() => {
-    const totalVND = monthlyRevenueVal * 1000000;
-    const completedCount = appointments.filter(a => a.status === "COMPLETED").length || 32;
-    const avgInvoice = completedCount > 0 ? Math.round(totalVND / completedCount) : 0;
-    const avgInvoiceStr = avgInvoice >= 1000000 ? `${(avgInvoice / 1000000).toFixed(1)}M` : avgInvoice >= 1000 ? `${Math.round(avgInvoice / 1000)}K` : `${avgInvoice}`;
+    const monthCompleted = completedAppointments.filter((app) => {
+      const dateKey = String(app.raw?.completed_at || app.apiDate || "").slice(0, 7);
+      return dateKey === todayStr.slice(0, 7);
+    });
+    const monthCount = monthCompleted.length;
+    const totalVND = monthCompleted.reduce((sum, app) => sum + getAppRevenue(app), 0);
+    const avgInvoice = monthCount > 0 ? Math.round(totalVND / monthCount) : 0;
+    const avgInvoiceStr =
+      avgInvoice >= 1000000
+        ? `${(avgInvoice / 1000000).toFixed(1)}M`
+        : avgInvoice >= 1000
+          ? `${Math.round(avgInvoice / 1000)}K`
+          : `${avgInvoice}`;
+    const completionRate =
+      appointments.length > 0
+        ? Math.round((completedAppointments.length / appointments.length) * 1000) / 10
+        : 0;
 
     return [
-      ["Tổng doanh thu", `${monthlyRevenueVal}M VNĐ`],
-      ["Đơn hoàn thành", `${completedCount} đơn`],
+      ["Tổng doanh thu tháng", `${monthlyRevenueVal}M VNĐ`],
+      ["Đơn hoàn thành tháng", `${monthCount} đơn`],
       ["Hóa đơn trung bình", `${avgInvoiceStr} VNĐ`],
-      ["Tỷ lệ hoàn thành", "96.2%"],
+      ["Tỷ lệ hoàn thành", `${completionRate}%`],
     ];
-  }, [appointments, monthlyRevenueVal]);
+  }, [appointments, completedAppointments, monthlyRevenueVal, todayStr]);
 
   // Leaderboard of Technicians
   const techniciansLeaderboard = useMemo(() => {
     if (staffPerformance.length > 0) {
-      return staffPerformance.map(tp => ({
-        name: tp.full_name,
-        specialty: tp.specialization || "KTV",
-        efficiency: tp.completion_rate || 95,
-        completed: tp.completed_appointments || 10
-      })).slice(0, 4);
+      return staffPerformance
+        .map((tp) => ({
+          name: tp.full_name,
+          specialty: tp.specialization || "KTV",
+          efficiency: tp.completion_rate || 0,
+          completed: tp.completed_appointments || 0,
+        }))
+        .sort((a, b) => b.completed - a.completed)
+        .slice(0, 4);
     }
-
-    return [
-      { name: "Nguyễn Minh Thắng", specialty: "Hệ thống điện & Fi", efficiency: 98, completed: 18 },
-      { name: "Lê Văn Minh", specialty: "Động cơ & Bình xăng con", efficiency: 95, completed: 15 },
-      { name: "Hoàng Kim Sơn", specialty: "Phuộc nhún & Phanh đĩa", efficiency: 92, completed: 12 },
-      { name: "Trần Quốc Huy", specialty: "Bảo dưỡng tổng quát", efficiency: 88, completed: 8 }
-    ];
+    return [];
   }, [staffPerformance]);
 
-  // Top revenue services
-  const topServices = [
-    { name: "Bảo dưỡng định kỳ Honda SH", count: 48, revenue: 14400000 },
-    { name: "Đại tu động cơ & côn Ducati", count: 12, revenue: 42000000 },
-    { name: "Vệ sinh nồi & thay bi nồi Yamaha NVX", count: 32, revenue: 9600000 },
-    { name: "Phủ Ceramic bảo vệ sơn xe cao cấp", count: 16, revenue: 16000000 }
-  ];
+  // Top revenue services from real completed appointments
+  const topServices = useMemo(() => {
+    const map = new Map();
+    completedAppointments.forEach((app) => {
+      const name =
+        app.service ||
+        app.raw?.service?.name ||
+        app.raw?.service_id?.service_name ||
+        "Dịch vụ khác";
+      const current = map.get(name) || { name, count: 0, revenue: 0 };
+      current.count += 1;
+      current.revenue += getAppRevenue(app);
+      map.set(name, current);
+    });
+    return [...map.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 4);
+  }, [completedAppointments]);
 
-  // Recent activity log formatted for Admin styles
+  // Recent activity log
   const recentActivities = useMemo(() => {
-    const sorted = [...appointments].sort((a, b) => {
-      const aDate = new Date(a.raw?.updated_at || a.raw?.created_at || 0);
-      const bDate = new Date(b.raw?.updated_at || b.raw?.created_at || 0);
-      return bDate - aDate;
-    }).slice(0, 4);
+    const sorted = [...appointments]
+      .sort((a, b) => {
+        const aDate = new Date(a.raw?.updated_at || a.raw?.created_at || 0);
+        const bDate = new Date(b.raw?.updated_at || b.raw?.created_at || 0);
+        return bDate - aDate;
+      })
+      .slice(0, 4);
 
-    if (sorted.length === 0) {
-      return [
-        { time: "09:42", text: "KTV Nguyễn Minh Thắng được phân công sửa xe BMW R1250GS", type: "confirm" },
-        { time: "09:18", text: "Khách hàng Trần Thị Hồng đặt lịch hẹn thành công lúc 16:00", type: "booking" },
-        { time: "08:55", text: "Đã hoàn thành sửa chữa cho xe Yamaha R1M của khách Phạm Quốc Hùng", type: "assign" },
-        { time: "08:20", text: "Lịch hẹn xe Vespa Sprint của khách Đỗ Kim Oanh bị hủy", type: "stock" }
-      ];
-    }
-
-    return sorted.map(app => {
+    return sorted.map((app) => {
       const date = new Date(app.raw?.updated_at || app.raw?.created_at || new Date());
       const hour = String(date.getHours()).padStart(2, "0");
       const min = String(date.getMinutes()).padStart(2, "0");
       const timeStr = `${hour}:${min}`;
-
-      let text = "";
       const bikeName = app.vehicleType || "Xe máy";
       let type = "booking";
+      let text = "";
 
-      if (app.status === "PENDING") {
-        text = `Khách hàng ${app.customer} đặt lịch hẹn dịch vụ ${app.service}`;
-        type = "booking";
-      } else if (app.status === "CONFIRMED") {
-        text = `Lịch hẹn xe ${bikeName} của ${app.customer} đã được xác nhận`;
-        if (app.techAssigned && app.techAssigned !== "Chưa phân công") {
-          text += `, phân công cho KTV ${app.techAssigned}`;
-        }
-        type = "confirm";
-      } else if (app.status === "IN_PROGRESS") {
-        text = `KTV ${app.techAssigned} đang sửa chữa xe ${bikeName}`;
+      if (app.status === "COMPLETED") {
         type = "assign";
-      } else if (app.status === "COMPLETED") {
-        text = `Hoàn thành xe ${bikeName} cho khách ${app.customer}. Chi phí: ${new Intl.NumberFormat("vi-VN").format(app.raw?.final_cost || 0)}đ`;
+        text = `Hoàn thành dịch vụ cho ${bikeName}`;
+      } else if (app.status === "CANCELLED") {
         type = "stock";
+        text = `Lịch hẹn ${bikeName} bị hủy`;
+      } else if (app.status === "CONFIRMED" || app.status === "IN_PROGRESS") {
+        type = "confirm";
+        text = `Đang xử lý lịch hẹn ${bikeName}`;
       } else {
-        text = `Lịch hẹn xe ${bikeName} của ${app.customer} đã bị hủy`;
-        type = "stock";
+        text = `Khách đặt lịch ${bikeName}`;
       }
 
       return { time: timeStr, text, type };
@@ -323,7 +350,7 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
           <strong>
             <CountUp value={monthlyRevenueVal} suffix="M" decimals={1} />
           </strong>
-          <p>VND · tăng 14% so với tháng trước</p>
+            <p>VND · tính từ đơn đã hoàn thành trong tháng</p>
         </article>
 
         <article className="overview-card warning">
@@ -398,7 +425,10 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
             <Package />
           </div>
           <div className="compact-list">
-            {lowStock.map((item) => (
+            {lowStock.length === 0 ? (
+              <p style={{ margin: 0, color: "var(--manager-muted)", fontWeight: 700 }}>Chưa có cảnh báo tồn kho.</p>
+            ) : (
+              lowStock.map((item) => (
               <div className={`stock-row ${item.tone}`} key={item.name}>
                 <div className="stock-row-main">
                   <Package />
@@ -414,7 +444,8 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
                   <strong>{item.amount}</strong>
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         </article>
 
@@ -428,7 +459,10 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
             <Award />
           </div>
           <div className="compact-list">
-            {techniciansLeaderboard.map((tech, index) => (
+            {techniciansLeaderboard.length === 0 ? (
+              <p style={{ margin: 0, color: "var(--manager-muted)", fontWeight: 700 }}>Chưa có dữ liệu hiệu suất KTV.</p>
+            ) : (
+              techniciansLeaderboard.map((tech, index) => (
               <div className="stock-row" key={tech.name} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center" }}>
                 <div className="stock-row-main">
                   <Award style={{ color: index === 0 ? "#eab308" : index === 1 ? "#94a3b8" : "#94a3b8" }} />
@@ -457,7 +491,8 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
                   </small>
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         </article>
       </section>
@@ -479,7 +514,12 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
               <span>Số đơn</span>
               <span style={{ textAlign: "right" }}>Tổng doanh thu</span>
             </div>
-            {topServices.map((svc) => (
+            {topServices.length === 0 ? (
+              <p style={{ margin: "12px 16px", color: "var(--manager-muted)", fontWeight: 700 }}>
+                Chưa có đơn hoàn thành để thống kê doanh thu dịch vụ.
+              </p>
+            ) : (
+              topServices.map((svc) => (
               <div className="latest-table-row" key={svc.name} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.2fr", padding: "12px 16px" }}>
                 <strong>{svc.name}</strong>
                 <span>{svc.count} đơn</span>
@@ -487,7 +527,8 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
                   {formatVND(svc.revenue)}
                 </span>
               </div>
-            ))}
+              ))
+            )}
           </div>
         </article>
 
@@ -501,13 +542,17 @@ export default function ManagerDashboard({ bays = [], technicians = [], appointm
             <Activity />
           </div>
           <div className="activity-timeline">
-            {recentActivities.map((item, idx) => (
+            {recentActivities.length === 0 ? (
+              <p style={{ margin: 0, color: "var(--manager-muted)", fontWeight: 700 }}>Chưa có hoạt động gần đây.</p>
+            ) : (
+              recentActivities.map((item, idx) => (
               <div className={`activity-row ${item.type}`} key={idx}>
                 <time>{item.time}</time>
                 <span className="activity-dot" />
                 <p dangerouslySetInnerHTML={{ __html: item.text }} />
               </div>
-            ))}
+              ))
+            )}
           </div>
         </article>
       </section>

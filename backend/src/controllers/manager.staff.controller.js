@@ -29,7 +29,8 @@ const SHIFT_DEFAULTS = {
 };
 
 function todayString() {
-  return new Date().toISOString().slice(0, 10);
+  const localDate = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 10);
 }
 
 function isDateString(value) {
@@ -47,7 +48,8 @@ function getMondayOfWeek(dateStr) {
   const day = date.getDay(); // 0 Sun .. 6 Sat
   const diff = day === 0 ? -6 : 1 - day;
   date.setDate(date.getDate() + diff);
-  return date.toISOString().slice(0, 10);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
 }
 
 /** Mon→Sat (6 days) from Monday */
@@ -56,7 +58,8 @@ function getWorkWeekDates(weekStart) {
   return Array.from({ length: 6 }, (_, index) => {
     const day = new Date(`${monday}T12:00:00`);
     day.setDate(day.getDate() + index);
-    return day.toISOString().slice(0, 10);
+    const local = new Date(day.getTime() - day.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
   });
 }
 
@@ -126,13 +129,23 @@ function scheduleResponse(schedule) {
 function attendanceResponse(attendance) {
   if (!attendance) return null;
   const data = attendance.toObject ? attendance.toObject() : attendance;
+  const checkIn = data.check_in_time || data.check_in_at || null;
+  const checkOut = data.check_out_time || data.check_out_at || null;
+  const totalHours = Number(data.total_hours);
+  const totalMinutes = Number.isFinite(totalHours) && totalHours > 0
+    ? Math.round(totalHours * 60)
+    : (checkOut && checkIn ? minutesBetween(checkIn, checkOut) : Number(data.total_minutes) || 0);
+
   return {
     id: String(data._id || data.id),
     staff_id: String(data.staff_id?._id || data.staff_id),
     work_date: data.work_date,
-    check_in_at: data.check_in_at,
-    check_out_at: data.check_out_at,
-    total_minutes: data.total_minutes || 0,
+    check_in_at: checkIn,
+    check_out_at: checkOut,
+    check_in_time: checkIn,
+    check_out_time: checkOut,
+    total_minutes: totalMinutes,
+    total_hours: Number.isFinite(totalHours) ? totalHours : Number((totalMinutes / 60).toFixed(2)),
     status: data.status,
     check_in_note: data.check_in_note || '',
     check_out_note: data.check_out_note || ''
@@ -876,14 +889,17 @@ async function createManualAttendance(req, res) {
 
     const checkIn = new Date(check_in_at);
     const checkOut = check_out_at ? new Date(check_out_at) : null;
+    if (Number.isNaN(checkIn.getTime())) return errorResponse(res, 400, 'Thời gian check-in không hợp lệ');
+    if (checkOut && Number.isNaN(checkOut.getTime())) return errorResponse(res, 400, 'Thời gian check-out không hợp lệ');
     if (checkOut && checkOut < checkIn) return errorResponse(res, 400, 'Check-out không được nhỏ hơn check-in');
 
+    const totalMinutes = checkOut ? minutesBetween(checkIn, checkOut) : 0;
     const attendance = await StaffAttendance.create({
       staff_id,
       work_date,
-      check_in_at: checkIn,
-      check_out_at: checkOut || undefined,
-      total_minutes: checkOut ? minutesBetween(checkIn, checkOut) : 0,
+      check_in_time: checkIn,
+      check_out_time: checkOut || undefined,
+      total_hours: Number((totalMinutes / 60).toFixed(2)),
       status: checkOut ? 'COMPLETED' : 'IN_SHIFT',
       check_in_note: note || 'Manager tạo attendance thủ công',
       adjusted_by: req.user.userId
@@ -902,17 +918,22 @@ async function updateAttendance(req, res) {
     const attendance = await StaffAttendance.findById(req.params.id);
     if (!attendance) return errorResponse(res, 404, 'Không tìm thấy attendance');
 
-    if (req.body.check_in_at) attendance.check_in_at = new Date(req.body.check_in_at);
-    if (req.body.check_out_at !== undefined) attendance.check_out_at = req.body.check_out_at ? new Date(req.body.check_out_at) : undefined;
+    if (req.body.check_in_at) attendance.check_in_time = new Date(req.body.check_in_at);
+    if (req.body.check_out_at !== undefined) {
+      attendance.check_out_time = req.body.check_out_at ? new Date(req.body.check_out_at) : undefined;
+    }
     if (req.body.check_in_note !== undefined) attendance.check_in_note = req.body.check_in_note;
     if (req.body.check_out_note !== undefined) attendance.check_out_note = req.body.check_out_note;
 
-    if (attendance.check_out_at && attendance.check_out_at < attendance.check_in_at) {
+    if (attendance.check_out_time && attendance.check_out_time < attendance.check_in_time) {
       return errorResponse(res, 400, 'Check-out không được nhỏ hơn check-in');
     }
 
-    attendance.total_minutes = attendance.check_out_at ? minutesBetween(attendance.check_in_at, attendance.check_out_at) : 0;
-    attendance.status = attendance.check_out_at ? 'COMPLETED' : 'IN_SHIFT';
+    const totalMinutes = attendance.check_out_time
+      ? minutesBetween(attendance.check_in_time, attendance.check_out_time)
+      : 0;
+    attendance.total_hours = Number((totalMinutes / 60).toFixed(2));
+    attendance.status = attendance.check_out_time ? 'COMPLETED' : 'IN_SHIFT';
     attendance.adjusted_by = req.user.userId;
     await attendance.save();
 
@@ -945,7 +966,12 @@ async function getStaffPerformanceReport(req, res) {
       const cancelled = staffAppointments.filter((appointment) => appointment.status === 'CANCELLED').length;
       const staffSchedules = schedules.filter((schedule) => String(schedule.staff_id) === String(item._id));
       const staffAttendance = attendance.filter((row) => String(row.staff_id) === String(item._id));
-      const workingMinutes = staffAttendance.reduce((sum, row) => sum + (row.total_minutes || 0), 0);
+      const workingMinutes = staffAttendance.reduce((sum, row) => {
+        const hours = Number(row.total_hours);
+        if (Number.isFinite(hours) && hours > 0) return sum + Math.round(hours * 60);
+        if (row.check_in_time && row.check_out_time) return sum + minutesBetween(row.check_in_time, row.check_out_time);
+        return sum + (Number(row.total_minutes) || 0);
+      }, 0);
 
       return {
         staff_id: String(item._id),
@@ -989,7 +1015,12 @@ async function getAttendanceSummaryReport(req, res) {
         scheduled_days: new Set(staffSchedules.map((schedule) => schedule.work_date)).size,
         attended_days: new Set(staffAttendance.map((row) => row.work_date)).size,
         completed_days: staffAttendance.filter((row) => row.status === 'COMPLETED').length,
-        total_minutes: staffAttendance.reduce((sum, row) => sum + (row.total_minutes || 0), 0)
+        total_minutes: staffAttendance.reduce((sum, row) => {
+          const hours = Number(row.total_hours);
+          if (Number.isFinite(hours) && hours > 0) return sum + Math.round(hours * 60);
+          if (row.check_in_time && row.check_out_time) return sum + minutesBetween(row.check_in_time, row.check_out_time);
+          return sum + (Number(row.total_minutes) || 0);
+        }, 0)
       };
     });
 
@@ -1015,7 +1046,12 @@ async function getStaffPerformanceById(req, res) {
     return successResponse(res, 200, 'Lấy báo cáo staff thành công', {
       appointment_breakdown: appointments,
       attendance_breakdown: attendance.map(attendanceResponse),
-      total_working_hours: Math.round((attendance.reduce((sum, row) => sum + (row.total_minutes || 0), 0) / 60) * 10) / 10,
+      total_working_hours: Math.round((attendance.reduce((sum, row) => {
+        const hours = Number(row.total_hours);
+        if (Number.isFinite(hours) && hours > 0) return sum + hours;
+        if (row.check_in_time && row.check_out_time) return sum + (minutesBetween(row.check_in_time, row.check_out_time) / 60);
+        return sum;
+      }, 0)) * 10) / 10,
       completed_appointments: appointments.filter((appointment) => appointment.status === 'COMPLETED').length,
       completion_rate: appointments.length ? Math.round((appointments.filter((appointment) => appointment.status === 'COMPLETED').length / appointments.length) * 100) : 0,
       average_handling_time: appointments.length ? Math.round(appointments.reduce((sum, appointment) => sum + (appointment.actual_duration || appointment.estimated_duration || 0), 0) / appointments.length) : 0

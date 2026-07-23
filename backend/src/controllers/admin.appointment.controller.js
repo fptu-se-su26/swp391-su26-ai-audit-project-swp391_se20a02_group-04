@@ -6,6 +6,7 @@ const RepairBay = require('../models/RepairBay.model');
 const Notification = require('../models/Notification.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const { sendAppointmentConfirmedEmail } = require('../utils/email.util');
+const { notifyStaffAssigned } = require('../utils/staffNotification.util');
 const {
   assignAppointment,
   buildDateTime,
@@ -476,8 +477,13 @@ const assignStaff = async (req, res) => {
 
     const oldStaffId = appointment.staff_id;
     appointment.staff_id = staff_id;
+    appointment.assigned_at = new Date();
 
     await appointment.save();
+
+    await notifyStaffAssigned(appointment, staff_id, {
+      previousStaffId: oldStaffId
+    });
 
     // Log audit
     await UserAudit.create({

@@ -725,8 +725,8 @@ export default function AdminDashboard({ onViewChange }) {
                   <button type="button" onClick={() => onViewChange?.("customers")}>
                     <Users size={14} /> Khách
                   </button>
-                  <button type="button" onClick={() => onViewChange?.("contact")}>
-                    <Activity size={14} /> Liên hệ
+                  <button type="button" onClick={() => onViewChange?.("inventory")}>
+                    <Package size={14} /> Kho
                   </button>
                 </div>
               </article>
