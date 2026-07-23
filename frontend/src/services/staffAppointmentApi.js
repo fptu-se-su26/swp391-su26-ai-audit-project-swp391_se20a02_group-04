@@ -231,10 +231,14 @@ export function saveStaffAppointmentNote(appointmentId, notes) {
   });
 }
 
-export function saveDiagnosis(appointmentId, diagnosis_notes) {
+export function saveDiagnosis(appointmentId, diagnosis_notes, quoted_price) {
+  const payload = { diagnosis_notes };
+  if (quoted_price !== undefined && quoted_price !== null && quoted_price !== "") {
+    payload.quoted_price = Number(quoted_price);
+  }
   return staffRequest(`/staff/appointments/${appointmentId}/diagnosis`, {
     method: "PUT",
-    body: JSON.stringify({ diagnosis_notes }),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -250,6 +254,17 @@ export function saveRepairLog(appointmentId, { status, notes = "" } = {}) {
     method: "PUT",
     body: JSON.stringify({ status, notes }),
   });
+}
+
+export function saveAddonServices(appointmentId, { items = [] } = {}) {
+  return staffRequest(`/staff/appointments/${appointmentId}/addon-services`, {
+    method: "PUT",
+    body: JSON.stringify({ items }),
+  });
+}
+
+export function getCatalogServices(params = {}) {
+  return staffRequest(withQuery("/services", { limit: 100, sort_by: "service_name", sort_order: "asc", ...params }));
 }
 
 export function createPayment(appointmentId) {

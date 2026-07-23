@@ -16,7 +16,8 @@ import {
   User,
   Bike,
   FileText,
-  Receipt
+  Receipt,
+  MessageSquare
 } from "lucide-react";
 import "../../styles/manager/ManagerLayout.css";
 import { getAuthSession, clearAuthSession } from "../../services/authApi";
@@ -31,6 +32,7 @@ import ManagerStaff from "./ManagerStaff";
 import ManagerProfile from "./ManagerProfile";
 import ManagerRevenue from "./ManagerRevenue";
 import ManagerCustomers from "./ManagerCustomers";
+import ManagerContact from "./ManagerContact";
 
 import AdminCalendar from "../admin/AdminCalendar";
 import InventoryModule from "../inventory/InventoryModule";
@@ -157,7 +159,8 @@ const MANAGER_TABS = new Set([
   "inventory",
   "revenue",
   "profile",
-  "customers"
+  "customers",
+  "contact"
 ]);
 
 function getManagerTabFromPath(pathname) {
@@ -169,6 +172,7 @@ function getManagerTabFromPath(pathname) {
   if (pathname.startsWith("/manager/revenue")) return "revenue";
   if (pathname.startsWith("/manager/profile")) return "profile";
   if (pathname.startsWith("/manager/customers")) return "customers";
+  if (pathname.startsWith("/manager/contact")) return "contact";
   return "dashboard";
 }
 
@@ -181,6 +185,7 @@ function getManagerPathFromTab(tabName) {
   if (tabName === "revenue") return "/manager/revenue";
   if (tabName === "profile") return "/manager/profile";
   if (tabName === "customers") return "/manager/customers";
+  if (tabName === "contact") return "/manager/contact";
   return "/manager/dashboard";
 }
 
@@ -274,6 +279,7 @@ const ManagerLayout = () => {
       case "revenue": return "Báo cáo Doanh thu";
       case "profile": return "Hồ sơ cá nhân";
       case "customers": return "Thông tin Khách hàng";
+      case "contact": return "Liên hệ / Chăm sóc KH";
       default: return "MotoCare Manager";
     }
   };
@@ -616,6 +622,8 @@ const ManagerLayout = () => {
         return <ManagerProfile />;
       case "customers":
         return <ManagerCustomers />;
+      case "contact":
+        return <ManagerContact />;
 
       default:
         return <ManagerDashboard bays={bays} technicians={technicians} appointments={appointments} refreshData={loadManagerData} />;
@@ -785,6 +793,14 @@ const ManagerLayout = () => {
             </a>
             <a
               href="#"
+              className={`nav-item ${currentTab === "contact" ? "active" : ""}`}
+              onClick={(e) => { e.preventDefault(); handleTabChange("contact"); }}
+            >
+              <MessageSquare className="nav-icon" />
+              <span>Liên hệ</span>
+            </a>
+            <a
+              href="#"
               className={`nav-item ${currentTab === "profile" ? "active" : ""}`}
               onClick={(e) => { e.preventDefault(); handleTabChange("profile"); }}
             >
@@ -856,7 +872,7 @@ const ManagerLayout = () => {
           <div className="footer-links">
             <a href="#">Chính sách bảo mật</a>
             <a href="#">Điều khoản dịch vụ</a>
-            <a href="#">Liên hệ</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); handleTabChange("contact"); }}>Liên hệ</a>
           </div>
           <p className="footer-copyright">
             © 2024 MOTOCORE. Bảo lưu mọi quyền.

@@ -223,6 +223,40 @@ const appointmentSchema = new mongoose.Schema({
       default: null
     }
   },
+  // Dịch vụ bổ sung sau sửa chữa (vd. rửa xe) — snapshot giá để bill ổn định
+  addon_services: [{
+    service_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Service',
+      required: true
+    },
+    name: {
+      type: String,
+      trim: true,
+      required: true,
+      maxlength: [200, 'Addon service name cannot exceed 200 characters']
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: [0, 'Addon service price cannot be negative']
+    },
+    quantity: {
+      type: Number,
+      default: 1,
+      min: [1, 'Addon quantity must be at least 1'],
+      max: [20, 'Addon quantity cannot exceed 20']
+    },
+    added_at: {
+      type: Date,
+      default: Date.now
+    },
+    added_by: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    }
+  }],
   payment_info: {
     order_code: {
       type: String,
@@ -243,6 +277,11 @@ const appointmentSchema = new mongoose.Schema({
     },
     paid_at: {
       type: Date,
+      default: null
+    },
+    method: {
+      type: String,
+      enum: ['CASH', 'PAYOS', 'ONLINE'],
       default: null
     },
     amount: {

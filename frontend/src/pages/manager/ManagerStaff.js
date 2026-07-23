@@ -14,21 +14,29 @@ import {
 import managerStaffApi from "../../services/managerStaffApi";
 import "../../styles/manager/ManagerStaff.css";
 
-const today = () => new Date().toISOString().slice(0, 10);
-const monthNow = () => new Date().toISOString().slice(0, 7);
+const today = () => {
+  const local = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+const monthNow = () => today().slice(0, 7);
+
+function toLocalDateString(date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
 
 function getMonday(dateStr = today()) {
   const date = new Date(`${dateStr}T12:00:00`);
   const day = date.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   date.setDate(date.getDate() + diff);
-  return date.toISOString().slice(0, 10);
+  return toLocalDateString(date);
 }
 
 function shiftWeek(weekStart, deltaWeeks) {
   const date = new Date(`${weekStart}T12:00:00`);
   date.setDate(date.getDate() + deltaWeeks * 7);
-  return date.toISOString().slice(0, 10);
+  return toLocalDateString(date);
 }
 
 function formatWeekRange(weekStart, weekEnd) {

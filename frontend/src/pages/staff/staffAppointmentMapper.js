@@ -47,6 +47,15 @@ export function canUseMaterials(job = {}) {
   return job.status === "IN_PROGRESS";
 }
 
+export function isBillLocked(job = {}) {
+  const status = String(job?.paymentInfo?.status || job?.raw?.payment_info?.status || "").toUpperCase();
+  return status === "PENDING" || status === "PAID";
+}
+
+export function canEditMaterials(job = {}) {
+  return canUseMaterials(job) && !isBillLocked(job);
+}
+
 export function canCompleteJob(job = {}, user) {
   return job.status === "IN_PROGRESS" && isJobAssignedToUser(job, user);
 }
@@ -105,6 +114,22 @@ function getServiceType(service = {}, serviceDoc = {}) {
   return String(service.type || serviceDoc.category || "").toUpperCase();
 }
 
+function getLaborPrice(appointment = {}, service = {}, serviceDoc = {}) {
+  const serviceType = getServiceType(service, serviceDoc);
+  const quoted = service.estimated_price;
+
+  if (quoted !== null && quoted !== undefined && quoted !== "") {
+    return Number(quoted) || 0;
+  }
+
+  // REPAIR bookings are "quote after inspection" — never invent catalog base_price.
+  if (serviceType === "REPAIR") {
+    return 0;
+  }
+
+  return Number(serviceDoc.base_price || appointment.estimated_price || 0);
+}
+
 export function mapAppointmentToJob(appointment = {}) {
   const appointmentId = getEntityId(appointment);
   const staffId = getEntityId(appointment.staff_id);
@@ -127,8 +152,9 @@ export function mapAppointmentToJob(appointment = {}) {
     serviceDoc.estimated_duration ||
     appointment.total_service_duration_minutes ||
     appointment.estimated_duration;
-  const estimatedPrice = service.estimated_price || serviceDoc.base_price || appointment.estimated_price || 0;
+  const estimatedPrice = getLaborPrice(appointment, service, serviceDoc);
   const serviceType = getServiceType(service, serviceDoc);
+  const needsLaborQuote = serviceType === "REPAIR" && (service.estimated_price === null || service.estimated_price === undefined || service.estimated_price === "");
 
   return {
     id: appointmentId,
@@ -161,6 +187,8 @@ export function mapAppointmentToJob(appointment = {}) {
     estimatedDuration,
     laborCost: formatCurrency(estimatedPrice),
     laborCostValue: estimatedPrice,
+    serviceType,
+    needsLaborQuote,
     diagnosisNotes: appointment.diagnosis_notes || "",
     contactLog: appointment.contact_log?.status
       ? {
@@ -176,7 +204,16 @@ export function mapAppointmentToJob(appointment = {}) {
           completed_at: appointment.repair_log.completed_at || null,
         }
       : null,
-    paymentInfo: appointment.payment_info?.order_code ? appointment.payment_info : null,
+    addonServices: Array.isArray(appointment.addon_services)
+      ? appointment.addon_services.map((item) => ({
+          service_id: getEntityId(item.service_id) || item.service_id,
+          name: item.name || "",
+          price: Number(item.price || 0),
+          quantity: Math.max(1, Number(item.quantity) || 1),
+          added_at: item.added_at || null,
+        }))
+      : [],
+    paymentInfo: appointment.payment_info?.status ? appointment.payment_info : null,
     assignedAt: appointment.assigned_at || null,
     priceType: String(serviceDoc.price_type || service.price_type || "FIXED").toUpperCase(),
     recommendation:

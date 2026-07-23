@@ -18,6 +18,8 @@ import {
   canMarkNoShow,
   canStartJob,
   canUseMaterials,
+  canEditMaterials,
+  isBillLocked,
   getCurrentUserId,
   getJobRouteId,
   hasFullJobAssignment,
@@ -271,7 +273,8 @@ function ActionRail({ job, onChanged }) {
   const { user } = getAuthSession();
   const routeId = getJobRouteId(job);
   const canStart = canStartJob(job);
-  const canUseMaterial = canUseMaterials(job);
+  const canOpenRepair = canUseMaterials(job);
+  const billLocked = isBillLocked(job);
   const canComplete = canCompleteJob(job, user);
   const canAcknowledge = job.status === "CONFIRMED" && !job.raw?.acknowledged_at;
   const canNoShow = canMarkNoShow(job);
@@ -322,10 +325,15 @@ function ActionRail({ job, onChanged }) {
             <Icon name="play_circle" />
             Bắt đầu công việc
           </Link>
-          <Link className={`secondary-button full ${!canUseMaterial ? "disabled-link" : ""}`} to={`/staff/jobs/${routeId}`}>
+          <Link className={`secondary-button full ${!canOpenRepair ? "disabled-link" : ""}`} to={`/staff/jobs/${routeId}`}>
             <Icon name="build" />
             Mở phiếu sửa chữa
           </Link>
+          {billLocked && (
+            <p className="form-message warning">
+              Bill đã khóa (PayOS {String(job.paymentInfo?.status || "").toUpperCase()}) — không thêm phụ tùng.
+            </p>
+          )}
           <Link className={`primary-button success full ${!canComplete ? "disabled-link" : ""}`} to={canComplete ? `/staff/jobs/${routeId}/complete` : `/staff/jobs/${routeId}`}>
             <Icon name="task_alt" />
             Hoàn thành công việc
@@ -528,6 +536,8 @@ export function StaffJobMaterials() {
   const [revertingId, setRevertingId] = useState("");
   const [materialsError, setMaterialsError] = useState("");
   const [message, setMessage] = useState("");
+  const canEdit = canEditMaterials(job);
+  const billLocked = isBillLocked(job);
 
   const loadMaterials = async () => {
     if (!job) return;
@@ -566,13 +576,17 @@ export function StaffJobMaterials() {
     setMessage("");
     setMaterialsError("");
 
-    if (!selectedItems.length) {
-      setMaterialsError("Vui lòng nhập số lượng cho ít nhất một vật tư.");
+    if (!canEdit) {
+      setMaterialsError(
+        billLocked
+          ? "Không thể thêm vật tư sau khi đã tạo QR PayOS hoặc đã thanh toán."
+          : "Chỉ có thể ghi nhận vật tư khi công việc đang làm."
+      );
       return;
     }
 
-    if (!canUseMaterials(job)) {
-      setMaterialsError("Chỉ có thể ghi nhận vật tư khi công việc đang làm.");
+    if (!selectedItems.length) {
+      setMaterialsError("Vui lòng nhập số lượng cho ít nhất một vật tư.");
       return;
     }
 
@@ -635,9 +649,17 @@ export function StaffJobMaterials() {
                 </h3>
               </div>
 
+              {billLocked && (
+                <p className="form-message warning">
+                  {String(job.paymentInfo?.status || "").toUpperCase() === "PAID"
+                    ? "Hóa đơn đã thanh toán — không thể thêm/hoàn tác vật tư."
+                    : "Đã tạo QR PayOS (đang chờ thanh toán) — bill đã khóa. Không thể thêm/hoàn tác vật tư."}
+                </p>
+              )}
               {materialsError && <p className="form-message error">{materialsError}</p>}
               {message && <p className="form-message success">{message}</p>}
 
+              {canEdit ? (
               <form onSubmit={handleSaveMaterials}>
                 {inventory.length > 0 ? (
                   <div className="material-pick-grid">
@@ -676,19 +698,22 @@ export function StaffJobMaterials() {
 
                 <div className="form-actions">
                   <Link className="secondary-button" to={`/staff/jobs/${getJobRouteId(job)}`}>Hủy</Link>
-                  <button className="primary-button" disabled={isSaving || !inventory.length || !canUseMaterials(job)} type="submit">
+                  <button className="primary-button" disabled={isSaving || !inventory.length} type="submit">
                     <Icon name="save" />
                     {isSaving ? "Đang lưu..." : "Lưu vật tư"}
                   </button>
                 </div>
               </form>
+              ) : (
+                <p className="muted-copy">Chỉ xem danh sách vật tư đã dùng — không thể chỉnh sửa khi bill đã khóa hoặc công việc chưa đang làm.</p>
+              )}
 
               <h3 className="sub-panel-title">
                 <Icon name="receipt_long" />
                 Vật tư đã dùng
               </h3>
               <MaterialUsageList
-                canRevert={canUseMaterials(job)}
+                canRevert={canEdit}
                 onRevert={handleRevertMaterial}
                 revertingId={revertingId}
                 transactions={transactions}
@@ -726,7 +751,11 @@ export function StaffJobComplete() {
   }, [job]);
 
   const materialTotal = transactions.reduce((total, transaction) => total + Number(transaction.total_cost || 0), 0);
-  const total = Number(job?.laborCostValue || 0) + materialTotal;
+  const addonTotal = (job?.addonServices || []).reduce(
+    (sum, item) => sum + Number(item.price || 0) * Math.max(1, Number(item.quantity) || 1),
+    0
+  );
+  const total = Number(job?.laborCostValue || 0) + materialTotal + addonTotal;
 
   const handleComplete = async (event) => {
     event.preventDefault();
@@ -796,6 +825,17 @@ export function StaffJobComplete() {
                     </div>
                   );
                 })}
+                {(job.addonServices || []).map((item) => (
+                  <div key={`${item.service_id}-${item.name}`}>
+                    <span>
+                      {item.name || "Dịch vụ bổ sung"}
+                      {Number(item.quantity) > 1 ? ` × ${item.quantity}` : ""}
+                    </span>
+                    <strong>
+                      {formatCurrency(Number(item.price || 0) * Math.max(1, Number(item.quantity) || 1))}
+                    </strong>
+                  </div>
+                ))}
                 <div className="cost-total">
                   <span>Tổng chi phí tạm tính</span>
                   <strong>{formatCurrency(total)}</strong>
@@ -818,7 +858,11 @@ export function StaffJobComplete() {
                 {job.statusKey !== "in_progress" && <p className="form-message error">Chỉ có thể hoàn thành công việc đang làm.</p>}
                 {submitError && <p className="form-message error">{submitError}</p>}
                 <div className="form-actions">
-                  <Link className="secondary-button" to={`/staff/jobs/${getJobRouteId(job)}/materials`}>Thêm vật tư</Link>
+                  {canEditMaterials(job) ? (
+                    <Link className="secondary-button" to={`/staff/jobs/${getJobRouteId(job)}/materials`}>Thêm vật tư</Link>
+                  ) : (
+                    <span className="secondary-button disabled-link">Thêm vật tư</span>
+                  )}
                   <button className="primary-button success" disabled={isSubmitting || !canComplete} type="submit">
                     <Icon name="check_circle" />
                     {isSubmitting ? "Đang hoàn thành..." : "Đánh dấu hoàn thành"}

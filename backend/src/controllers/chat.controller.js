@@ -3,14 +3,7 @@ const ChatMessage = require('../models/ChatMessage.model');
 const Appointment = require('../models/Appointment.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 
-const STAFF_ROLES = new Set(['ADMIN', 'MANAGER']);
-
-function getPrimaryRole(roles = []) {
-  if (roles.includes('ADMIN')) return 'ADMIN';
-  if (roles.includes('MANAGER')) return 'MANAGER';
-  if (roles.includes('STAFF')) return 'STAFF';
-  return 'CUSTOMER';
-}
+const STAFF_ROLES = new Set(['MANAGER']);
 
 function isStaff(req) {
   return (req.user?.roles || []).some((role) => STAFF_ROLES.has(role));
@@ -313,12 +306,10 @@ const sendStaffMessage = async (req, res) => {
       return errorResponse(res, 404, 'Conversation not found');
     }
 
-    const senderRole = getPrimaryRole(req.user.roles);
-
     const message = await ChatMessage.create({
       conversation_id: conversation._id,
       sender_id: req.user.userId,
-      sender_role: senderRole === 'MANAGER' ? 'MANAGER' : 'ADMIN',
+      sender_role: 'MANAGER',
       text
     });
 

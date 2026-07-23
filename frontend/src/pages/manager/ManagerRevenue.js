@@ -14,22 +14,6 @@ const ManagerRevenue = ({ appointments = [] }) => {
       "Thứ 7": 0,
       "Chủ Nhật": 0
     };
-    
-    const completedApps = appointments.filter(app => app.status === "COMPLETED");
-    
-    // Fallback if no database data
-    if (completedApps.length === 0) {
-      return [
-        { day: "Thứ 2", revenue: 8.5, active: false },
-        { day: "Thứ 3", revenue: 10.2, active: false },
-        { day: "Thứ 4", revenue: 12.4, active: true },
-        { day: "Thứ 5", revenue: 9.8, active: false },
-        { day: "Thứ 6", revenue: 14.5, active: false },
-        { day: "Thứ 7", revenue: 18.2, active: false },
-        { day: "Chủ Nhật", revenue: 16.0, active: false }
-      ];
-    }
-
     const weekdayMap = {
       0: "Chủ Nhật",
       1: "Thứ 2",
@@ -39,20 +23,21 @@ const ManagerRevenue = ({ appointments = [] }) => {
       5: "Thứ 6",
       6: "Thứ 7"
     };
+    const todayDayName = weekdayMap[new Date().getDay()];
+    
+    const completedApps = appointments.filter(app => app.status === "COMPLETED");
 
     completedApps.forEach(app => {
       const date = new Date(app.raw?.completed_at || app.apiDate);
       const dayName = weekdayMap[date.getDay()];
       if (revenueMap[dayName] !== undefined) {
-        revenueMap[dayName] += Number(app.raw?.final_cost || 0);
+        revenueMap[dayName] += Number(app.raw?.final_cost || app.raw?.payment_info?.amount || 0);
       }
     });
 
-    const todayDayName = weekdayMap[new Date().getDay()];
-
     return weekdays.map(day => ({
       day,
-      revenue: Number((revenueMap[day] / 1000000).toFixed(1)), // in Millions
+      revenue: Number((revenueMap[day] / 1000000).toFixed(1)),
       active: day === todayDayName
     }));
   }, [appointments]);
@@ -66,9 +51,9 @@ const ManagerRevenue = ({ appointments = [] }) => {
     const completed = appointments.filter(app => app.status === "COMPLETED");
     if (completed.length === 0) {
       return [
-        { name: "Sửa chữa động cơ", percent: 45, color: "#3b82f6" },
-        { name: "Bảo dưỡng định kỳ", percent: 35, color: "#ff6b00" },
-        { name: "Chăm sóc & Rửa xe", percent: 20, color: "#10b981" }
+        { name: "Sửa chữa động cơ", percent: 0, color: "#3b82f6" },
+        { name: "Bảo dưỡng định kỳ", percent: 0, color: "#ff6b00" },
+        { name: "Chăm sóc & Rửa xe", percent: 0, color: "#10b981" }
       ];
     }
     

@@ -26,7 +26,9 @@ const notificationRoutes = require('./routes/notification.routes');
 const chatRoutes = require('./routes/chat.routes');
 const adminChatRoutes = require('./routes/admin.chat.routes');
 const adminAiRoutes = require('./routes/admin.ai.routes');
+const adminReminderRoutes = require('./routes/admin.reminder.routes');
 const webhookRoutes = require('./routes/webhook.routes');
+const { startMaintenanceReminderScheduler } = require('./jobs/maintenanceReminder.job');
 
 const app = express();
 
@@ -98,6 +100,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminChatRoutes);
 app.use('/api/admin', adminAiRoutes);
+app.use('/api/admin', adminReminderRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -128,6 +131,7 @@ app.listen(PORT, () => {
   console.log(`📡 API available at http://localhost:${PORT}/api`);
   console.log(`🏥 Health check at http://localhost:${PORT}/health`);
   console.log('🤖 Admin AI: plain-Vietnamese analytics reports enabled');
+  startMaintenanceReminderScheduler();
 });
 
 module.exports = app;

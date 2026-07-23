@@ -8,8 +8,8 @@ import AdminServices from './pages/admin/AdminServices';
 import AdminCustomers from './pages/admin/AdminCustomers';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminInventory from './pages/admin/AdminInventory';
-import AdminContact from './pages/admin/AdminContact';
 import AdminAI from './pages/admin/AdminAI';
+import AdminReminders from './pages/admin/AdminReminders';
 import './App.css';
 import { Bell } from 'lucide-react';
 import { getNotifications, markAsRead as markNotificationAsRead, markAllAsRead as markAllNotificationsAsRead } from './services/notificationApi';
@@ -18,11 +18,11 @@ const ADMIN_PAGES = new Set([
   'dashboard',
   'calendar',
   'services',
+  'reminders',
   'customers',
   'users',
   'profile',
   'inventory',
-  'contact',
   'ai'
 ]);
 
@@ -143,10 +143,10 @@ function App() {
         return <AdminProfile onViewChange={handlePageChange} />;
       case 'inventory':
         return <AdminInventory onViewChange={handlePageChange} />;
-      case 'contact':
-        return <AdminContact onViewChange={handlePageChange} />;
       case 'ai':
         return <AdminAI onViewChange={handlePageChange} />;
+      case 'reminders':
+        return <AdminReminders onViewChange={handlePageChange} />;
       default:
         return <AdminDashboard onViewChange={handlePageChange} />;
 

@@ -10,6 +10,20 @@
   background: var(--manager-surface);
 }
 
+.contact-layout.is-embedded {
+  min-height: 0;
+  height: 100%;
+  background: transparent;
+}
+
+.contact-layout.is-embedded .contact-main {
+  min-height: calc(100vh - 180px);
+  border: 1px solid var(--contact-line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--manager-surface);
+}
+
 .contact-main {
   display: flex;
   flex-direction: column;

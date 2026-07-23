@@ -369,10 +369,104 @@ const sendAppointmentConfirmedEmail = async (email, name, appointment = {}) => {
   }
 };
 
+/**
+ * Reminder email for periodic maintenance (oil change, inspection, etc.)
+ */
+const sendMaintenanceReminderEmail = async (email, name, payload = {}) => {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
+    console.warn('SMTP is not configured. Skipping maintenance reminder email.');
+    return false;
+  }
+
+  const transporter = createTransporter();
+  const serviceName = payload.service_name || 'bảo dưỡng định kỳ';
+  const reminderDays = Number(payload.reminder_days || 0);
+  const reminderMileage = Number(payload.reminder_mileage || 0);
+  const vehicle = payload.vehicle || {};
+  const vehicleLabel = [vehicle.brand, vehicle.model].filter(Boolean).join(' ') || 'xe của quý khách';
+  const plate = vehicle.license_plate || 'Chưa cập nhật';
+  const bookingUrl = payload.booking_url || `${process.env.FRONTEND_URL || 'http://localhost:3000'}/booking`;
+  const completedDate = payload.completed_date || '';
+  const dueDate = payload.due_date || '';
+
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+    to: email,
+    subject: `[MOTOCORE] Nhắc bảo dưỡng: ${serviceName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #222; background: #f6f7f8; }
+          .container { max-width: 640px; margin: 0 auto; padding: 24px; }
+          .card { background: #fff; border: 1px solid #ead8cf; border-radius: 12px; overflow: hidden; }
+          .header { background: #e4282b; color: #fff; padding: 18px 22px; }
+          .content { padding: 22px; }
+          .meta { margin: 16px 0; border: 1px solid #ead8cf; border-radius: 10px; overflow: hidden; }
+          .row { display: grid; grid-template-columns: 160px 1fr; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #ead8cf; }
+          .row:last-child { border-bottom: 0; }
+          .label { color: #6b7280; font-weight: 700; }
+          .value { color: #111827; font-weight: 800; }
+          .button { display: inline-block; margin-top: 8px; padding: 12px 22px; background: #e4282b; color: #fff !important; text-decoration: none; border-radius: 8px; font-weight: 800; }
+          .notice { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 14px; margin-top: 16px; }
+          .footer { color: #6b7280; font-size: 12px; padding: 16px 22px; border-top: 1px solid #ead8cf; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="card">
+            <div class="header">
+              <h2 style="margin:0;">Đến hạn bảo dưỡng rồi</h2>
+            </div>
+            <div class="content">
+              <p>Xin chào ${name || 'quý khách'},</p>
+              <p>
+                Đã khoảng <strong>${reminderDays} ngày</strong> kể từ lần
+                <strong>${serviceName}</strong> gần nhất.
+                MOTOCORE nhắc quý khách mang xe đến kiểm tra / bảo dưỡng để xe vận hành ổn định.
+              </p>
+              <div class="meta">
+                <div class="row"><span class="label">Dịch vụ</span><span class="value">${serviceName}</span></div>
+                <div class="row"><span class="label">Xe</span><span class="value">${vehicleLabel} · ${plate}</span></div>
+                ${completedDate ? `<div class="row"><span class="label">Lần làm gần nhất</span><span class="value">${completedDate}</span></div>` : ''}
+                ${dueDate ? `<div class="row"><span class="label">Ngày đến hạn nhắc</span><span class="value">${dueDate}</span></div>` : ''}
+                ${reminderMileage ? `<div class="row"><span class="label">Gợi ý theo km</span><span class="value">~${reminderMileage.toLocaleString('vi-VN')} km</span></div>` : ''}
+              </div>
+              <center>
+                <a href="${bookingUrl}" class="button">Đặt lịch bảo dưỡng</a>
+              </center>
+              <div class="notice">
+                Đây là nhắc bảo dưỡng theo chu kỳ dịch vụ, không phải quảng cáo sản phẩm.
+                Quý khách có thể bỏ qua email nếu xe vừa được bảo dưỡng gần đây.
+              </div>
+            </div>
+            <div class="footer">
+              Email được gửi tự động từ hệ thống MOTOCORE.
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Maintenance reminder email sent to ${email}`);
+    return true;
+  } catch (error) {
+    console.error('Error sending maintenance reminder email:', error);
+    return false;
+  }
+};
+
 module.exports = {
   sendVerificationOTP,
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail,
-  sendAppointmentConfirmedEmail
+  sendAppointmentConfirmedEmail,
+  sendMaintenanceReminderEmail
 };

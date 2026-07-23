@@ -245,6 +245,8 @@ router.put('/appointments/:id/diagnosis',
   param('id').isMongoId().withMessage('Invalid appointment ID'),
   body('diagnosis_notes').trim().notEmpty().isLength({ max: 2000 })
     .withMessage('Diagnosis notes are required and cannot exceed 2000 characters'),
+  body('quoted_price').optional({ nullable: true }).isFloat({ min: 0 })
+    .withMessage('Quoted labor price must be a non-negative number'),
   validate,
   staffAppointmentController.saveDiagnosis
 );
@@ -271,6 +273,18 @@ router.put('/appointments/:id/repair-log',
     .withMessage('Repair notes cannot exceed 500 characters'),
   validate,
   staffAppointmentController.saveRepairLog
+);
+
+router.put('/appointments/:id/addon-services',
+  authenticate,
+  authorize('STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('items').isArray({ max: 20 }).withMessage('items must be an array (max 20)'),
+  body('items.*.service_id').isMongoId().withMessage('Invalid service_id'),
+  body('items.*.quantity').optional().isInt({ min: 1, max: 20 })
+    .withMessage('Addon quantity must be between 1 and 20'),
+  validate,
+  staffAppointmentController.saveAddonServices
 );
 
 router.post('/appointments/:id/payment',

@@ -1387,6 +1387,48 @@
   gap: 8px;
 }
 
+.addon-services-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--border-soft);
+}
+
+.addon-services-section .repair-head {
+  margin-bottom: 12px;
+}
+
+.addon-services-section .repair-actions {
+  margin-top: 12px;
+}
+
+.quote-guide-section {
+  margin: 16px 0 8px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.quote-guide-section .repair-head {
+  margin-bottom: 10px;
+}
+
+.quote-guide-section h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.quote-suggest-list {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.quote-pick-btn {
+  min-width: 108px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
 .usage-list.compact {
   margin-top: 8px;
 }

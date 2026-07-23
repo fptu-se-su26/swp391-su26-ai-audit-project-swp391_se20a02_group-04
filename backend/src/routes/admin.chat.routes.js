@@ -27,7 +27,7 @@ const messageValidation = [
 router.get(
   '/chat/conversations',
   authenticate,
-  authorize('ADMIN', 'MANAGER'),
+  authorize('MANAGER'),
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('status').optional().isIn(['OPEN', 'WAITING_ADMIN', 'WAITING_CUSTOMER', 'RESOLVED']),
@@ -41,7 +41,7 @@ router.get(
 router.get(
   '/chat/conversations/:id',
   authenticate,
-  authorize('ADMIN', 'MANAGER'),
+  authorize('MANAGER'),
   param('id').isMongoId(),
   validate,
   chatController.getConversationById
@@ -53,7 +53,7 @@ router.get(
 router.post(
   '/chat/conversations/:id/messages',
   authenticate,
-  authorize('ADMIN', 'MANAGER'),
+  authorize('MANAGER'),
   param('id').isMongoId(),
   messageValidation,
   validate,
@@ -66,7 +66,7 @@ router.post(
 router.patch(
   '/chat/conversations/:id/status',
   authenticate,
-  authorize('ADMIN', 'MANAGER'),
+  authorize('MANAGER'),
   param('id').isMongoId(),
   body('status').isIn(['OPEN', 'WAITING_ADMIN', 'WAITING_CUSTOMER', 'RESOLVED']),
   validate,

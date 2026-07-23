@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Icon } from "../StaffComponents";
-import { formatCurrency, getJobRouteId } from "../staffAppointmentMapper";
+import { formatCurrency, getEntityId, getJobRouteId } from "../staffAppointmentMapper";
 import {
   getAppointmentMaterials,
+  getCatalogServices,
   getStaffInventory,
   revertAppointmentMaterial,
+  saveAddonServices,
   saveRepairLog,
   useAppointmentMaterials,
 } from "../../../services/staffAppointmentApi";
@@ -12,6 +14,14 @@ import {
   getCategoryLabel,
   INVENTORY_CATEGORIES,
 } from "../../../utils/inventoryStatus";
+
+const ADDON_CATEGORY_OPTIONS = [
+  { value: "WASH_CARE", label: "Rửa & chăm sóc" },
+  { value: "MAINTENANCE", label: "Bảo dưỡng" },
+  { value: "INSPECTION", label: "Kiểm tra" },
+  { value: "OTHER", label: "Khác" },
+  { value: "", label: "Tất cả dịch vụ" },
+];
 
 function QuantityControl({ max, value, onChange, disabled }) {
   const number = Number(value) || 0;
@@ -53,6 +63,20 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  const [addonCatalog, setAddonCatalog] = useState([]);
+  const [addonCategory, setAddonCategory] = useState("WASH_CARE");
+  const [addonSearch, setAddonSearch] = useState("");
+  const [addonQty, setAddonQty] = useState({});
+  const [savedAddons, setSavedAddons] = useState(job.addonServices || []);
+  const [showAddons, setShowAddons] = useState(Boolean(job.addonServices?.length));
+  const [loadingAddons, setLoadingAddons] = useState(true);
+  const [savingAddons, setSavingAddons] = useState(false);
+
+  const bookedServiceId = getEntityId(job.raw?.service_id) || "";
+  const paymentStatus = String(job.paymentInfo?.status || "").toUpperCase();
+  const billLocked = paymentStatus === "PENDING" || paymentStatus === "PAID";
+  const editingLocked = readOnly || billLocked;
+
   const load = async (nextCategory = category) => {
     setLoading(true);
     setError("");
@@ -74,9 +98,42 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
     }
   };
 
+  const loadAddonCatalog = async (nextCategory = addonCategory) => {
+    setLoadingAddons(true);
+    try {
+      const params = { limit: 100, sort_by: "service_name", sort_order: "asc" };
+      if (nextCategory) params.category = nextCategory;
+      const response = await getCatalogServices(params);
+      const services = (response.data?.services || []).filter((service) => {
+        if (!service.is_active) return false;
+        if (bookedServiceId && String(service._id) === String(bookedServiceId)) return false;
+        return Number(service.base_price || 0) >= 0;
+      });
+      setAddonCatalog(services);
+    } catch (requestError) {
+      setAddonCatalog([]);
+      setError(requestError.message || "Không thể tải danh mục dịch vụ bổ sung.");
+    } finally {
+      setLoadingAddons(false);
+    }
+  };
+
   useEffect(() => {
     load("");
+    loadAddonCatalog("WASH_CARE");
   }, [job.id]);
+
+  useEffect(() => {
+    setSavedAddons(job.addonServices || []);
+    if (job.addonServices?.length) {
+      setShowAddons(true);
+      const nextQty = {};
+      job.addonServices.forEach((item) => {
+        if (item.service_id) nextQty[item.service_id] = String(item.quantity || 1);
+      });
+      setAddonQty(nextQty);
+    }
+  }, [job.addonServices, job.id]);
 
   useEffect(() => {
     if (transactions.length) setShowUsed(true);
@@ -85,6 +142,11 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
   const handleCategoryChange = (value) => {
     setCategory(value);
     load(value);
+  };
+
+  const handleAddonCategoryChange = (value) => {
+    setAddonCategory(value);
+    loadAddonCatalog(value);
   };
 
   const filteredInventory = useMemo(() => {
@@ -99,6 +161,18 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
     });
   }, [inventory, search]);
 
+  const filteredAddons = useMemo(() => {
+    const keyword = addonSearch.trim().toLowerCase();
+    if (!keyword) return addonCatalog;
+    return addonCatalog.filter((service) => {
+      const haystack = [service.service_name, service.service_code, service.description]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(keyword);
+    });
+  }, [addonCatalog, addonSearch]);
+
   const selectedItems = useMemo(
     () =>
       Object.entries(quantities)
@@ -107,17 +181,38 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
     [quantities]
   );
 
+  const selectedAddonItems = useMemo(
+    () =>
+      Object.entries(addonQty)
+        .map(([service_id, quantity]) => ({ service_id, quantity: Number(quantity) }))
+        .filter((item) => item.quantity > 0),
+    [addonQty]
+  );
+
   const selectedTotal = selectedItems.reduce((total, selected) => {
     const item = inventory.find((row) => row._id === selected.inventory_item_id);
     return total + Number(item?.unit_price || 0) * selected.quantity;
   }, 0);
 
+  const selectedAddonTotal = selectedAddonItems.reduce((total, selected) => {
+    const service = addonCatalog.find((row) => String(row._id) === String(selected.service_id));
+    return total + Number(service?.base_price || 0) * selected.quantity;
+  }, 0);
+
   const usedTotal = transactions.reduce((sum, row) => sum + Number(row.total_cost || 0), 0);
+  const savedAddonTotal = savedAddons.reduce(
+    (sum, item) => sum + Number(item.price || 0) * Math.max(1, Number(item.quantity) || 1),
+    0
+  );
   const stepDone = Boolean(transactions.length) || Boolean(job.repairLog?.status);
   const noPartsDone = job.repairLog?.status === "NO_PARTS";
 
   const setQuantity = (itemId, value) => {
     setQuantities((current) => ({ ...current, [itemId]: value }));
+  };
+
+  const setAddonQuantity = (serviceId, value) => {
+    setAddonQty((current) => ({ ...current, [serviceId]: value }));
   };
 
   const submitParts = async (event) => {
@@ -170,6 +265,57 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
     }
   };
 
+  const submitAddons = async () => {
+    setError("");
+    setMessage("");
+    setSavingAddons(true);
+    try {
+      const response = await saveAddonServices(getJobRouteId(job), {
+        items: selectedAddonItems.map((item) => ({
+          service_id: item.service_id,
+          quantity: item.quantity,
+        })),
+      });
+      const next = response.data?.appointment?.addon_services || [];
+      setSavedAddons(
+        next.map((item) => ({
+          service_id: getEntityId(item.service_id) || item.service_id,
+          name: item.name || "",
+          price: Number(item.price || 0),
+          quantity: Math.max(1, Number(item.quantity) || 1),
+        }))
+      );
+      setShowAddons(true);
+      setMessage(
+        selectedAddonItems.length
+          ? `Đã ghi nhận ${selectedAddonItems.length} dịch vụ bổ sung.`
+          : "Đã xóa dịch vụ bổ sung."
+      );
+      await onChanged();
+    } catch (requestError) {
+      setError(requestError.message || "Không thể ghi nhận dịch vụ bổ sung.");
+    } finally {
+      setSavingAddons(false);
+    }
+  };
+
+  const clearAddons = async () => {
+    setAddonQty({});
+    setError("");
+    setMessage("");
+    setSavingAddons(true);
+    try {
+      await saveAddonServices(getJobRouteId(job), { items: [] });
+      setSavedAddons([]);
+      setMessage("Không thêm dịch vụ bổ sung.");
+      await onChanged();
+    } catch (requestError) {
+      setError(requestError.message || "Không thể cập nhật dịch vụ bổ sung.");
+    } finally {
+      setSavingAddons(false);
+    }
+  };
+
   const handleRevert = async (transactionId) => {
     if (!window.confirm("Hoàn tác vật tư này và trả lại kho?")) return;
 
@@ -202,10 +348,17 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
         )}
       </div>
 
+      {billLocked && (
+        <p className="form-message warning">
+          {paymentStatus === "PAID"
+            ? "Hóa đơn đã thanh toán — không thể thêm/sửa phụ tùng hay dịch vụ bổ sung."
+            : "Đã tạo QR PayOS (đang chờ thanh toán) — bill đã khóa. Không thể thêm phụ tùng hay dịch vụ bổ sung để tránh lệch số tiền."}
+        </p>
+      )}
       {error && <p className="form-message error">{error}</p>}
       {message && <p className="form-message success">{message}</p>}
 
-      {!readOnly && (
+      {!editingLocked && (
         <form className="repair-form" onSubmit={submitParts}>
           <div className="repair-filter-bar">
             <label className="repair-search-field">
@@ -328,7 +481,7 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
                     </div>
                     <div className="usage-item-actions">
                       <b>{formatCurrency(transaction.total_cost)}</b>
-                      {!readOnly && (
+                      {!editingLocked && (
                         <button
                           className="text-button usage-undo-btn"
                           disabled={saving || Boolean(revertingId)}
@@ -347,6 +500,146 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
             <p className="muted-copy">Chưa ghi nhận phụ tùng.</p>
           )
         )}
+      </div>
+
+      <div className="addon-services-section">
+        <div className="repair-head">
+          <div>
+            <h3>Dịch vụ bổ sung</h3>
+            <p>Thêm dịch vụ sau sửa chữa (vd. rửa xe) trước khi tính tổng tiền.</p>
+          </div>
+          {savedAddons.length > 0 && (
+            <span className="repair-status-chip ok">
+              Đã thêm {savedAddons.length} DV · {formatCurrency(savedAddonTotal)}
+            </span>
+          )}
+        </div>
+
+        {!editingLocked && (
+          <>
+            <div className="repair-filter-bar">
+              <label className="repair-search-field">
+                <Icon name="search" />
+                <input
+                  onChange={(event) => setAddonSearch(event.target.value)}
+                  placeholder="Tìm dịch vụ bổ sung..."
+                  value={addonSearch}
+                />
+              </label>
+              <label className="repair-category-field">
+                <select onChange={(event) => handleAddonCategoryChange(event.target.value)} value={addonCategory}>
+                  {ADDON_CATEGORY_OPTIONS.map((option) => (
+                    <option key={option.value || "all"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="repair-result-meta">
+              <span>
+                {ADDON_CATEGORY_OPTIONS.find((option) => option.value === addonCategory)?.label || "Tất cả"} ·{" "}
+                <strong>{filteredAddons.length}</strong> dịch vụ
+              </span>
+              {selectedAddonItems.length > 0 && (
+                <span className="repair-selected-meta">
+                  Đang chọn <strong>{selectedAddonItems.length}</strong> · {formatCurrency(selectedAddonTotal)}
+                  <button className="text-button" onClick={() => setAddonQty({})} type="button">
+                    Xóa
+                  </button>
+                </span>
+              )}
+            </div>
+
+            {loadingAddons ? (
+              <p className="muted-copy">Đang tải dịch vụ...</p>
+            ) : filteredAddons.length === 0 ? (
+              <div className="repair-empty compact">
+                <strong>Không có dịch vụ phù hợp</strong>
+                <p>Đổi danh mục hoặc bỏ tìm kiếm. Có thể bỏ qua nếu khách không cần thêm dịch vụ.</p>
+              </div>
+            ) : (
+              <div className="repair-list">
+                <div className="repair-list-head">
+                  <span>Dịch vụ</span>
+                  <span>Giá</span>
+                  <span>Số lượng</span>
+                </div>
+                {filteredAddons.map((service) => {
+                  const qty = Number(addonQty[service._id] || 0);
+                  return (
+                    <div className={`repair-list-row ${qty > 0 ? "selected" : ""}`} key={service._id}>
+                      <div className="repair-list-info">
+                        <strong>{service.service_name}</strong>
+                        <small>
+                          {service.service_code || service.category}
+                          {service.estimated_duration ? ` · ${service.estimated_duration} phút` : ""}
+                        </small>
+                      </div>
+                      <div className="repair-list-stock">
+                        <strong>{formatCurrency(service.base_price)}</strong>
+                        <small>công</small>
+                      </div>
+                      <QuantityControl
+                        disabled={savingAddons}
+                        max={20}
+                        onChange={(value) => setAddonQuantity(service._id, value)}
+                        value={qty}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="repair-actions">
+              <button className="secondary-button" disabled={savingAddons} onClick={clearAddons} type="button">
+                Không thêm dịch vụ
+              </button>
+              <button
+                className="primary-button"
+                disabled={savingAddons || loadingAddons}
+                onClick={submitAddons}
+                type="button"
+              >
+                <Icon name="add_circle" />
+                {savingAddons
+                  ? "Đang lưu..."
+                  : `Ghi nhận DV bổ sung${selectedAddonItems.length ? ` (${selectedAddonItems.length})` : ""}`}
+              </button>
+            </div>
+          </>
+        )}
+
+        <div className="repair-used-section compact">
+          <button className="repair-used-toggle" onClick={() => setShowAddons((open) => !open)} type="button">
+            <span>
+              <Icon name="local_car_wash" />
+              Dịch vụ đã thêm {savedAddons.length ? `(${savedAddons.length})` : ""}
+              {savedAddons.length > 0 ? ` · ${formatCurrency(savedAddonTotal)}` : ""}
+            </span>
+            <Icon name={showAddons ? "expand_less" : "expand_more"} />
+          </button>
+          {showAddons &&
+            (savedAddons.length ? (
+              <div className="usage-list compact">
+                {savedAddons.map((item) => (
+                  <div className="usage-item" key={`${item.service_id}-${item.name}`}>
+                    <div>
+                      <strong>{item.name || "Dịch vụ bổ sung"}</strong>
+                      <span>x{item.quantity || 1}</span>
+                    </div>
+                    <div className="usage-item-actions">
+                      <b>{formatCurrency(Number(item.price || 0) * Math.max(1, Number(item.quantity) || 1))}</b>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted-copy">Chưa thêm dịch vụ bổ sung.</p>
+            ))}
+        </div>
       </div>
     </section>
   );

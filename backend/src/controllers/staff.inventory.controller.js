@@ -150,6 +150,15 @@ const useAppointmentMaterials = async (req, res) => {
       return errorResponse(res, 422, 'Chỉ có thể ghi nhận vật tư khi appointment đang xử lý');
     }
 
+    const paymentStatus = appointment.payment_info?.status;
+    if (paymentStatus === 'PENDING' || paymentStatus === 'PAID') {
+      return errorResponse(
+        res,
+        422,
+        'Không thể thêm vật tư sau khi đã tạo QR PayOS hoặc đã thanh toán. Hủy/chờ hết hạn thanh toán rồi thử lại, hoặc tạo hóa đơn mới sau khi cập nhật bill.'
+      );
+    }
+
     const createdTransactions = [];
     const updatedItems = [];
 
