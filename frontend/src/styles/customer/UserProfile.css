@@ -1398,3 +1398,140 @@
     left: 16px;
   }
 }
+
+.status-waiting-parts {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.appointment-status-dot.waiting-parts {
+  background: #fb923c;
+}
+
+.parts-hold-consent-panel {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #fdba74;
+  border-radius: 16px;
+  background: #fff7ed;
+}
+
+.parts-hold-consent-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.parts-hold-consent-head .material-symbols-outlined {
+  color: #c2410c;
+  font-size: 28px;
+}
+
+.parts-hold-consent-head h4 {
+  margin: 0 0 4px;
+  color: #9a3412;
+  font-size: 16px;
+}
+
+.parts-hold-consent-head p {
+  margin: 0;
+  color: #7c2d12;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.parts-hold-consent-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.parts-hold-consent-meta > div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #fed7aa;
+}
+
+.parts-hold-consent-meta span {
+  display: block;
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.parts-hold-consent-meta strong {
+  display: block;
+  margin-top: 4px;
+  color: #191c1d;
+  font-size: 14px;
+}
+
+.parts-hold-consent-items {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: #7c2d12;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.parts-hold-consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.parts-hold-consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  justify-content: flex-end;
+}
+
+.parts-hold-approve-btn,
+.parts-hold-decline-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.parts-hold-approve-btn {
+  background: #c2410c;
+  color: #fff;
+}
+
+.parts-hold-decline-btn {
+  background: #fff;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+}
+
+.parts-hold-approve-btn:disabled,
+.parts-hold-decline-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .parts-hold-consent-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-hold-consent-actions {
+    flex-direction: column;
+  }
+
+  .parts-hold-approve-btn,
+  .parts-hold-decline-btn {
+    width: 100%;
+  }
+}

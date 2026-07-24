@@ -5,6 +5,7 @@ import {
   getAppointmentMaterials,
   getCatalogServices,
   getStaffInventory,
+  createPartsHold,
   revertAppointmentMaterial,
   saveAddonServices,
   saveRepairLog,
@@ -71,11 +72,17 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
   const [showAddons, setShowAddons] = useState(Boolean(job.addonServices?.length));
   const [loadingAddons, setLoadingAddons] = useState(true);
   const [savingAddons, setSavingAddons] = useState(false);
+  const [showHoldForm, setShowHoldForm] = useState(false);
+  const [holdItemsText, setHoldItemsText] = useState("");
 
   const bookedServiceId = getEntityId(job.raw?.service_id) || "";
   const paymentStatus = String(job.paymentInfo?.status || "").toUpperCase();
   const billLocked = paymentStatus === "PENDING" || paymentStatus === "PAID";
-  const editingLocked = readOnly || billLocked;
+  const partsHold = job.partsHold;
+  const waitingParts = job.status === "WAITING_PARTS" || ["PENDING_MANAGER", "PENDING_CONSENT", "APPROVED"].includes(String(partsHold?.status || "").toUpperCase());
+  const holdStatus = String(partsHold?.status || "").toUpperCase();
+  const consentStatus = String(partsHold?.consent?.status || "").toUpperCase();
+  const editingLocked = readOnly || billLocked || waitingParts;
 
   const load = async (nextCategory = category) => {
     setLoading(true);
@@ -134,6 +141,13 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
       setAddonQty(nextQty);
     }
   }, [job.addonServices, job.id]);
+
+  useEffect(() => {
+    if (waitingParts) {
+      setShowHoldForm(false);
+      setHoldItemsText("");
+    }
+  }, [waitingParts]);
 
   useEffect(() => {
     if (transactions.length) setShowUsed(true);
@@ -204,7 +218,9 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
     (sum, item) => sum + Number(item.price || 0) * Math.max(1, Number(item.quantity) || 1),
     0
   );
-  const stepDone = Boolean(transactions.length) || Boolean(job.repairLog?.status);
+  const stepDone =
+    Boolean(transactions.length) ||
+    ["WITH_PARTS", "NO_PARTS"].includes(String(job.repairLog?.status || "").toUpperCase());
   const noPartsDone = job.repairLog?.status === "NO_PARTS";
 
   const setQuantity = (itemId, value) => {
@@ -213,6 +229,48 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
 
   const setAddonQuantity = (serviceId, value) => {
     setAddonQty((current) => ({ ...current, [serviceId]: value }));
+  };
+
+  const submitPartsHold = async (event) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+
+    const items = holdItemsText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const match = line.match(/^(.*?)(?:\s*[x×]\s*(\d+))?$/i);
+        return {
+          name: (match?.[1] || line).trim(),
+          quantity: Math.max(1, Number(match?.[2]) || 1),
+        };
+      })
+      .filter((item) => item.name);
+
+    if (!items.length) {
+      return setError("Nhập ít nhất một phụ tùng thiếu (mỗi dòng một món, vd: Lọc nhớt x2).");
+    }
+
+    setSaving(true);
+    try {
+      await createPartsHold(getJobRouteId(job), { items });
+      setShowHoldForm(false);
+      setHoldItemsText("");
+      setMessage("Đã báo Manager. Manager sẽ gọi khách để xác nhận chờ phụ tùng.");
+      await onChanged();
+    } catch (requestError) {
+      const message = requestError.message || "Không thể tạo yêu cầu chờ phụ tùng.";
+      setError(message);
+      // Đồng bộ lại trạng thái nếu lịch đã chuyển sang chờ phụ tùng
+      if (/chờ phụ tùng|WAITING_PARTS|đã báo/i.test(message)) {
+        setShowHoldForm(false);
+        await onChanged();
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const submitParts = async (event) => {
@@ -355,8 +413,78 @@ export default function Step3Materials({ job, onChanged, onContinue, readOnly = 
             : "Đã tạo QR PayOS (đang chờ thanh toán) — bill đã khóa. Không thể thêm phụ tùng hay dịch vụ bổ sung để tránh lệch số tiền."}
         </p>
       )}
+
+          {waitingParts && (
+        <div className="parts-hold-banner">
+          <div>
+            <strong>Đang chờ phụ tùng</strong>
+            <p>
+              {(holdStatus === "PENDING_MANAGER" || holdStatus === "PENDING_CONSENT") &&
+                "Đã báo Manager — đang chờ Manager gọi khách xác nhận."}
+              {consentStatus === "APPROVED" &&
+                (partsHold?.eta_days
+                  ? `Khách đã đồng ý chờ khoảng ${partsHold.eta_days} ngày. Khi hàng về, Manager nhập kho rồi mở lại sửa chữa — lúc đó bạn lấy phụ tùng từ kho tại đây.`
+                  : "Khách đã đồng ý chờ phụ tùng. Khi hàng về, Manager nhập kho rồi mở lại sửa chữa — lúc đó bạn lấy phụ tùng từ kho tại đây.")}
+              {consentStatus === "DECLINED" && "Manager đã xác nhận: khách từ chối chờ hàng."}
+            </p>
+            {Array.isArray(partsHold?.items) && partsHold.items.length > 0 && (
+              <ul className="parts-hold-list">
+                {partsHold.items.map((item, index) => (
+                  <li key={`${item.name}-${index}`}>
+                    {item.name}
+                    {item.quantity > 1 ? ` × ${item.quantity}` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
       {error && <p className="form-message error">{error}</p>}
       {message && <p className="form-message success">{message}</p>}
+
+      {!editingLocked && !waitingParts && (
+        <div className="parts-hold-actions">
+          <button
+            className="secondary-button"
+            disabled={saving || billLocked}
+            onClick={() => setShowHoldForm((open) => !open)}
+            type="button"
+          >
+            <Icon name="hourglass_top" />
+            {showHoldForm ? "Đóng form chờ hàng" : "Thiếu phụ tùng — báo Manager"}
+          </button>
+        </div>
+      )}
+
+      {showHoldForm && !editingLocked && (
+        <form className="parts-hold-form" onSubmit={submitPartsHold}>
+          <h4>Báo Manager thiếu phụ tùng</h4>
+          <p className="muted-copy">
+            Chỉ cần liệt kê phụ tùng thiếu. Manager sẽ liên hệ khách (ETA, chi phí, nội dung gửi khách).
+          </p>
+          <label>
+            Phụ tùng thiếu (mỗi dòng một món)
+            <textarea
+              onChange={(event) => setHoldItemsText(event.target.value)}
+              placeholder={"Lọc nhớt x2\nBugi NGK\nMá phanh trước"}
+              required
+              rows={4}
+              value={holdItemsText}
+            />
+          </label>
+          <div className="repair-actions">
+            <button className="secondary-button" onClick={() => setShowHoldForm(false)} type="button">
+              Hủy
+            </button>
+            <button className="primary-button" disabled={saving} type="submit">
+              <Icon name="send" />
+              {saving ? "Đang gửi..." : "Báo lên Manager"}
+            </button>
+          </div>
+        </form>
+      )}
 
       {!editingLocked && (
         <form className="repair-form" onSubmit={submitParts}>

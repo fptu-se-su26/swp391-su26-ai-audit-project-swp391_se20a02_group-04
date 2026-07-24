@@ -7,7 +7,7 @@ const UserRole = require('../models/UserRole.model');
 const Role = require('../models/Role.model');
 const { notifyStaffAssigned } = require('../utils/staffNotification.util');
 
-const ACTIVE_STATUSES = ['PENDING', 'CONFIRMED', 'IN_PROGRESS'];
+const ACTIVE_STATUSES = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'WAITING_PARTS'];
 
 function buildDateTime(dateValue, timeValue) {
   if (!dateValue || !timeValue) return null;

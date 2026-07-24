@@ -267,12 +267,32 @@ router.put('/appointments/:id/repair-log',
   authenticate,
   authorize('STAFF'),
   param('id').isMongoId().withMessage('Invalid appointment ID'),
-  body('status').isIn(['WITH_PARTS', 'NO_PARTS'])
-    .withMessage('Repair status must be WITH_PARTS or NO_PARTS'),
+  body('status').isIn(['WITH_PARTS', 'NO_PARTS', 'WAITING_PARTS'])
+    .withMessage('Repair status must be WITH_PARTS, NO_PARTS, or WAITING_PARTS'),
   body('notes').optional().trim().isLength({ max: 500 })
     .withMessage('Repair notes cannot exceed 500 characters'),
   validate,
   staffAppointmentController.saveRepairLog
+);
+
+router.post('/appointments/:id/parts-hold',
+  authenticate,
+  authorize('STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('items').isArray({ min: 1, max: 20 }).withMessage('items must be an array (1-20)'),
+  body('items.*.name').trim().notEmpty().withMessage('Part name is required'),
+  body('items.*.quantity').optional({ checkFalsy: true }).isInt({ min: 1, max: 100 }),
+  validate,
+  staffAppointmentController.createPartsHold
+);
+
+router.post('/appointments/:id/parts-hold/ready',
+  authenticate,
+  authorize('STAFF'),
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('notes').optional().trim().isLength({ max: 500 }),
+  validate,
+  staffAppointmentController.markPartsReady
 );
 
 router.put('/appointments/:id/addon-services',

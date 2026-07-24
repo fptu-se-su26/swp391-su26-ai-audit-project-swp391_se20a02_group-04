@@ -914,6 +914,161 @@ const saveRepairLog = async (req, res) => {
   }
 };
 
+const createPartsHold = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    const ownership = checkStaffAppointmentOwnership(appointment, req.user);
+    if (!ownership.ok) {
+      return errorResponse(res, ownership.statusCode, ownership.message);
+    }
+
+    const holdStatus = String(appointment.parts_hold?.status || '').toUpperCase();
+    if (appointment.status === 'WAITING_PARTS' || ['PENDING_MANAGER', 'PENDING_CONSENT', 'APPROVED'].includes(holdStatus)) {
+      return errorResponse(
+        res,
+        422,
+        'Lịch này đã báo thiếu phụ tùng. Manager đang liên hệ khách — không cần báo lại.'
+      );
+    }
+
+    if (appointment.status !== 'IN_PROGRESS') {
+      return errorResponse(res, 422, 'Chỉ báo thiếu phụ tùng khi lịch đang ở trạng thái đang sửa chữa.');
+    }
+
+    const paymentStatus = appointment.payment_info?.status;
+    if (paymentStatus === 'PENDING' || paymentStatus === 'PAID') {
+      return errorResponse(res, 422, 'Không thể tạm dừng chờ hàng sau khi đã tạo thanh toán.');
+    }
+
+    const rawItems = Array.isArray(req.body.items) ? req.body.items : [];
+    const items = rawItems
+      .map((item) => ({
+        name: String(item.name || '').trim(),
+        quantity: Math.max(1, Number(item.quantity) || 1),
+        note: String(item.note || '').trim()
+      }))
+      .filter((item) => item.name);
+
+    if (!items.length) {
+      return errorResponse(res, 400, 'Cần ít nhất một phụ tùng thiếu');
+    }
+    if (items.length > 20) {
+      return errorResponse(res, 400, 'Không thể yêu cầu quá 20 loại phụ tùng');
+    }
+
+    // ETA / chi phí / nội dung gửi khách do Manager xử lý khi liên hệ khách
+    let etaDays = null;
+    if (req.body.eta_days !== undefined && req.body.eta_days !== null && req.body.eta_days !== '') {
+      etaDays = Number(req.body.eta_days);
+      if (!Number.isInteger(etaDays) || etaDays < 1 || etaDays > 90) {
+        return errorResponse(res, 400, 'ETA phải từ 1 đến 90 ngày');
+      }
+    }
+
+    let estimatedCost = null;
+    if (req.body.estimated_cost !== undefined && req.body.estimated_cost !== null && req.body.estimated_cost !== '') {
+      estimatedCost = Number(req.body.estimated_cost);
+      if (!Number.isFinite(estimatedCost) || estimatedCost < 0) {
+        return errorResponse(res, 400, 'Chi phí dự kiến không hợp lệ');
+      }
+    }
+
+    const customerMessage = String(req.body.customer_message || '').trim();
+    const now = new Date();
+    const partsSummary = items.map((item) => item.name).join(', ');
+
+    appointment.parts_hold = {
+      status: 'PENDING_MANAGER',
+      items,
+      eta_days: etaDays,
+      estimated_cost: estimatedCost,
+      customer_message: customerMessage || '',
+      requested_at: now,
+      requested_by: req.user.userId,
+      consent: {
+        status: 'PENDING',
+        responded_at: null,
+        note: '',
+        contacted_by: null
+      },
+      ready_at: null,
+      ready_by: null
+    };
+    appointment.repair_log = {
+      status: 'WAITING_PARTS',
+      notes: `Chờ phụ tùng: ${partsSummary}`,
+      completed_at: null
+    };
+    appointment.status = 'WAITING_PARTS';
+    await appointment.save();
+
+    await createAuditSafely(req, 'APPOINTMENT_PARTS_HOLD_CREATED', {
+      appointment_id: appointment._id,
+      eta_days: etaDays,
+      items_count: items.length
+    });
+
+    const Notification = require('../models/Notification.model');
+    const Role = require('../models/Role.model');
+    const UserRole = require('../models/UserRole.model');
+    const code = appointment.appointment_code || appointment._id;
+    const partsList = items.map((item) => `${item.name} x${item.quantity}`).join(', ');
+    const plate = appointment.vehicle?.license_plate || appointment.vehicle_info?.license_plate || '';
+
+    // Báo Manager/Admin — Manager sẽ liên hệ khách (ETA/chi phí/ghi chú)
+    try {
+      const targetRoles = await Role.find({ role_name: { $in: ['MANAGER', 'ADMIN'] } });
+      const roleIds = targetRoles.map((role) => role._id);
+      if (roleIds.length > 0) {
+        const managerRoles = await UserRole.find({ role_id: { $in: roleIds } }).select('user_id');
+        const managerIds = [...new Set(managerRoles.map((row) => String(row.user_id)))];
+        const notifications = managerIds.map((managerId) => ({
+          user_id: managerId,
+          appointment_id: appointment._id,
+          type: 'APPOINTMENT_UPDATED',
+          title: 'Staff báo thiếu phụ tùng — cần liên hệ khách',
+          message: `Lịch ${code}${plate ? ` (${plate})` : ''}: thiếu ${partsList}. Vui lòng gọi khách xác nhận đồng ý chờ hàng.`,
+          metadata: {
+            kind: 'PARTS_HOLD_MANAGER_REVIEW',
+            appointment_id: String(appointment._id),
+            appointment_code: code,
+            status: 'WAITING_PARTS',
+            eta_days: etaDays,
+            parts: items
+          }
+        }));
+        if (notifications.length) {
+          await Notification.insertMany(notifications);
+        }
+      }
+    } catch (notifyError) {
+      console.warn('Parts hold manager notify failed:', notifyError.message);
+    }
+
+    return successResponse(res, 200, 'Đã báo Manager. Manager sẽ liên hệ khách để xác nhận chờ phụ tùng.', {
+      appointment: {
+        _id: appointment._id,
+        status: appointment.status,
+        repair_log: appointment.repair_log,
+        parts_hold: appointment.parts_hold
+      }
+    });
+  } catch (error) {
+    console.error('Create parts hold error:', error);
+    return errorResponse(res, 500, 'Không thể tạo yêu cầu chờ phụ tùng');
+  }
+};
+
+const markPartsReady = async (req, res) => {
+  return errorResponse(
+    res,
+    403,
+    'Staff không mở lại sửa chữa tại bước này. Manager nhập phụ tùng vào kho rồi mở lại; sau đó Staff lấy phụ tùng từ kho.'
+  );
+};
+
 const saveAddonServices = async (req, res) => {
   try {
     const appointment = await Appointment.findById(req.params.id);
@@ -1378,6 +1533,8 @@ module.exports = {
   saveDiagnosis,
   saveContactLog,
   saveRepairLog,
+  createPartsHold,
+  markPartsReady,
   saveAddonServices,
   createPayment,
   getPaymentStatus,

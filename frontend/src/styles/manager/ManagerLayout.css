@@ -172,26 +172,37 @@
     /* Force reset global margin-left leaks from other views */
 }
 
-/* HEADER */
+/* HEADER — đã bỏ tiêu đề / breadcrumb trên mọi trang Manager */
 .manager-layout .header {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-    padding: 16px 32px;
-    border-bottom: 1px solid #e2e8f0;
-    background-color: #ffffff;
-}
-
-/* Chi tiết lịch hẹn đã có header riêng — tránh thanh trắng đè nội dung */
-.manager-layout:has(.calendar-detail-body) > .main-content > .header {
     display: none;
 }
 
 .manager-layout:has(.calendar-detail-body) > .main-content > .manager-body {
     padding-top: 16px;
+}
+
+/* Liên hệ / CSKH: inbox full-height, không khoảng trống thừa + footer */
+.manager-layout:has(.contact-layout) > .main-content {
+    overflow: hidden;
+    min-height: 0;
+}
+
+.manager-layout:has(.contact-layout) > .main-content > .manager-body {
+    flex: 1;
+    min-height: 0;
+    padding: 16px;
+    gap: 0;
+    overflow: hidden;
+}
+
+.manager-layout:has(.contact-layout) > .main-content > .manager-body > .contact-layout {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+}
+
+.manager-layout:has(.contact-layout) > .main-content > .footer {
+    display: none;
 }
 
 .manager-layout .header-left {
@@ -280,7 +291,7 @@
 
 /* MANAGER CONTENT BODY */
 .manager-layout .manager-body {
-    padding: 32px 32px;
+    padding: 20px 24px 24px;
     display: flex;
     flex-direction: column;
     gap: 28px;

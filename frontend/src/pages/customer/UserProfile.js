@@ -4,6 +4,7 @@ import {
   cancelAppointment,
   getMyAppointmentById,
   getMyAppointments,
+  respondPartsHoldConsent,
   reviewAppointment,
 } from "../../services/appointmentApi";
 import { clearAuthSession } from "../../services/authApi";
@@ -82,7 +83,8 @@ function getStatusLabel(status) {
   const labels = {
     PENDING: "Chờ xác nhận",
     CONFIRMED: "Đã xác nhận",
-    IN_PROGRESS: "Đang xử lý",
+    IN_PROGRESS: "Đang sửa chữa",
+    WAITING_PARTS: "Đang sửa chữa",
     COMPLETED: "Hoàn thành",
     PAID: "Đã thanh toán",
     CANCELLED: "Đã hủy",
@@ -97,7 +99,7 @@ const APPOINTMENT_STATUS_FILTERS = [
   { value: "ALL", label: "Tất cả" },
   { value: "PENDING", label: "Chờ xác nhận" },
   { value: "CONFIRMED", label: "Đã xác nhận" },
-  { value: "IN_PROGRESS", label: "Đang xử lý" },
+  { value: "IN_PROGRESS", label: "Đang sửa chữa" },
   { value: "COMPLETED", label: "Hoàn thành" },
   { value: "PAID", label: "Đã thanh toán" },
   { value: "CANCELLED", label: "Đã hủy" },
@@ -105,6 +107,7 @@ const APPOINTMENT_STATUS_FILTERS = [
 
 function matchesAppointmentStatusFilter(status, filter) {
   if (filter === "ALL") return true;
+  if (filter === "IN_PROGRESS") return status === "IN_PROGRESS" || status === "WAITING_PARTS";
   if (filter === "COMPLETED") return status === "COMPLETED" || status === "PAID";
   if (filter === "CANCELLED") return status === "CANCELLED" || status === "REJECTED" || status === "NO_SHOW";
   return status === filter;
@@ -115,6 +118,7 @@ function getStatusClass(status) {
     PENDING: "pending",
     CONFIRMED: "confirmed",
     IN_PROGRESS: "progress",
+    WAITING_PARTS: "progress",
     COMPLETED: "completed",
     PAID: "paid",
     CANCELLED: "cancelled",
@@ -360,14 +364,55 @@ export default function UserProfile() {
   }, [filteredAppointments, selectedAppointment]);
 
   useEffect(() => {
-    const tab = new URLSearchParams(location.search).get("tab");
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    const appointmentId = params.get("appointmentId") || params.get("appointment_id");
+
     if (tabs.some((item) => item.id === tab)) {
       setActiveTab(tab);
-      if (tab === "appointments") {
+      if (tab === "appointments" && !appointmentId) {
         setAppointmentView("list");
       }
     }
-  }, [location]);
+
+    if (!appointmentId || String(appointmentId).startsWith("demo-")) return undefined;
+
+    let cancelled = false;
+    const openFromNotification = async () => {
+      setActiveTab("appointments");
+      setAppointmentStatusFilter("ALL");
+      setIsAppointmentDetailLoading(true);
+      try {
+        const res = await getMyAppointmentById(appointmentId);
+        if (cancelled || !res.data?.appointment) return;
+        const detail = {
+          ...res.data.appointment,
+          materials_used: res.data.materials_used || [],
+        };
+        setSelectedAppointment(detail);
+        setAppointmentView("detail");
+        setReviewRating(Number(detail.review?.rating) || 0);
+        setReviewComment(detail.review?.comment || "");
+        setAppointments((prev) => {
+          const exists = prev.some((item) => String(item._id) === String(detail._id));
+          return exists
+            ? prev.map((item) => (String(item._id) === String(detail._id) ? { ...item, ...detail } : item))
+            : [detail, ...prev];
+        });
+      } catch (error) {
+        if (!cancelled) {
+          showToast(error.message || "Không mở được chi tiết lịch hẹn từ thông báo.", "error");
+        }
+      } finally {
+        if (!cancelled) setIsAppointmentDetailLoading(false);
+      }
+    };
+
+    void openFromNotification();
+    return () => {
+      cancelled = true;
+    };
+  }, [location.search]);
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -682,6 +727,34 @@ export default function UserProfile() {
       showToast("Đã hủy lịch hẹn.");
     } catch (err) {
       showToast(err.message || "Không thể hủy lịch hẹn.", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePartsHoldConsent = async (decision) => {
+    if (!selectedAppointment?._id || String(selectedAppointment._id).startsWith("demo-")) {
+      showToast("Không thể xác nhận trên lịch demo.", "error");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const res = await respondPartsHoldConsent(selectedAppointment._id, { decision });
+      const updated = res.data?.appointment || {};
+      setAppointments((prev) =>
+        prev.map((item) =>
+          String(item._id) === String(selectedAppointment._id) ? { ...item, ...updated } : item
+        )
+      );
+      setSelectedAppointment((prev) => (prev ? { ...prev, ...updated } : prev));
+      showToast(
+        decision === "APPROVED"
+          ? "Đã xác nhận đồng ý chờ phụ tùng."
+          : "Đã ghi nhận bạn không muốn chờ phụ tùng."
+      );
+    } catch (err) {
+      showToast(err.message || "Không thể gửi xác nhận chờ phụ tùng.", "error");
     } finally {
       setIsSaving(false);
     }
@@ -1180,6 +1253,107 @@ export default function UserProfile() {
                               <p>{selectedAppointment.staff_notes || "Garage chưa cập nhật ghi chú xử lý."}</p>
                             </div>
                           </div>
+
+                          {selectedAppointment.status === "WAITING_PARTS" && selectedAppointment.parts_hold && (
+                            <section className="parts-hold-consent-panel">
+                              <div className="parts-hold-consent-head">
+                                <MaterialIcon>hourglass_top</MaterialIcon>
+                                <div>
+                                  <h4>
+                                    {["PENDING_MANAGER", "PENDING_CONSENT"].includes(
+                                      String(selectedAppointment.parts_hold.status || "").toUpperCase()
+                                    )
+                                      ? "Garage đang liên hệ bạn về phụ tùng"
+                                      : selectedAppointment.parts_hold.consent?.status === "APPROVED"
+                                        ? "Đang chờ phụ tùng cho xe của bạn"
+                                        : "Cập nhật phụ tùng"}
+                                  </h4>
+                                  <p>
+                                    {["PENDING_MANAGER", "PENDING_CONSENT"].includes(
+                                      String(selectedAppointment.parts_hold.status || "").toUpperCase()
+                                    )
+                                      ? (selectedAppointment.parts_hold.customer_message
+                                        || "Garage thông báo cần nhập phụ tùng. Vui lòng xác nhận bên dưới nếu bạn đồng ý chờ hàng.")
+                                      : selectedAppointment.parts_hold.consent?.status === "APPROVED"
+                                        ? selectedAppointment.parts_hold.customer_message ||
+                                          `Garage sẽ chờ phụ tùng khoảng ${selectedAppointment.parts_hold.eta_days || "?"} ngày và liên hệ khi hàng về.`
+                                        : selectedAppointment.parts_hold.consent?.status === "DECLINED"
+                                          ? "Bạn đã từ chối chờ phụ tùng. Garage sẽ xử lý theo hướng khác."
+                                          : selectedAppointment.parts_hold.customer_message ||
+                                            "Garage đang xử lý yêu cầu phụ tùng cho lịch hẹn này."}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="parts-hold-consent-meta">
+                                <div>
+                                  <span>Thời gian chờ dự kiến</span>
+                                  <strong>{selectedAppointment.parts_hold.eta_days || "—"} ngày</strong>
+                                </div>
+                                {selectedAppointment.parts_hold.estimated_cost != null && (
+                                  <div>
+                                    <span>Chi phí dự kiến</span>
+                                    <strong>
+                                      {Number(selectedAppointment.parts_hold.estimated_cost).toLocaleString("vi-VN")}đ
+                                    </strong>
+                                  </div>
+                                )}
+                                <div>
+                                  <span>Trạng thái</span>
+                                  <strong>
+                                    {["PENDING_MANAGER", "PENDING_CONSENT"].includes(
+                                      String(selectedAppointment.parts_hold.status || "").toUpperCase()
+                                    )
+                                      ? (selectedAppointment.parts_hold.status === "PENDING_CONSENT"
+                                        ? "Chờ bạn xác nhận"
+                                        : "Chờ garage gửi thông báo")
+                                      : selectedAppointment.parts_hold.consent?.status === "APPROVED"
+                                        ? "Đã đồng ý chờ"
+                                        : selectedAppointment.parts_hold.consent?.status === "DECLINED"
+                                          ? "Đã từ chối chờ"
+                                          : "Đang cập nhật"}
+                                  </strong>
+                                </div>
+                              </div>
+
+                              {Array.isArray(selectedAppointment.parts_hold.items) &&
+                                selectedAppointment.parts_hold.items.length > 0 && (
+                                  <ul className="parts-hold-consent-items">
+                                    {selectedAppointment.parts_hold.items.map((item, index) => (
+                                      <li key={`${item.name}-${index}`}>
+                                        {item.name}
+                                        {Number(item.quantity) > 1 ? ` × ${item.quantity}` : ""}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+
+                              {["PENDING_MANAGER", "PENDING_CONSENT"].includes(
+                                String(selectedAppointment.parts_hold.status || "").toUpperCase()
+                              ) &&
+                                String(selectedAppointment.parts_hold.consent?.status || "PENDING").toUpperCase() ===
+                                  "PENDING" && (
+                                  <div className="parts-hold-consent-actions">
+                                    <button
+                                      className="parts-hold-decline-btn"
+                                      disabled={isSaving}
+                                      onClick={() => handlePartsHoldConsent("DECLINED")}
+                                      type="button"
+                                    >
+                                      Không chờ phụ tùng
+                                    </button>
+                                    <button
+                                      className="parts-hold-approve-btn"
+                                      disabled={isSaving}
+                                      onClick={() => handlePartsHoldConsent("APPROVED")}
+                                      type="button"
+                                    >
+                                      {isSaving ? "Đang gửi..." : "Đồng ý chờ phụ tùng"}
+                                    </button>
+                                  </div>
+                                )}
+                            </section>
+                          )}
 
                           {["PENDING", "CONFIRMED"].includes(selectedAppointment.status) && (
                             <div className="appointment-detail-actions">

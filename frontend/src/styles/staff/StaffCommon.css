@@ -334,6 +334,11 @@ button {
   background: #fef3c7;
 }
 
+.status-orange {
+  color: #c2410c;
+  background: #ffedd5;
+}
+
 .status-green {
   color: #15803d;
   background: #dcfce7;

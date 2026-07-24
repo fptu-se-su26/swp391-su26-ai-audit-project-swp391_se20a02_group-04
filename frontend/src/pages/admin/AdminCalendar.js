@@ -33,6 +33,12 @@ import {
   updateAdminAppointment,
   updateAdminAppointmentStatus,
 } from "../../services/adminAppointmentApi";
+import {
+  notifyManagerPartsHoldCustomer,
+  recordManagerPartsHoldContactResult,
+  markManagerPartsReady,
+  mapManagerAppointment,
+} from "../../services/managerAppointmentApi";
 
 const appointmentKpis = [
   ["Tổng lịch", "128", ClipboardList, "neutral", "+12 lịch tuần này"],
@@ -162,11 +168,13 @@ const AdminCalendar = ({ onViewChange, embedded = false }) => {
       {}
     );
 
+    const localInProgress = (localCounts.IN_PROGRESS || 0) + (localCounts.WAITING_PARTS || 0);
+
     return {
       total: appointmentStats?.total ?? appointments.length,
       pending: appointmentStats?.pending ?? localCounts.PENDING ?? 0,
       confirmed: appointmentStats?.confirmed ?? localCounts.CONFIRMED ?? 0,
-      inProgress: appointmentStats?.in_progress ?? localCounts.IN_PROGRESS ?? 0,
+      inProgress: appointmentStats?.in_progress ?? localInProgress,
       completed: appointmentStats?.completed ?? localCounts.COMPLETED ?? 0,
       completionRate: appointmentStats?.completion_rate ?? 0,
     };
@@ -234,6 +242,36 @@ const AdminCalendar = ({ onViewChange, embedded = false }) => {
     return cancelledAppointment;
   };
 
+  const notifyPartsHoldCustomer = async (appointment, payload = {}) => {
+    const rawId = appointment.rawId;
+    if (!rawId) throw new Error("Không tìm thấy mã lịch hẹn.");
+    const res = await notifyManagerPartsHoldCustomer(rawId, payload);
+    const mapped = mapAdminAppointment(res.data?.appointment || {});
+    const next = mapped.rawId ? mapped : mapManagerAppointment(res.data?.appointment || {});
+    updateAppointmentRow({ ...appointment, ...next });
+    return { message: res.message, data: { appointment: next } };
+  };
+
+  const recordPartsHoldContactResult = async (appointment, payload = {}) => {
+    const rawId = appointment.rawId;
+    if (!rawId) throw new Error("Không tìm thấy mã lịch hẹn.");
+    const res = await recordManagerPartsHoldContactResult(rawId, payload);
+    const mapped = mapAdminAppointment(res.data?.appointment || {});
+    const next = mapped.rawId ? mapped : mapManagerAppointment(res.data?.appointment || {});
+    updateAppointmentRow({ ...appointment, ...next });
+    return { message: res.message, data: { appointment: next } };
+  };
+
+  const markPartsReady = async (appointment, payload = {}) => {
+    const rawId = appointment.rawId;
+    if (!rawId) throw new Error("Không tìm thấy mã lịch hẹn.");
+    const res = await markManagerPartsReady(rawId, payload);
+    const mapped = mapAdminAppointment(res.data?.appointment || {});
+    const next = mapped.rawId ? mapped : mapManagerAppointment(res.data?.appointment || {});
+    updateAppointmentRow({ ...appointment, ...next });
+    return { message: res.message, data: { appointment: next } };
+  };
+
   const openAppointmentDetail = async (appointment) => {
     setSelectedAppointment(appointment);
 
@@ -246,6 +284,9 @@ const AdminCalendar = ({ onViewChange, embedded = false }) => {
 
   const filteredAppointments = useMemo(() => {
     if (activeFilter === "all") return appointments;
+    if (activeFilter === "IN_PROGRESS") {
+      return appointments.filter((item) => item.status === "IN_PROGRESS" || item.status === "WAITING_PARTS");
+    }
     return appointments.filter((item) => item.status === activeFilter);
   }, [activeFilter, appointments]);
 
@@ -264,6 +305,9 @@ const AdminCalendar = ({ onViewChange, embedded = false }) => {
               onComplete={(appointment) => updateStatusFromDatabase(appointment, "COMPLETED")}
               onUpdateSchedule={updateScheduleFromDatabase}
               onCancel={cancelFromDatabase}
+              onPartsHoldNotifyCustomer={notifyPartsHoldCustomer}
+              onPartsHoldContactResult={recordPartsHoldContactResult}
+              onPartsHoldMarkReady={markPartsReady}
               onAppointmentChange={updateAppointmentRow}
             />
           </div>

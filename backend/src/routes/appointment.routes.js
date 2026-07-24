@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { body } = require('express-validator');
 const appointmentController = require('../controllers/appointment.controller');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 const {
@@ -101,6 +102,21 @@ router.post(
   reviewAppointmentValidation,
   validate,
   appointmentController.reviewMyAppointment
+);
+
+/**
+ * @route   PATCH /api/appointments/:id/parts-hold/consent
+ * @desc    Customer agrees or declines waiting for missing parts
+ * @access  Private - CUSTOMER
+ */
+router.patch(
+  '/:id/parts-hold/consent',
+  validateAllowedBodyFields(['decision', 'note']),
+  appointmentIdValidation,
+  body('decision').isIn(['APPROVED', 'DECLINED']).withMessage('decision must be APPROVED or DECLINED'),
+  body('note').optional().trim().isLength({ max: 500 }),
+  validate,
+  appointmentController.respondPartsHoldConsent
 );
 
 module.exports = router;

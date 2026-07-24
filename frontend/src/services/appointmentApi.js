@@ -65,6 +65,16 @@ export function reviewAppointment(appointmentId, { rating, comment = "" } = {}) 
   });
 }
 
+export function respondPartsHoldConsent(appointmentId, { decision, note = "" } = {}) {
+  return appointmentRequest(`/appointments/${appointmentId}/parts-hold/consent`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      decision,
+      ...(note ? { note } : {}),
+    }),
+  });
+}
+
 export async function getPublicReviews(limit = 12) {
   const response = await fetch(
     `${API_BASE_URL}/appointments/reviews?limit=${encodeURIComponent(limit)}`

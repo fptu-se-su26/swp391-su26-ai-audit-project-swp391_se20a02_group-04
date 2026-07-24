@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { cancelAppointment, createAppointment, getMyAppointments } from "../../services/appointmentApi";
 import "../../styles/customer/BookingPage.css";
 import { clearAuthSession } from "../../services/authApi";
@@ -65,13 +66,49 @@ const repairIssues = [
   "Kiểm tra tổng quát",
 ];
 
-const VEHICLE_BRAND_HINT = "Honda, Yamaha, Suzuki, SYM...";
-const VEHICLE_MODEL_HINT = "Vision, Wave, Exciter, Air Blade...";
+/** Hãng xe phổ biến VN → danh sách dòng xe (cascading select trên form đặt lịch). */
+const VEHICLE_CATALOG = {
+  Honda: [
+    "Vision",
+    "Wave Alpha",
+    "Wave RSX",
+    "Air Blade",
+    "Lead",
+    "SH",
+    "SH Mode",
+    "Winner X",
+    "Future",
+    "Blade",
+    "Scoopy",
+    "PCX",
+  ],
+  Yamaha: [
+    "Sirius",
+    "Jupiter",
+    "Exciter",
+    "Grande",
+    "Janus",
+    "NVX",
+    "Latte",
+    "Freego",
+    "MT-15",
+  ],
+  Suzuki: ["Raider", "Satria", "Address", "Impulse", "GD110"],
+  SYM: ["Attila", "Angela", "Elegant", "Star SR", "Husky"],
+  Piaggio: ["Vespa", "Liberty", "Medley", "Zip"],
+  VinFast: ["Klara S", "Theon", "Feliz", "Vento", "Evo"],
+  Ducati: ["Monster", "Scrambler", "Panigale"],
+  Kawasaki: ["Ninja 400", "Z400", "W175"],
+};
+
+const VEHICLE_BRANDS = Object.keys(VEHICLE_CATALOG);
 const LICENSE_PLATE_HINT = "29B1-234.56";
 
 const TIME_SLOTS = ["08:00", "09:30", "10:30", "13:30", "15:00", "16:30", "18:00"];
 const morningSlots = TIME_SLOTS.filter((slot) => Number(slot.split(":")[0]) < 12);
 const afternoonSlots = TIME_SLOTS.filter((slot) => Number(slot.split(":")[0]) >= 12);
+const MAX_ADVANCE_BOOKING_DAYS = 30;
+const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
 function MaterialIcon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
@@ -92,8 +129,27 @@ function getTomorrowDateValue() {
 
 function getMaxAppointmentDateValue() {
   const date = new Date();
-  date.setDate(date.getDate() + 7);
+  date.setDate(date.getDate() + MAX_ADVANCE_BOOKING_DAYS);
   return toLocalDateValue(date);
+}
+
+function buildBookingDateOptions() {
+  const options = [];
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  for (let offset = 1; offset <= MAX_ADVANCE_BOOKING_DAYS; offset += 1) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + offset);
+    options.push({
+      value: toLocalDateValue(date),
+      day: String(date.getDate()).padStart(2, "0"),
+      weekday: WEEKDAY_LABELS[date.getDay()],
+      monthLabel: `Th${date.getMonth() + 1}`,
+    });
+  }
+
+  return options;
 }
 
 function formatDisplayDate(value) {
@@ -124,7 +180,8 @@ function getStatusLabel(status) {
   const labels = {
     PENDING: "Chờ xác nhận",
     CONFIRMED: "Đã xác nhận",
-    IN_PROGRESS: "Đang sửa",
+    IN_PROGRESS: "Đang sửa chữa",
+    WAITING_PARTS: "Đang sửa chữa",
     COMPLETED: "Hoàn tất",
     PAID: "Đã thanh toán",
     CANCELLED: "Đã hủy",
@@ -139,6 +196,7 @@ function getStatusClass(status) {
     PENDING: "pending",
     CONFIRMED: "confirmed",
     IN_PROGRESS: "progress",
+    WAITING_PARTS: "progress",
     COMPLETED: "completed",
     PAID: "paid",
     CANCELLED: "cancelled",
@@ -177,6 +235,7 @@ function isValidVnPhone(phone) {
 }
 
 export default function BookingPage() {
+  const navigate = useNavigate();
   const [serviceType, setServiceType] = useState("wash");
   const [washPackage, setWashPackage] = useState(washPackages[0].id);
   const [maintenancePackage, setMaintenancePackage] = useState(maintenancePackages[0].id);
@@ -184,6 +243,7 @@ export default function BookingPage() {
   const [daySession, setDaySession] = useState("morning");
   const [timeSlot, setTimeSlot] = useState("");
   const [appointmentDate, setAppointmentDate] = useState(getTomorrowDateValue);
+  const bookingDateOptions = useMemo(() => buildBookingDateOptions(), []);
 
   // Notification States
   const [notificationsList, setNotificationsList] = useState([]);
@@ -221,6 +281,17 @@ export default function BookingPage() {
         setNotificationsList(prev => prev.map(n => n._id === notif._id ? { ...n, is_read: true } : n));
       }
       setShowNotificationsMenu(false);
+
+      const rawAppointmentId = notif.appointment_id;
+      const targetId = typeof rawAppointmentId === "string"
+        ? rawAppointmentId
+        : (rawAppointmentId?._id || rawAppointmentId?.id || notif.metadata?.appointment_id || "");
+
+      if (targetId) {
+        navigate(`/profile?tab=appointments&appointmentId=${encodeURIComponent(String(targetId))}`);
+      } else {
+        navigate("/profile?tab=appointments");
+      }
     } catch (err) {
       console.error("Failed to handle notification click:", err);
     }
@@ -265,10 +336,14 @@ export default function BookingPage() {
   const [appointmentsList, setAppointmentsList] = useState([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
   const [cancellingId, setCancellingId] = useState("");
+  const [vehicleBrand, setVehicleBrand] = useState("");
+  const [vehicleModel, setVehicleModel] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [user, setUser] = useState({
     fullname: "Nguyễn Hoàng Nam",
     email: "namnh.customer@gmail.com",
+    phone: "",
     avatar: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6d1f"/></svg>'
   });
 
@@ -276,17 +351,30 @@ export default function BookingPage() {
     setTimeSlot("");
   }, [daySession]);
 
+  const vehicleModels = useMemo(
+    () => (vehicleBrand ? VEHICLE_CATALOG[vehicleBrand] || [] : []),
+    [vehicleBrand]
+  );
+
+  const handleVehicleBrandChange = (event) => {
+    setVehicleBrand(event.target.value);
+    setVehicleModel("");
+  };
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const res = await profileService.getMe();
         if (res && res.success && res.data) {
           const apiUser = res.data.user || res.data;
+          const phone = String(apiUser.phone || "").trim();
           setUser({
             fullname: apiUser.full_name || apiUser.fullname || "Nguyễn Hoàng Nam",
             email: apiUser.email || "namnh.customer@gmail.com",
+            phone,
             avatar: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="%23fff7ed"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%23ff6d1f"/></svg>'
           });
+          setContactPhone((current) => current || phone);
         }
       } catch (e) {
         console.log("Offline or not logged in, using default profile info");
@@ -371,8 +459,8 @@ export default function BookingPage() {
       return;
     }
 
-    if (diffDays > 7) {
-      setSubmitError("Chỉ có thể đặt lịch trước tối đa 7 ngày.");
+    if (diffDays > MAX_ADVANCE_BOOKING_DAYS) {
+      setSubmitError(`Chỉ có thể đặt lịch trước tối đa ${MAX_ADVANCE_BOOKING_DAYS} ngày.`);
       setIsSubmitting(false);
       return;
     }
@@ -438,6 +526,9 @@ export default function BookingPage() {
       setServiceType("wash");
       setAppointmentDate(getTomorrowDateValue());
       setTimeSlot("");
+      setVehicleBrand("");
+      setVehicleModel("");
+      setContactPhone(user.phone || "");
       loadNotifications();
       loadMyAppointments();
     } catch (error) {
@@ -446,6 +537,26 @@ export default function BookingPage() {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (!submitResult) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setSubmitResult(null);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [submitResult]);
+
+  const closeSuccessModal = () => setSubmitResult(null);
 
   const handleLogout = () => {
     clearAuthSession();
@@ -748,11 +859,38 @@ export default function BookingPage() {
             <div className="booking-fields-grid">
               <label>
                 Hãng xe
-                <input name="vehicle_brand" placeholder={VEHICLE_BRAND_HINT} required type="text" />
+                <select
+                  name="vehicle_brand"
+                  onChange={handleVehicleBrandChange}
+                  required
+                  value={vehicleBrand}
+                >
+                  <option value="">-- Chọn hãng xe --</option>
+                  {VEHICLE_BRANDS.map((brand) => (
+                    <option key={brand} value={brand}>
+                      {brand}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Dòng xe
-                <input name="vehicle_model" placeholder={VEHICLE_MODEL_HINT} required type="text" />
+                <select
+                  disabled={!vehicleBrand}
+                  name="vehicle_model"
+                  onChange={(event) => setVehicleModel(event.target.value)}
+                  required
+                  value={vehicleModel}
+                >
+                  <option value="">
+                    {vehicleBrand ? "-- Chọn dòng xe --" : "-- Chọn hãng trước --"}
+                  </option>
+                  {vehicleModels.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Biển số
@@ -762,9 +900,21 @@ export default function BookingPage() {
                 Số km hiện tại
                 <input max="999999" min="0" name="odometer" placeholder="12500" type="number" />
               </label>
-              <label>
+              <label className="booking-contact-phone">
                 Số điện thoại liên hệ
-                <input name="contact_phone" placeholder="0912345678" type="tel" />
+                <input
+                  autoComplete="tel"
+                  inputMode="tel"
+                  name="contact_phone"
+                  onChange={(event) => setContactPhone(event.target.value)}
+                  placeholder="0912345678"
+                  required
+                  type="tel"
+                  value={contactPhone}
+                />
+                <small className="booking-field-hint">
+                  Có thể nhập SĐT khác nếu đặt lịch hộ người thân / bạn bè. Garage sẽ gọi số này khi cần.
+                </small>
               </label>
             </div>
 
@@ -772,41 +922,85 @@ export default function BookingPage() {
               <span>03</span>
               <div>
                 <h2>Chọn ngày giờ đến garage</h2>
-                <p>Lịch mới ở trạng thái chờ xác nhận cho đến khi cửa hàng duyệt.</p>
+                <p>Chọn trong vòng {MAX_ADVANCE_BOOKING_DAYS} ngày tới. Lịch mới sẽ chờ cửa hàng xác nhận.</p>
               </div>
             </div>
 
-            <div className="booking-fields-grid booking-date-grid">
-              <label>
-                Ngày hẹn
-                <input
-                  min={getTomorrowDateValue()}
-                  max={getMaxAppointmentDateValue()}
-                  onChange={(event) => setAppointmentDate(event.target.value)}
-                  required
-                  type="date"
-                  value={appointmentDate}
-                />
-              </label>
+            <div className="booking-schedule-panel">
+              <div className="booking-schedule-block">
+                <div className="booking-schedule-label">
+                  <span>Ngày hẹn</span>
+                  <small>
+                    {appointmentDate
+                      ? formatDisplayDate(appointmentDate)
+                      : `Từ ngày mai · tối đa ${MAX_ADVANCE_BOOKING_DAYS} ngày`}
+                  </small>
+                </div>
+                <div className="booking-date-chip-row" role="listbox" aria-label="Chọn ngày hẹn">
+                  {bookingDateOptions.map((option) => (
+                    <button
+                      aria-selected={appointmentDate === option.value}
+                      className={`booking-date-chip ${appointmentDate === option.value ? "selected" : ""}`}
+                      key={option.value}
+                      onClick={() => setAppointmentDate(option.value)}
+                      type="button"
+                    >
+                      <em>{option.weekday}</em>
+                      <strong>{option.day}</strong>
+                      <span>{option.monthLabel}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-              <label>
-                Chọn Buổi
-                <select value={daySession} onChange={(event) => setDaySession(event.target.value)}>
-                  <option value="morning">Buổi sáng (08:00 – 10:30)</option>
-                  <option value="afternoon">Buổi chiều (13:30 – 18:00)</option>
-                </select>
-              </label>
+              <div className="booking-schedule-block">
+                <div className="booking-schedule-label">
+                  <span>Chọn buổi</span>
+                </div>
+                <div className="booking-session-grid">
+                  <button
+                    className={`booking-session-card ${daySession === "morning" ? "selected" : ""}`}
+                    onClick={() => setDaySession("morning")}
+                    type="button"
+                  >
+                    <MaterialIcon>wb_sunny</MaterialIcon>
+                    <div>
+                      <strong>Buổi sáng</strong>
+                      <span>08:00 – 10:30</span>
+                    </div>
+                  </button>
+                  <button
+                    className={`booking-session-card ${daySession === "afternoon" ? "selected" : ""}`}
+                    onClick={() => setDaySession("afternoon")}
+                    type="button"
+                  >
+                    <MaterialIcon>wb_twilight</MaterialIcon>
+                    <div>
+                      <strong>Buổi chiều</strong>
+                      <span>13:30 – 18:00</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
 
-              <label>
-                Khung giờ
-                <select value={timeSlot} onChange={(event) => setTimeSlot(event.target.value)} required>
-                  <option value="">-- Chọn giờ --</option>
-                  {daySession === "morning"
-                    ? morningSlots.map((slot) => <option key={slot} value={slot}>{slot}</option>)
-                    : afternoonSlots.map((slot) => <option key={slot} value={slot}>{slot}</option>)
-                  }
-                </select>
-              </label>
+              <div className="booking-schedule-block">
+                <div className="booking-schedule-label">
+                  <span>Khung giờ</span>
+                  <small>{timeSlot ? `Đã chọn ${timeSlot}` : "Chọn một khung giờ phù hợp"}</small>
+                </div>
+                <div className="booking-slot-grid">
+                  {(daySession === "morning" ? morningSlots : afternoonSlots).map((slot) => (
+                    <button
+                      className={`booking-slot-chip ${timeSlot === slot ? "selected" : ""}`}
+                      key={slot}
+                      onClick={() => setTimeSlot(slot)}
+                      type="button"
+                    >
+                      {slot}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <label className="booking-note">
@@ -913,6 +1107,73 @@ export default function BookingPage() {
         </section>
       </main>
       <CustomerChatWidget />
+
+      {submitResult && (
+        <div
+          className="booking-success-overlay"
+          onClick={closeSuccessModal}
+          role="presentation"
+        >
+          <div
+            aria-labelledby="booking-success-title"
+            aria-modal="true"
+            className="booking-success-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="booking-success-modal-icon" aria-hidden="true">
+              <MaterialIcon>check_circle</MaterialIcon>
+            </div>
+            <h2 id="booking-success-title">Đặt lịch thành công</h2>
+            <p className="booking-success-modal-lead">
+              Lịch hẹn đã được gửi. Garage sẽ liên hệ xác nhận sớm.
+            </p>
+
+            <div className="booking-success-modal-details">
+              <div>
+                <span>Mã lịch</span>
+                <strong>{submitResult.appointment_code || "—"}</strong>
+              </div>
+              <div>
+                <span>Thời gian</span>
+                <strong>
+                  {[
+                    formatDisplayDate(normalizeAppointmentDate(submitResult.appointment_date)),
+                    submitResult.time_slot,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
+                </strong>
+              </div>
+              <div>
+                <span>Xe</span>
+                <strong>
+                  {[
+                    submitResult.vehicle?.brand || submitResult.vehicle_info?.brand,
+                    submitResult.vehicle?.model || submitResult.vehicle_info?.model,
+                    submitResult.vehicle?.license_plate || submitResult.vehicle_info?.license_plate,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
+                </strong>
+              </div>
+              <div>
+                <span>Trạng thái</span>
+                <strong>{getStatusLabel(submitResult.status) || "Chờ xác nhận"}</strong>
+              </div>
+            </div>
+
+            <div className="booking-success-modal-actions">
+              <a className="booking-success-secondary" href="/profile?tab=appointments">
+                Xem lịch hẹn
+              </a>
+              <button className="booking-success-primary" onClick={closeSuccessModal} type="button">
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

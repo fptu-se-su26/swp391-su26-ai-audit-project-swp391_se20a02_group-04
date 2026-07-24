@@ -6,6 +6,7 @@ const statusTextMap = {
   PENDING: "Chờ xác nhận",
   CONFIRMED: "Đã xác nhận",
   IN_PROGRESS: "Đang xử lý",
+  WAITING_PARTS: "Đang sửa — chờ phụ tùng",
   COMPLETED: "Hoàn tất",
   CANCELLED: "Đã hủy",
   NO_SHOW: "Không đến",
@@ -134,10 +135,29 @@ function getVehiclePlate(vehicle = {}) {
 
 function getUrgency(appointment = {}) {
   if (appointment.status === "PENDING") return "Lịch mới";
+  if (appointment.status === "WAITING_PARTS") return "Thiếu phụ tùng";
   if (!appointment.staff_id) return "Chưa phân kệ";
   if (appointment.status === "IN_PROGRESS") return "Ưu tiên cao";
   if (appointment.status === "CONFIRMED") return "Sắp đến giờ";
   return "Ổn định";
+}
+
+function mapPartsHold(partsHold) {
+  if (!partsHold) return null;
+  const status = partsHold.status ? String(partsHold.status).toUpperCase() : "";
+  const items = Array.isArray(partsHold.items) ? partsHold.items : [];
+  if (!status && items.length === 0) return null;
+
+  return {
+    status: status || null,
+    items,
+    eta_days: partsHold.eta_days || null,
+    estimated_cost: partsHold.estimated_cost,
+    customer_message: partsHold.customer_message || "",
+    requested_at: partsHold.requested_at || null,
+    consent: partsHold.consent || { status: "PENDING" },
+    ready_at: partsHold.ready_at || null,
+  };
 }
 
 export function mapAdminAppointment(appointment = {}) {
@@ -196,6 +216,7 @@ export function mapAdminAppointment(appointment = {}) {
     paymentStatus: appointment.final_cost || status === "COMPLETED" ? "paid" : "unpaid",
     customerNote: appointment.customer_note || appointment.customer_notes || "Chưa có ghi chú khách hàng.",
     garageNote: appointment.staff_notes || "Chưa có ghi chú garage.",
+    partsHold: mapPartsHold(appointment.parts_hold),
     services: [
       {
         name: service.service_name || service.name || appointment.service?.name || "Dịch vụ chưa cập nhật",

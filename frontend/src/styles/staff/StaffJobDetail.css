@@ -820,6 +820,17 @@
   border-color: #86efac;
 }
 
+.workflow-step-btn.waiting {
+  color: #c2410c;
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+
+.workflow-step-btn.waiting .workflow-step-icon {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
 .workflow-step-btn.skipped {
   color: #64748b;
   background: #f8fafc;
@@ -1531,4 +1542,93 @@
   .workflow-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .contact-outcomes { grid-template-columns: 1fr; }
   .payment-method-grid { grid-template-columns: 1fr; }
+}
+
+.parts-hold-actions {
+  margin-bottom: 12px;
+}
+
+.parts-hold-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border: 1px solid #fdba74;
+  border-radius: 14px;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.parts-hold-banner strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.parts-hold-banner p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.parts-hold-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.parts-hold-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #ead7cd;
+  border-radius: 14px;
+  background: #fffaf7;
+}
+
+.parts-hold-form h4 {
+  margin: 0;
+  color: #191c1d;
+  font-size: 15px;
+}
+
+.parts-hold-form label {
+  display: grid;
+  gap: 6px;
+  color: #5a4136;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.parts-hold-form textarea,
+.parts-hold-form input {
+  width: 100%;
+  border: 1px solid #e2bfb0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  text-transform: none;
+  font-weight: 600;
+  color: #191c1d;
+}
+
+.parts-hold-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .parts-hold-banner,
+  .parts-hold-grid {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
 }

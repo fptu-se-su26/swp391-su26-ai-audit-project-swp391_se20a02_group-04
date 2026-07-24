@@ -14,7 +14,6 @@ import {
   UserRound,
 } from "lucide-react";
 import { chatApi } from "../../services/chatApi";
-import "../../styles/admin/AdminDashboard.css";
 import "../../styles/admin/AdminContact.css";
 
 const STATUS_META = {
@@ -49,11 +48,8 @@ function formatTime(value) {
 function getInitials(name = "") {
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "KH";
-  return parts
-    .slice(-2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 function isRateLimitError(message = "") {
@@ -445,7 +441,7 @@ export default function ManagerContact() {
                 <>
                   <div className="contact-detail-card profile">
                     <div className="contact-detail-avatar">{getInitials(customer?.full_name)}</div>
-                    <h4>{customer?.full_name}</h4>
+                    <h4>{customer?.full_name || "Khách hàng"}</h4>
                     <span className={`contact-status tone-${statusMeta.tone}`}>{statusMeta.label}</span>
                   </div>
 
@@ -454,14 +450,28 @@ export default function ManagerContact() {
                       <UserRound size={13} /> Liên hệ
                     </h5>
                     <div className="contact-detail-rows">
-                      <a href={customer?.phone ? `tel:${customer.phone}` : undefined}>
-                        <Phone size={14} />
-                        <span>{customer?.phone || "Chưa có SĐT"}</span>
-                      </a>
-                      <a href={customer?.email ? `mailto:${customer.email}` : undefined}>
-                        <Mail size={14} />
-                        <span>{customer?.email || "Chưa có email"}</span>
-                      </a>
+                      {customer?.phone ? (
+                        <a href={`tel:${customer.phone}`}>
+                          <Phone size={14} />
+                          <span>{customer.phone}</span>
+                        </a>
+                      ) : (
+                        <div className="contact-vehicle-row">
+                          <Phone size={14} />
+                          <span>Chưa có SĐT</span>
+                        </div>
+                      )}
+                      {customer?.email ? (
+                        <a href={`mailto:${customer.email}`}>
+                          <Mail size={14} />
+                          <span>{customer.email}</span>
+                        </a>
+                      ) : (
+                        <div className="contact-vehicle-row">
+                          <Mail size={14} />
+                          <span>Chưa có email</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -473,7 +483,7 @@ export default function ManagerContact() {
                       <div>
                         <strong>{vehicle?.bike || "Chưa cập nhật"}</strong>
                         <p>{vehicle?.plate || "—"}</p>
-                        {vehicle?.odo && <p>{vehicle.odo}</p>}
+                        {vehicle?.odo ? <p>{vehicle.odo}</p> : null}
                       </div>
                     </div>
                   </div>
