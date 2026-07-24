@@ -82,7 +82,10 @@ const ManagerAppointments = ({
               .filter((app) => {
                 const matchesSearch = app.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                      app.vehicle.toLowerCase().includes(searchQuery.toLowerCase());
-                const matchesFilter = appointmentFilter === "ALL" || app.status === appointmentFilter;
+                const matchesFilter =
+                  appointmentFilter === "ALL" ||
+                  app.status === appointmentFilter ||
+                  (appointmentFilter === "IN_PROGRESS" && app.status === "WAITING_PARTS");
                 return matchesSearch && matchesFilter;
               })
               .map((app) => (
@@ -120,8 +123,22 @@ const ManagerAppointments = ({
                     <span
                       className={`status-badge ${app.status === "COMPLETED" ? "active" : app.status === "PENDING" ? "locked" : "active"}`}
                       style={{
-                        backgroundColor: app.status === "PENDING" ? "#fff7ed" : app.status === "IN_PROGRESS" ? "#eff6ff" : "",
-                        color: app.status === "PENDING" ? "#ea580c" : app.status === "IN_PROGRESS" ? "#2563eb" : ""
+                        backgroundColor:
+                          app.status === "PENDING"
+                            ? "#fff7ed"
+                            : app.status === "WAITING_PARTS"
+                              ? "#ffedd5"
+                              : app.status === "IN_PROGRESS"
+                                ? "#eff6ff"
+                                : "",
+                        color:
+                          app.status === "PENDING"
+                            ? "#ea580c"
+                            : app.status === "WAITING_PARTS"
+                              ? "#c2410c"
+                              : app.status === "IN_PROGRESS"
+                                ? "#2563eb"
+                                : ""
                       }}
                     >
                       {app.statusText}

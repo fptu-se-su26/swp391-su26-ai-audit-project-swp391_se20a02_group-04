@@ -438,11 +438,144 @@ const reviewMyAppointment = async (req, res) => {
   }
 };
 
+/**
+ * PATCH /api/appointments/:id/parts-hold/consent
+ * Customer agrees or declines waiting for missing parts (after garage notification).
+ */
+const respondPartsHoldConsent = async (req, res) => {
+  try {
+    const appointment = await Appointment.findOne({
+      _id: req.params.id,
+      customer_id: req.user.userId
+    }).populate('staff_id', 'full_name');
+
+    if (!appointment) {
+      return errorResponse(res, 404, 'Appointment not found');
+    }
+
+    if (appointment.status !== 'WAITING_PARTS' || !appointment.parts_hold?.status) {
+      return errorResponse(res, 422, 'Lịch hẹn không đang chờ phụ tùng');
+    }
+
+    const holdStatus = String(appointment.parts_hold.status || '').toUpperCase();
+    if (!['PENDING_MANAGER', 'PENDING_CONSENT'].includes(holdStatus)) {
+      return errorResponse(res, 422, 'Yêu cầu chờ phụ tùng đã được xử lý trước đó');
+    }
+
+    const decision = String(req.body.decision || '').toUpperCase();
+    if (!['APPROVED', 'DECLINED'].includes(decision)) {
+      return errorResponse(res, 400, 'decision must be APPROVED or DECLINED');
+    }
+
+    const note = String(req.body.note || '').trim();
+    const now = new Date();
+    const code = appointment.appointment_code || appointment._id;
+    const etaDays = appointment.parts_hold.eta_days || null;
+    const partsList = (appointment.parts_hold.items || [])
+      .map((item) => `${item.name} x${item.quantity || 1}`)
+      .join(', ');
+
+    appointment.parts_hold.consent = {
+      status: decision,
+      responded_at: now,
+      note,
+      contacted_by: req.user.userId
+    };
+    appointment.parts_hold.status = decision === 'APPROVED' ? 'APPROVED' : 'DECLINED';
+
+    if (decision === 'DECLINED') {
+      appointment.status = 'IN_PROGRESS';
+      appointment.repair_log = {
+        status: null,
+        notes: note || 'Khách từ chối chờ phụ tùng (qua app)',
+        completed_at: null
+      };
+    }
+
+    await appointment.save();
+
+    const Notification = require('../models/Notification.model');
+    const Role = require('../models/Role.model');
+    const UserRole = require('../models/UserRole.model');
+
+    // Notify staff
+    if (appointment.staff_id) {
+      const staffId = appointment.staff_id._id || appointment.staff_id;
+      try {
+        await Notification.create({
+          user_id: staffId,
+          appointment_id: appointment._id,
+          type: 'APPOINTMENT_UPDATED',
+          title: decision === 'APPROVED'
+            ? 'Khách đồng ý chờ phụ tùng'
+            : 'Khách từ chối chờ phụ tùng',
+          message: decision === 'APPROVED'
+            ? `Lịch ${code}: khách đã xác nhận đồng ý chờ${etaDays ? ` ~${etaDays} ngày` : ''}. Khi hàng về Manager nhập kho rồi mở lại sửa chữa.`
+            : `Lịch ${code}: khách từ chối chờ hàng. Tiếp tục xử lý không dùng phụ tùng thiếu.`,
+          metadata: {
+            kind: 'PARTS_HOLD_CUSTOMER_RESULT',
+            decision,
+            appointment_id: String(appointment._id),
+            appointment_code: code
+          }
+        });
+      } catch (err) {
+        console.warn('Parts hold staff notify failed:', err.message);
+      }
+    }
+
+    // Notify managers
+    try {
+      const targetRoles = await Role.find({ role_name: { $in: ['MANAGER', 'ADMIN'] } });
+      const roleIds = targetRoles.map((role) => role._id);
+      if (roleIds.length > 0) {
+        const managerRoles = await UserRole.find({ role_id: { $in: roleIds } }).select('user_id');
+        const managerIds = [...new Set(managerRoles.map((row) => String(row.user_id)))];
+        const notifications = managerIds.map((managerId) => ({
+          user_id: managerId,
+          appointment_id: appointment._id,
+          type: 'APPOINTMENT_UPDATED',
+          title: decision === 'APPROVED'
+            ? 'Khách đồng ý chờ phụ tùng'
+            : 'Khách từ chối chờ phụ tùng',
+          message: decision === 'APPROVED'
+            ? `Lịch ${code}: khách xác nhận chờ phụ tùng (${partsList || 'đang đặt hàng'}).`
+            : `Lịch ${code}: khách từ chối chờ phụ tùng.`,
+          metadata: {
+            kind: 'PARTS_HOLD_CUSTOMER_RESULT',
+            decision,
+            appointment_id: String(appointment._id),
+            appointment_code: code
+          }
+        }));
+        if (notifications.length) {
+          await Notification.insertMany(notifications);
+        }
+      }
+    } catch (err) {
+      console.warn('Parts hold manager notify failed:', err.message);
+    }
+
+    return successResponse(
+      res,
+      200,
+      decision === 'APPROVED'
+        ? 'Đã xác nhận: bạn đồng ý chờ phụ tùng'
+        : 'Đã ghi nhận: bạn không muốn chờ phụ tùng',
+      { appointment }
+    );
+  } catch (error) {
+    console.error('Respond parts hold consent error:', error);
+    return errorResponse(res, 500, 'Không thể lưu xác nhận chờ phụ tùng');
+  }
+};
+
 module.exports = {
   createAppointment,
   getMyAppointments,
   getMyAppointmentById,
   cancelMyAppointment,
   reviewMyAppointment,
-  getPublicReviews
+  getPublicReviews,
+  respondPartsHoldConsent
 };

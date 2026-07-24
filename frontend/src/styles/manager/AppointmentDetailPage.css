@@ -1485,6 +1485,113 @@
   color: var(--appointment-purple);
 }
 
+:where(.manager-layout, .appointment-detail-scope) .appointment-status-badge.waiting_parts {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-panel .parts-hold-manager-lead {
+  margin: 0 0 12px;
+  color: #5c4a42;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-panel-active {
+  border: 1px solid #f0a070;
+  background: linear-gradient(180deg, #fff8f1 0%, #ffffff 48%);
+  box-shadow: 0 8px 24px rgba(194, 65, 12, 0.08);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-parts {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff8f3;
+  border: 1px solid rgba(226, 191, 176, 0.7);
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-parts strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #4a372f;
+  font-size: 0.88rem;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-items {
+  margin: 0;
+  padding-left: 18px;
+  color: #3f2f28;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-note {
+  margin: 10px 0 0;
+  color: #6b5348;
+  font-size: 0.88rem;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-actions {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-actions label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4a372f;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-actions textarea,
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-actions input {
+  width: 100%;
+  border: 1px solid rgba(226, 191, 176, 0.8);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  color: #2f241f;
+  background: #fff;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-actions textarea {
+  resize: vertical;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-actions small {
+  font-weight: 500;
+  color: #8a7368;
+}
+
+:where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  :where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-grid {
+    grid-template-columns: 1fr;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-buttons {
+    flex-direction: column;
+  }
+
+  :where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-buttons .detail-primary-btn,
+  :where(.manager-layout, .appointment-detail-scope) .parts-hold-manager-buttons .detail-secondary-btn {
+    width: 100%;
+  }
+}
+
 :where(.manager-layout, .appointment-detail-scope) .appointment-status-badge.done {
   background: var(--appointment-success-soft);
   color: var(--appointment-success);

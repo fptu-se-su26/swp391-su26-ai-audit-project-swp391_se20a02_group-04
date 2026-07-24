@@ -23,5 +23,8 @@ module.exports = {
   deleteRepairBay: adminAppointmentController.deleteRepairBay,
   getRepairBayAvailability: adminAppointmentController.getRepairBayAvailability,
   getAppointmentStatistics: adminAppointmentController.getAppointmentStatistics,
-  getAppointmentCalendar: adminAppointmentController.getAppointmentCalendar
+  getAppointmentCalendar: adminAppointmentController.getAppointmentCalendar,
+  recordPartsHoldContactResult: adminAppointmentController.recordPartsHoldContactResult,
+  notifyPartsHoldCustomer: adminAppointmentController.notifyPartsHoldCustomer,
+  markPartsReady: adminAppointmentController.markPartsReady
 };

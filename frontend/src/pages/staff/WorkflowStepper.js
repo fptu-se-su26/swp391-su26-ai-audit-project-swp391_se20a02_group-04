@@ -18,32 +18,55 @@ function isJobCompleted(job = {}) {
   return job?.status === "COMPLETED" || job?.status === "PAID" || job?.statusKey === "completed";
 }
 
+function isRepairStepDone(job = {}) {
+  if (job?.materialsUsed?.length) return true;
+  const repairStatus = String(job?.repairLog?.status || "").toUpperCase();
+  return repairStatus === "WITH_PARTS" || repairStatus === "NO_PARTS";
+}
+
+function isWaitingParts(job = {}) {
+  return (
+    job?.status === "WAITING_PARTS" ||
+    String(job?.repairLog?.status || "").toUpperCase() === "WAITING_PARTS" ||
+    ["PENDING_MANAGER", "PENDING_CONSENT", "APPROVED"].includes(String(job?.partsHold?.status || "").toUpperCase())
+  );
+}
+
 function getStepCompletion(job = {}) {
   return [
     Boolean(job.diagnosisNotes?.trim()),
     Boolean(job.contactLog?.status),
-    Boolean(job.materialsUsed?.length) || Boolean(job.repairLog?.status),
+    isRepairStepDone(job),
     isJobCompleted(job),
   ];
 }
 
 export function getStepState(job = {}) {
   const completion = getStepCompletion(job);
+  const waitingParts = isWaitingParts(job) && !isRepairStepDone(job) && !isJobCompleted(job);
 
   const steps = STEP_DEFS.map((def, index) => {
     if (isJobCompleted(job) || completion[index]) {
       return { ...def, status: "done", done: true };
     }
+    if (index === 2 && waitingParts) {
+      return {
+        ...def,
+        status: "waiting",
+        done: false,
+        short: "Chờ Manager liên hệ khách",
+      };
+    }
     return { ...def, status: "pending", done: false };
   });
 
-  let currentStep = steps.findIndex((step) => step.status === "pending");
+  let currentStep = steps.findIndex((step) => step.status === "pending" || step.status === "waiting");
   if (currentStep < 0) currentStep = steps.length - 1;
 
   const completedCount = steps.filter((step) => step.status === "done").length;
   const progressPct = Math.round((completedCount / steps.length) * 100);
 
-  return { currentStep, steps, progressPct, completedCount };
+  return { currentStep, steps, progressPct, completedCount, waitingParts };
 }
 
 function StepIndicator({ step, index, isLast, onSelect, canSelect, isViewing, isCurrent }) {
@@ -74,7 +97,13 @@ function StepIndicator({ step, index, isLast, onSelect, canSelect, isViewing, is
         </span>
         <span className="workflow-step-text">
           <strong>{step.label}</strong>
-          <small>{isCurrent ? "Đang làm" : step.short}</small>
+          <small>
+            {step.status === "waiting"
+              ? "Chờ hàng"
+              : isCurrent
+                ? "Đang làm"
+                : step.short}
+          </small>
         </span>
       </button>
       {!isLast && (

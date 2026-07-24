@@ -42,9 +42,26 @@ import {
 
 const pendingStatuses = ["pending", "waiting_confirmation"];
 
+function normalizePartsHold(partsHold) {
+  if (!partsHold) return null;
+  const status = partsHold.status ? String(partsHold.status).toUpperCase() : "";
+  const items = Array.isArray(partsHold.items) ? partsHold.items : [];
+  if (!status && items.length === 0) return null;
+  return {
+    ...partsHold,
+    status: status || null,
+    items,
+    eta_days: partsHold.eta_days || null,
+    estimated_cost: partsHold.estimated_cost,
+    customer_message: partsHold.customer_message || "",
+    consent: partsHold.consent || { status: "PENDING" },
+  };
+}
+
 const normalizeStatus = (status = "pending") => {
   const normalized = String(status).toLowerCase();
   if (normalized === "in_progress") return "processing";
+  if (normalized === "waiting_parts") return "waiting_parts";
   if (normalized === "completed" || normalized === "paid") return "done";
   if (normalized === "cancelled") return "cancelled";
   if (normalized === "confirmed") return "confirmed";
@@ -118,6 +135,7 @@ const buildAppointmentDetail = (appointment = {}) => {
     },
     materials,
     activityLogs,
+    partsHold: normalizePartsHold(appointment.partsHold || raw.parts_hold),
     customerNote:
       appointment.customerNote ||
       "Xe bị rung đầu khi chạy trên 80km/h. Mong kiểm tra kỹ phần lốp và phuộc trước.",
@@ -142,6 +160,7 @@ const getStatusText = (status) => {
     waiting_confirmation: "Chờ xác nhận",
     confirmed: "Đã xác nhận",
     processing: "Đang xử lý",
+    waiting_parts: "Đang sửa — chờ phụ tùng",
     done: "Hoàn tất",
     cancelled: "Đã hủy"
   };
@@ -273,6 +292,9 @@ export default function AppointmentDetailPage({
   onComplete,
   onUpdateSchedule,
   onCancel,
+  onPartsHoldContactResult,
+  onPartsHoldNotifyCustomer,
+  onPartsHoldMarkReady,
   onAppointmentChange
 }) {
   const [localAppointment, setLocalAppointment] = useState(appointment || {});
@@ -281,14 +303,50 @@ export default function AppointmentDetailPage({
   const [editDraft, setEditDraft] = useState(null);
   const [editErrors, setEditErrors] = useState({});
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
+  const [partsHoldContactNote, setPartsHoldContactNote] = useState("");
+  const [partsHoldEtaDays, setPartsHoldEtaDays] = useState("");
+  const [partsHoldCost, setPartsHoldCost] = useState("");
+  const [partsHoldCustomerMessage, setPartsHoldCustomerMessage] = useState("");
   const detail = buildAppointmentDetail(localAppointment);
   const isApproved = !pendingStatuses.includes(detail.status);
   const hasAssignment = hasAppointmentAssignment(localAppointment, detail);
   const totalPrice = detail.services.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
-  const progress = detail.status === "done" ? 100 : detail.status === "processing" ? 75 : detail.status === "confirmed" ? 50 : 25;
+  const progress =
+    detail.status === "done"
+      ? 100
+      : detail.status === "processing" || detail.status === "waiting_parts"
+        ? 75
+        : detail.status === "confirmed"
+          ? 50
+          : 25;
+  const partsHold = detail.partsHold;
+  const partsHoldStatus = String(partsHold?.status || "").toUpperCase();
+  const partsConsentStatus = String(partsHold?.consent?.status || "").toUpperCase();
+  const appointmentWaitingParts =
+    detail.status === "waiting_parts" ||
+    localAppointment.status === "WAITING_PARTS" ||
+    String(localAppointment.raw?.status || "").toUpperCase() === "WAITING_PARTS";
+  const needsManagerPartsContact =
+    partsHold &&
+    ["PENDING_MANAGER", "PENDING_CONSENT"].includes(partsHoldStatus) &&
+    appointmentWaitingParts;
+  const needsManagerPartsRestock =
+    partsHold &&
+    appointmentWaitingParts &&
+    partsConsentStatus === "APPROVED" &&
+    ["APPROVED", "PENDING_MANAGER", "PENDING_CONSENT"].includes(partsHoldStatus);
+
+  const syncPartsHoldForm = (hold) => {
+    setPartsHoldContactNote(hold?.consent?.note || "");
+    setPartsHoldEtaDays(hold?.eta_days != null ? String(hold.eta_days) : "");
+    setPartsHoldCost(hold?.estimated_cost != null && hold.estimated_cost !== "" ? String(hold.estimated_cost) : "");
+    setPartsHoldCustomerMessage(hold?.customer_message || "");
+  };
 
   useEffect(() => {
     setLocalAppointment(appointment || {});
+    const hold = normalizePartsHold(appointment?.partsHold || appointment?.raw?.parts_hold);
+    syncPartsHoldForm(hold);
   }, [appointment]);
 
   useEffect(() => {
@@ -402,6 +460,44 @@ export default function AppointmentDetailPage({
     }
   };
 
+  const buildPartsHoldPayload = () => ({
+    contact_note: partsHoldContactNote.trim(),
+    customer_message: partsHoldCustomerMessage.trim(),
+    eta_days: partsHoldEtaDays === "" ? null : partsHoldEtaDays,
+    estimated_cost: partsHoldCost === "" ? null : partsHoldCost,
+  });
+
+  const submitPartsHoldNotifyCustomer = async () => {
+    if (!onPartsHoldNotifyCustomer || isActionLoading) return;
+    if (!partsHoldCustomerMessage.trim()) {
+      setActionMessage({ type: "error", text: "Nhập nội dung thông báo gửi khách trước khi gửi." });
+      return;
+    }
+    await runAppointmentAction(
+      (current) => onPartsHoldNotifyCustomer(current, buildPartsHoldPayload()),
+      () => undefined
+    );
+  };
+
+  const submitPartsHoldContactResult = async (decision) => {
+    if (!onPartsHoldContactResult || isActionLoading) return;
+    await runAppointmentAction(
+      (current) => onPartsHoldContactResult(current, { decision, ...buildPartsHoldPayload() }),
+      () => undefined
+    );
+  };
+
+  const submitPartsHoldMarkReady = async () => {
+    if (!onPartsHoldMarkReady || isActionLoading) return;
+    await runAppointmentAction(
+      (current) =>
+        onPartsHoldMarkReady(current, {
+          notes: "Manager đã nhập kho — mở lại sửa chữa cho Staff",
+        }),
+      () => undefined
+    );
+  };
+
   return (
     <div className="appointment-detail-page appointment-record-page">
       <RecordHeader appointment={detail} onBack={onBack} />
@@ -451,6 +547,171 @@ export default function AppointmentDetailPage({
             </div>
           </section>
 
+          {partsHold && (
+            <section className={`record-panel parts-hold-manager-panel ${needsManagerPartsContact || needsManagerPartsRestock ? "parts-hold-manager-panel-active" : ""}`}>
+              <div className="record-section-header">
+                <h3>{needsManagerPartsRestock ? "Chờ phụ tùng — nhập kho" : "Chờ phụ tùng — liên hệ khách"}</h3>
+              </div>
+              <p className="parts-hold-manager-lead">
+                {needsManagerPartsContact
+                  ? "Staff đã báo thiếu phụ tùng. Soạn thông báo gửi khách (hoặc gọi điện), rồi ghi nhận khách đồng ý chờ hàng mới."
+                  : needsManagerPartsRestock
+                    ? "Khách đã đồng ý chờ. Khi hàng về: nhập phụ tùng vào Kho, rồi bấm mở lại sửa chữa để Staff lấy phụ tùng từ kho."
+                    : partsConsentStatus === "APPROVED"
+                      ? "Đã xác nhận: khách đồng ý chờ phụ tùng."
+                      : partsConsentStatus === "DECLINED"
+                        ? "Đã xác nhận: khách từ chối chờ phụ tùng."
+                        : "Thông tin yêu cầu chờ phụ tùng."}
+              </p>
+              <div className="record-field-grid record-field-grid-compact">
+                <DetailField label="SĐT khách" value={detail.customer.phone} />
+                <DetailField
+                  label="ETA dự kiến"
+                  value={partsHold.eta_days ? `${partsHold.eta_days} ngày` : needsManagerPartsContact ? "Chưa nhập" : "—"}
+                />
+                <DetailField
+                  label="Chi phí dự kiến"
+                  value={
+                    partsHold.estimated_cost != null
+                      ? formatCurrency(partsHold.estimated_cost)
+                      : needsManagerPartsContact
+                        ? "Chưa nhập"
+                        : "—"
+                  }
+                />
+                <DetailField
+                  label="Trạng thái"
+                  value={
+                    needsManagerPartsContact
+                      ? partsHoldStatus === "PENDING_CONSENT"
+                        ? "Đã gửi thông báo — chờ xác nhận"
+                        : "Chờ Manager liên hệ khách"
+                      : partsConsentStatus === "APPROVED"
+                        ? "Khách đồng ý chờ"
+                        : partsConsentStatus === "DECLINED"
+                          ? "Khách từ chối"
+                          : partsHoldStatus || "—"
+                  }
+                />
+              </div>
+              {Array.isArray(partsHold.items) && partsHold.items.length > 0 && (
+                <div className="parts-hold-manager-parts">
+                  <strong>Phụ tùng cần nhập</strong>
+                  <ul className="parts-hold-manager-items">
+                    {partsHold.items.map((item, index) => (
+                      <li key={`${item.name}-${index}`}>
+                        {item.name}
+                        {Number(item.quantity) > 1 ? ` × ${item.quantity}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {!needsManagerPartsContact && partsHold.customer_message ? (
+                <p className="parts-hold-manager-note">Nội dung đã gửi khách: {partsHold.customer_message}</p>
+              ) : null}
+              {needsManagerPartsContact && (
+                <div className="parts-hold-manager-actions">
+                  <div className="parts-hold-manager-grid">
+                    <label>
+                      Số ngày chờ (ETA)
+                      <input
+                        type="number"
+                        min="1"
+                        max="90"
+                        value={partsHoldEtaDays}
+                        onChange={(event) => setPartsHoldEtaDays(event.target.value)}
+                        placeholder="VD: 3"
+                        disabled={isActionLoading}
+                      />
+                    </label>
+                    <label>
+                      Chi phí dự kiến (tuỳ chọn)
+                      <input
+                        type="number"
+                        min="0"
+                        value={partsHoldCost}
+                        onChange={(event) => setPartsHoldCost(event.target.value)}
+                        placeholder="0"
+                        disabled={isActionLoading}
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    Nội dung thông báo gửi khách
+                    <textarea
+                      rows={3}
+                      value={partsHoldCustomerMessage}
+                      onChange={(event) => setPartsHoldCustomerMessage(event.target.value)}
+                      placeholder="VD: Xe cần nhập lọc gió, khoảng 2-3 ngày có hàng. Anh/chị có đồng ý chờ không?"
+                      disabled={isActionLoading}
+                      maxLength={500}
+                    />
+                    <small>{partsHoldCustomerMessage.length}/500</small>
+                  </label>
+                  <label>
+                    Ghi chú nội bộ cuộc gọi (tuỳ chọn)
+                    <textarea
+                      rows={2}
+                      value={partsHoldContactNote}
+                      onChange={(event) => setPartsHoldContactNote(event.target.value)}
+                      placeholder="VD: đã gọi 0866..., khách hỏi thêm về giá..."
+                      disabled={isActionLoading}
+                    />
+                  </label>
+                  <div className="parts-hold-manager-buttons">
+                    <button
+                      className="detail-secondary-btn"
+                      type="button"
+                      disabled={isActionLoading || !onPartsHoldNotifyCustomer}
+                      onClick={submitPartsHoldNotifyCustomer}
+                    >
+                      <Send size={16} /> {isActionLoading ? "Đang gửi..." : "Gửi yêu cầu chờ hàng cho khách"}
+                    </button>
+                    <button
+                      className="detail-secondary-btn danger"
+                      type="button"
+                      disabled={isActionLoading}
+                      onClick={() => submitPartsHoldContactResult("DECLINED")}
+                    >
+                      <XCircle size={16} /> Khách từ chối chờ
+                    </button>
+                    <button
+                      className="detail-primary-btn"
+                      type="button"
+                      disabled={isActionLoading}
+                      onClick={() => submitPartsHoldContactResult("APPROVED")}
+                    >
+                      <Phone size={16} /> {isActionLoading ? "Đang lưu..." : "Khách đồng ý chờ"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {needsManagerPartsRestock && (
+                <div className="parts-hold-manager-actions">
+                  <p className="parts-hold-manager-note">
+                    1) Vào <strong>Kho phụ tùng</strong> để nhập hàng đã về.{" "}
+                    2) Quay lại đây bấm mở lại sửa chữa — Staff sẽ chọn phụ tùng từ kho.
+                  </p>
+                  <div className="parts-hold-manager-buttons">
+                    <a className="detail-secondary-btn" href="/manager/inventory" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <Package size={16} /> Mở kho phụ tùng
+                    </a>
+                    <button
+                      className="detail-primary-btn"
+                      type="button"
+                      disabled={isActionLoading || !onPartsHoldMarkReady}
+                      onClick={submitPartsHoldMarkReady}
+                    >
+                      <Package size={16} />{" "}
+                      {isActionLoading ? "Đang mở..." : "Đã nhập kho — mở lại sửa chữa"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           <ServicesRecord services={detail.services} totalPrice={totalPrice} paymentStatus={detail.paymentStatus} />
 
           <div className={`record-split ${!(detail.materials || []).length ? "record-split-single" : ""}`}>
@@ -479,6 +740,7 @@ export default function AppointmentDetailPage({
             status={detail.status}
             hasAssignment={hasAssignment}
             isLoading={isActionLoading}
+            needsManagerPartsContact={needsManagerPartsContact}
             onConfirm={() => runAppointmentAction((current) => runMappedOrFallbackAction(onConfirm, mockConfirmAppointment, current))}
             onStart={() => runAppointmentAction((current) => runMappedOrFallbackAction(onStart, mockStartAppointmentProcessing, current))}
             onComplete={() => runAppointmentAction((current) => runMappedOrFallbackAction(onComplete, mockCompleteAppointment, current))}
@@ -695,7 +957,7 @@ function ProcessRecord({ status, appointment, hasAssignment }) {
   const isTerminal = status === "done" || status === "cancelled";
   const currentIndex = isTerminal
     ? 4
-    : status === "processing"
+    : status === "processing" || status === "waiting_parts"
       ? 3
       : status === "confirmed" && hasAssignment
         ? 2
@@ -1174,6 +1436,7 @@ function FooterActions({
   status,
   hasAssignment,
   isLoading,
+  needsManagerPartsContact = false,
   onConfirm,
   onStart,
   onComplete,
@@ -1188,17 +1451,19 @@ function FooterActions({
   const isTerminal = status === "done" || status === "cancelled";
   const isPending = pendingStatuses.includes(status);
   const primaryAction =
-    status === "processing"
-      ? { label: "Hoàn tất xử lý", onClick: onComplete }
-      : status === "confirmed"
-        ? hasAssignment
-          ? { label: "Bắt đầu kiểm tra xe", onClick: onStart }
-          : { label: "Phân công nhân viên", onClick: onAssign }
-        : status === "done"
-          ? { label: "Lịch hẹn đã hoàn tất", onClick: undefined }
-          : status === "cancelled"
-            ? { label: "Lịch hẹn đã hủy", onClick: undefined }
-            : { label: "Xác nhận lịch hẹn", onClick: onConfirm };
+    needsManagerPartsContact || status === "waiting_parts"
+      ? { label: "Đang chờ phụ tùng — gọi khách ở panel bên trái", onClick: undefined }
+      : status === "processing"
+        ? { label: "Hoàn tất xử lý", onClick: onComplete }
+        : status === "confirmed"
+          ? hasAssignment
+            ? { label: "Bắt đầu kiểm tra xe", onClick: onStart }
+            : { label: "Phân công nhân viên", onClick: onAssign }
+          : status === "done"
+            ? { label: "Lịch hẹn đã hoàn tất", onClick: undefined }
+            : status === "cancelled"
+              ? { label: "Lịch hẹn đã hủy", onClick: undefined }
+              : { label: "Xác nhận lịch hẹn", onClick: onConfirm };
   const isPrimaryDisabled = !primaryAction.onClick || isLoading;
   const flowMessage = isPending
     ? "Bước hiện tại: xác nhận lịch hẹn."
@@ -1206,9 +1471,11 @@ function FooterActions({
       ? "Bước tiếp theo: phân công kỹ thuật viên."
       : status === "confirmed" && hasAssignment
         ? "Đã phân công. Nhân viên sẽ tiếp nhận và kiểm tra xe."
-        : status === "processing"
-          ? "Nhân viên đang xử lý / kiểm tra xe."
-          : "";
+        : needsManagerPartsContact || status === "waiting_parts"
+          ? "Staff báo thiếu phụ tùng — Manager gọi khách và ghi nhận kết quả."
+          : status === "processing"
+            ? "Nhân viên đang xử lý / kiểm tra xe."
+            : "";
 
   return (
     <section className="appointment-detail-card action-card">

@@ -2,6 +2,7 @@ const STATUS_META = {
   PENDING: { label: "CHỜ XÁC NHẬN", key: "pending", className: "status-blue" },
   CONFIRMED: { label: "ĐƯỢC GIAO", key: "assigned", className: "status-blue" },
   IN_PROGRESS: { label: "ĐANG LÀM", key: "in_progress", className: "status-yellow" },
+  WAITING_PARTS: { label: "CHỜ PHỤ TÙNG", key: "waiting_parts", className: "status-orange" },
   COMPLETED: { label: "HOÀN THÀNH", key: "completed", className: "status-green" },
   PAID: { label: "HOÀN THÀNH", key: "completed", className: "status-green" },
   CANCELLED: { label: "ĐÃ HỦY", key: "cancelled", className: "status-red" },
@@ -204,6 +205,18 @@ export function mapAppointmentToJob(appointment = {}) {
           completed_at: appointment.repair_log.completed_at || null,
         }
       : null,
+    partsHold: appointment.parts_hold?.status
+      ? {
+          status: appointment.parts_hold.status,
+          items: Array.isArray(appointment.parts_hold.items) ? appointment.parts_hold.items : [],
+          eta_days: appointment.parts_hold.eta_days || null,
+          estimated_cost: appointment.parts_hold.estimated_cost,
+          customer_message: appointment.parts_hold.customer_message || "",
+          requested_at: appointment.parts_hold.requested_at || null,
+          consent: appointment.parts_hold.consent || { status: "PENDING" },
+          ready_at: appointment.parts_hold.ready_at || null,
+        }
+      : null,
     addonServices: Array.isArray(appointment.addon_services)
       ? appointment.addon_services.map((item) => ({
           service_id: getEntityId(item.service_id) || item.service_id,
@@ -233,6 +246,7 @@ function getJobActions(statusKey) {
 const JOB_PRIORITY_ORDER = {
   assigned: 0,
   in_progress: 1,
+  waiting_parts: 1,
   pending: 2,
   completed: 3,
   cancelled: 4,

@@ -186,7 +186,7 @@ router.get('/appointments',
   ...managerOnly,
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
-  query('status').optional().isIn(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
+  query('status').optional().isIn(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'WAITING_PARTS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
   query('customer_id').optional().isMongoId(),
   query('staff_id').optional(),
   query('service_id').optional().isMongoId(),
@@ -256,6 +256,39 @@ router.post('/appointments/:id/assign-staff',
   assignStaffValidation,
   validate,
   managerAppointmentController.assignStaff
+);
+
+router.post('/appointments/:id/parts-hold/notify-customer',
+  ...managerOnly,
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('customer_message').trim().notEmpty().withMessage('customer_message is required').isLength({ max: 500 }),
+  body('eta_days').optional({ nullable: true }).isInt({ min: 1, max: 90 }),
+  body('estimated_cost').optional({ nullable: true }).isFloat({ min: 0 }),
+  body('contact_note').optional().trim().isLength({ max: 500 }),
+  body('note').optional().trim().isLength({ max: 500 }),
+  validate,
+  managerAppointmentController.notifyPartsHoldCustomer
+);
+
+router.post('/appointments/:id/parts-hold/contact-result',
+  ...managerOnly,
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('decision').isIn(['APPROVED', 'DECLINED']).withMessage('decision must be APPROVED or DECLINED'),
+  body('contact_note').optional().trim().isLength({ max: 500 }),
+  body('note').optional().trim().isLength({ max: 500 }),
+  body('customer_message').optional().trim().isLength({ max: 500 }),
+  body('eta_days').optional({ nullable: true }).isInt({ min: 1, max: 90 }),
+  body('estimated_cost').optional({ nullable: true }).isFloat({ min: 0 }),
+  validate,
+  managerAppointmentController.recordPartsHoldContactResult
+);
+
+router.post('/appointments/:id/parts-hold/ready',
+  ...managerOnly,
+  param('id').isMongoId().withMessage('Invalid appointment ID'),
+  body('notes').optional().trim().isLength({ max: 500 }),
+  validate,
+  managerAppointmentController.markPartsReady
 );
 
 module.exports = router;

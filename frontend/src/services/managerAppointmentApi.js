@@ -6,6 +6,7 @@ const statusTextMap = {
   PENDING: "Chờ xác nhận",
   CONFIRMED: "Đã xác nhận",
   IN_PROGRESS: "Đang xử lý",
+  WAITING_PARTS: "Đang sửa — chờ phụ tùng",
   COMPLETED: "Hoàn tất",
   CANCELLED: "Đã hủy",
   NO_SHOW: "Không đến",
@@ -140,6 +141,24 @@ function getUrgency(appointment = {}) {
   return "Ổn định";
 }
 
+function mapPartsHold(partsHold) {
+  if (!partsHold) return null;
+  const status = partsHold.status ? String(partsHold.status).toUpperCase() : "";
+  const items = Array.isArray(partsHold.items) ? partsHold.items : [];
+  if (!status && items.length === 0) return null;
+
+  return {
+    status: status || null,
+    items,
+    eta_days: partsHold.eta_days || null,
+    estimated_cost: partsHold.estimated_cost,
+    customer_message: partsHold.customer_message || "",
+    requested_at: partsHold.requested_at || null,
+    consent: partsHold.consent || { status: "PENDING" },
+    ready_at: partsHold.ready_at || null,
+  };
+}
+
 export function mapManagerAppointment(appointment = {}) {
   const customer = getCustomer(appointment);
   const service = getService(appointment);
@@ -196,6 +215,7 @@ export function mapManagerAppointment(appointment = {}) {
     paymentStatus: appointment.final_cost || status === "COMPLETED" ? "paid" : "unpaid",
     customerNote: appointment.customer_note || appointment.customer_notes || "Chưa có ghi chú khách hàng.",
     garageNote: appointment.staff_notes || "Chưa có ghi chú garage.",
+    partsHold: mapPartsHold(appointment.parts_hold),
     services: [
       {
         name: service.service_name || service.name || appointment.service?.name || "Dịch vụ chưa cập nhật",
@@ -268,6 +288,44 @@ export async function cancelManagerAppointment(appointmentId, reason = "Hủy t�
   return managerAppointmentRequest(`/manager/appointments/${appointmentId}`, {
     method: "DELETE",
     body: JSON.stringify({ reason }),
+  });
+}
+
+export async function notifyManagerPartsHoldCustomer(appointmentId, payload = {}) {
+  return managerAppointmentRequest(`/manager/appointments/${appointmentId}/parts-hold/notify-customer`, {
+    method: "POST",
+    body: JSON.stringify({
+      customer_message: payload.customer_message || "",
+      ...(payload.eta_days !== "" && payload.eta_days != null ? { eta_days: Number(payload.eta_days) } : {}),
+      ...(payload.estimated_cost !== "" && payload.estimated_cost != null
+        ? { estimated_cost: Number(payload.estimated_cost) }
+        : {}),
+      ...(payload.contact_note ? { contact_note: payload.contact_note } : {}),
+    }),
+  });
+}
+
+export async function recordManagerPartsHoldContactResult(appointmentId, payload = {}) {
+  return managerAppointmentRequest(`/manager/appointments/${appointmentId}/parts-hold/contact-result`, {
+    method: "POST",
+    body: JSON.stringify({
+      decision: payload.decision,
+      ...(payload.contact_note ? { contact_note: payload.contact_note } : {}),
+      ...(payload.customer_message ? { customer_message: payload.customer_message } : {}),
+      ...(payload.eta_days !== "" && payload.eta_days != null ? { eta_days: Number(payload.eta_days) } : {}),
+      ...(payload.estimated_cost !== "" && payload.estimated_cost != null
+        ? { estimated_cost: Number(payload.estimated_cost) }
+        : {}),
+    }),
+  });
+}
+
+export async function markManagerPartsReady(appointmentId, payload = {}) {
+  return managerAppointmentRequest(`/manager/appointments/${appointmentId}/parts-hold/ready`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...(payload.notes ? { notes: payload.notes } : {}),
+    }),
   });
 }
 

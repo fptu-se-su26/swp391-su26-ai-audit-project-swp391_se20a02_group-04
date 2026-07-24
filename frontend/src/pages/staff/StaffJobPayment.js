@@ -22,16 +22,46 @@ export default function StaffJobPayment() {
   const [error, setError] = useState("");
   const [payment, setPayment] = useState(null);
 
+  const applyMappedJob = (mapped) => {
+    setJob(mapped);
+    setPayment(mapped.paymentInfo || null);
+    setCashAmount(mapped.raw?.final_cost ?? "");
+  };
+
   const loadJob = async () => {
     setIsLoading(true);
     setLoadError("");
     try {
       const response = await getStaffAppointmentById(jobId);
-      const mapped = mapAppointmentToJob(response.data?.appointment);
+      let mapped = mapAppointmentToJob(response.data?.appointment);
       mapped.materialsUsed = response.data?.materials_used || [];
-      setJob(mapped);
-      setPayment(mapped.paymentInfo || null);
-      setCashAmount(mapped.raw?.final_cost ?? "");
+
+      const routeId = getJobRouteId(mapped) || jobId;
+      const completed =
+        mapped.status === "COMPLETED" ||
+        mapped.status === "PAID" ||
+        mapped.statusKey === "completed";
+      const paymentStatus = String(mapped.paymentInfo?.status || "").toUpperCase();
+      const orderCode = mapped.paymentInfo?.order_code;
+
+      if (!completed && orderCode && paymentStatus === "PENDING") {
+        try {
+          const paymentResponse = await getPaymentStatus(routeId);
+          setPayment((current) => ({ ...(current || {}), ...paymentResponse.data }));
+          if (String(paymentResponse.data?.status || "").toUpperCase() === "PAID") {
+            const refreshed = await getStaffAppointmentById(jobId);
+            mapped = mapAppointmentToJob(refreshed.data?.appointment);
+            mapped.materialsUsed = refreshed.data?.materials_used || [];
+            applyMappedJob(mapped);
+            navigate(`/staff/jobs/${routeId}`, { replace: true });
+            return;
+          }
+        } catch {
+          // Keep pending payment UI; staff can still press "Kiểm tra thanh toán".
+        }
+      }
+
+      applyMappedJob(mapped);
     } catch (err) {
       setLoadError(err.message || "Không thể tải thông tin thanh toán.");
     } finally {
@@ -40,7 +70,7 @@ export default function StaffJobPayment() {
   };
 
   useEffect(() => {
-    loadJob();
+    void loadJob();
   }, [jobId]);
 
   const materials = job?.materialsUsed || [];

@@ -19,7 +19,7 @@ const {
   getAppointmentStart
 } = require('../services/appointment-scheduling.service');
 
-const ACTIVE_APPOINTMENT_STATUSES = ['PENDING', 'CONFIRMED', 'IN_PROGRESS'];
+const ACTIVE_APPOINTMENT_STATUSES = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'WAITING_PARTS'];
 const WORKLOAD_BUSY_IN_PROGRESS = 4;
 const WORKLOAD_BUSY_ORDERS = 7;
 const SHIFT_DEFAULTS = {

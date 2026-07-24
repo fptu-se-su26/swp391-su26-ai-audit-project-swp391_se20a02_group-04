@@ -209,7 +209,7 @@ const appointmentSchema = new mongoose.Schema({
   repair_log: {
     status: {
       type: String,
-      enum: ['WITH_PARTS', 'NO_PARTS'],
+      enum: ['WITH_PARTS', 'NO_PARTS', 'WAITING_PARTS'],
       default: null
     },
     notes: {
@@ -220,6 +220,102 @@ const appointmentSchema = new mongoose.Schema({
     },
     completed_at: {
       type: Date,
+      default: null
+    }
+  },
+  // Tạm dừng sửa vì thiếu phụ tùng — chờ khách đồng ý và/hoặc hàng về
+  parts_hold: {
+    status: {
+      type: String,
+      enum: ['PENDING_MANAGER', 'PENDING_CONSENT', 'APPROVED', 'DECLINED', 'READY', 'CANCELLED'],
+      default: null
+    },
+    items: [{
+      name: {
+        type: String,
+        trim: true,
+        required: true,
+        maxlength: [200, 'Part name cannot exceed 200 characters']
+      },
+      quantity: {
+        type: Number,
+        default: 1,
+        min: [1, 'Quantity must be at least 1'],
+        max: [100, 'Quantity cannot exceed 100']
+      },
+      note: {
+        type: String,
+        trim: true,
+        maxlength: [300, 'Part note cannot exceed 300 characters'],
+        default: ''
+      }
+    }],
+    eta_days: {
+      type: Number,
+      default: null,
+      validate: {
+        validator(value) {
+          if (value == null || value === '') return true;
+          return Number.isInteger(value) && value >= 1 && value <= 90;
+        },
+        message: 'ETA must be 1-90 days'
+      }
+    },
+    estimated_cost: {
+      type: Number,
+      default: null,
+      validate: {
+        validator(value) {
+          if (value == null || value === '') return true;
+          return Number.isFinite(value) && value >= 0;
+        },
+        message: 'Estimated cost cannot be negative'
+      }
+    },
+    customer_message: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Customer message cannot exceed 500 characters'],
+      default: ''
+    },
+    requested_at: {
+      type: Date,
+      default: null
+    },
+    requested_by: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    consent: {
+      status: {
+        type: String,
+        enum: ['PENDING', 'APPROVED', 'DECLINED'],
+        default: 'PENDING'
+      },
+      responded_at: {
+        type: Date,
+        default: null
+      },
+      note: {
+        type: String,
+        trim: true,
+        maxlength: [500, 'Consent note cannot exceed 500 characters'],
+        default: ''
+      },
+      contacted_by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+      }
+    },
+    ready_at: {
+      type: Date,
+      default: null
+    },
+    ready_by: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
       default: null
     }
   },

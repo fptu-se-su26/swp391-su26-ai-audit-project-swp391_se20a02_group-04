@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import "../../styles/manager/ManagerLayout.css";
 import { getAuthSession, clearAuthSession } from "../../services/authApi";
-import { getManagerAppointments, mapManagerAppointment, managerAppointmentRequest, updateManagerAppointmentStatus, updateManagerAppointment, cancelManagerAppointment } from "../../services/managerAppointmentApi";
+import { getManagerAppointments, mapManagerAppointment, getMappedManagerAppointmentById, managerAppointmentRequest, updateManagerAppointmentStatus, updateManagerAppointment, cancelManagerAppointment, recordManagerPartsHoldContactResult, notifyManagerPartsHoldCustomer, markManagerPartsReady } from "../../services/managerAppointmentApi";
 import { getTechnicians, getRepairBays } from "../../services/appointmentAssignmentApi";
 import { getNotifications, markAsRead as markNotificationAsRead, markAllAsRead as markAllNotificationsAsRead } from "../../services/notificationApi";
 
@@ -236,14 +236,15 @@ const ManagerLayout = () => {
       }
       setShowNotificationsMenu(false);
 
-      if (notif.appointment_id) {
-        const appObj = notif.appointment_id;
-        const targetId = appObj._id || notif.metadata?.appointment_id;
-        if (targetId) {
-          openAppointmentDetail(targetId);
-        } else {
-          handleTabChange("appointments");
-        }
+      const rawAppointmentId = notif.appointment_id;
+      const targetId = typeof rawAppointmentId === "string"
+        ? rawAppointmentId
+        : (rawAppointmentId?._id || rawAppointmentId?.id || notif.metadata?.appointment_id || "");
+
+      if (targetId) {
+        await openAppointmentDetail(String(targetId));
+      } else {
+        handleTabChange("appointments");
       }
     } catch (err) {
       console.error("Failed to handle notification click:", err);
@@ -268,22 +269,7 @@ const ManagerLayout = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Helper title & time formatters
-  const getViewTitle = (tab) => {
-    switch (tab) {
-      case "dashboard": return "Tổng quan Garage";
-      case "appointments": return "Quản lý Lịch hẹn";
-      case "appointment-detail": return "Chi tiết Lịch hẹn";
-      case "staff": return "Quản lý Nhân viên";
-      case "inventory": return "Kho vật tư";
-      case "revenue": return "Báo cáo Doanh thu";
-      case "profile": return "Hồ sơ cá nhân";
-      case "customers": return "Thông tin Khách hàng";
-      case "contact": return "Liên hệ / Chăm sóc KH";
-      default: return "MotoCare Manager";
-    }
-  };
-
+  // Helper time formatters
   const formatTimeElapsed = (dateStr) => {
     const date = new Date(dateStr);
     const now = new Date();
@@ -354,7 +340,7 @@ const ManagerLayout = () => {
           // Calculate workload (active appointments assigned to them today)
           const activeTechApps = mappedApps.filter(app =>
             (app.raw?.staff_id?._id === tech._id || app.raw?.staff_id === tech._id) &&
-            (app.status === 'CONFIRMED' || app.status === 'IN_PROGRESS')
+            (app.status === 'CONFIRMED' || app.status === 'IN_PROGRESS' || app.status === 'WAITING_PARTS')
           );
 
           return {
@@ -380,7 +366,7 @@ const ManagerLayout = () => {
         const mappedBays = bayRes.map(bay => {
           const activeBayApp = mappedApps.find(app =>
             (app.raw?.repair_bay_id?._id === bay._id || app.raw?.repair_bay_id === bay._id) &&
-            (app.status === 'CONFIRMED' || app.status === 'IN_PROGRESS')
+            (app.status === 'CONFIRMED' || app.status === 'IN_PROGRESS' || app.status === 'WAITING_PARTS')
           );
 
           return {
@@ -445,10 +431,52 @@ const ManagerLayout = () => {
     navigate(getManagerPathFromTab(tabName));
   };
 
-  const openAppointmentDetail = (appointmentId) => {
-    setSelectedAppointmentId(appointmentId);
+  const openAppointmentDetail = async (appointmentId) => {
+    const targetId = String(appointmentId || "").trim();
+    if (!targetId) return;
+
+    const localMatch = appointments.find(
+      (app) =>
+        String(app.rawId || "") === targetId ||
+        String(app.id || "") === targetId ||
+        String(app.id || "").replace(/^#/, "") === targetId.replace(/^#/, "") ||
+        String(app.raw?._id || "") === targetId
+    );
+
+    const fetchId = localMatch?.rawId || (/^[a-f\d]{24}$/i.test(targetId) ? targetId : "");
+    setSelectedAppointmentId(String(fetchId || targetId));
     setSearchQuery("");
+    setCurrentTab("appointment-detail");
     navigate("/manager/appointment-detail");
+
+    if (!fetchId) {
+      if (localMatch) setSelectedAppointmentId(String(localMatch.rawId || localMatch.id));
+      return;
+    }
+
+    // Luôn tải lại chi tiết để có parts_hold / WAITING_PARTS mới nhất
+    try {
+      const mapped = await getMappedManagerAppointmentById(fetchId);
+      if (!mapped?.rawId) return;
+
+      setAppointments((prev) => {
+        const idx = prev.findIndex(
+          (app) =>
+            String(app.rawId) === String(mapped.rawId) ||
+            String(app.id) === String(mapped.id)
+        );
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], ...mapped };
+          return next;
+        }
+        return [mapped, ...prev];
+      });
+      setSelectedAppointmentId(String(mapped.rawId));
+    } catch (err) {
+      console.error("Failed to load appointment detail:", err);
+      triggerToast(err.message || "Không tải được chi tiết lịch hẹn.", "error");
+    }
   };
 
   const updateAppointmentStatus = (appointmentId, status, statusText) => {
@@ -457,7 +485,19 @@ const ManagerLayout = () => {
     )));
   };
 
-  const selectedAppointment = appointments.find(app => app.id === selectedAppointmentId || app.rawId === selectedAppointmentId) || appointments[0];
+  const selectedAppointment = (() => {
+    if (!selectedAppointmentId) return null;
+    const id = String(selectedAppointmentId);
+    return (
+      appointments.find(
+        (app) =>
+          String(app.rawId || "") === id ||
+          String(app.id || "") === id ||
+          String(app.id || "").replace(/^#/, "") === id ||
+          String(app.raw?._id || "") === id
+      ) || null
+    );
+  })();
 
   // Open allocate technician modal
   const openAllocationModal = (appId) => {
@@ -545,6 +585,17 @@ const ManagerLayout = () => {
           />
         );
       case "appointment-detail":
+        if (!selectedAppointment) {
+          return (
+            <div className="state-box" style={{ padding: 24 }}>
+              <strong>Đang tải chi tiết lịch hẹn...</strong>
+              <p>Nếu lâu quá, hãy quay lại danh sách và chọn lại đơn.</p>
+              <button className="btn-secondary" type="button" onClick={() => handleTabChange("appointments")}>
+                Quay lại danh sách
+              </button>
+            </div>
+          );
+        }
         return (
           <AppointmentDetailPage
             appointment={selectedAppointment}
@@ -603,6 +654,44 @@ const ManagerLayout = () => {
               }
               updateAppointmentStatus(selectedAppointment.id, "CANCELLED", "Đã hủy");
               triggerToast("Đã hủy lịch hẹn (giả lập).", "success");
+            }}
+            onPartsHoldNotifyCustomer={async (app, payload = {}) => {
+              const rawId = app.rawId || selectedAppointment.rawId;
+              if (!rawId || String(rawId).startsWith("mock") || String(rawId).startsWith("WO-MOCK")) {
+                throw new Error("Không thể gửi thông báo trên lịch giả lập.");
+              }
+              const res = await notifyManagerPartsHoldCustomer(rawId, payload);
+              triggerToast("Đã gửi thông báo phụ tùng cho khách.", "success");
+              await loadManagerData();
+              const mapped = mapManagerAppointment(res.data?.appointment || {});
+              return { message: res.message, data: { appointment: mapped } };
+            }}
+            onPartsHoldContactResult={async (app, payload = {}) => {
+              const rawId = app.rawId || selectedAppointment.rawId;
+              if (!rawId || String(rawId).startsWith("mock") || String(rawId).startsWith("WO-MOCK")) {
+                throw new Error("Không thể ghi nhận trên lịch giả lập.");
+              }
+              const res = await recordManagerPartsHoldContactResult(rawId, payload);
+              triggerToast(
+                payload.decision === "APPROVED"
+                  ? "Đã ghi nhận: khách đồng ý chờ phụ tùng."
+                  : "Đã ghi nhận: khách từ chối chờ phụ tùng.",
+                "success"
+              );
+              await loadManagerData();
+              const mapped = mapManagerAppointment(res.data?.appointment || {});
+              return { message: res.message, data: { appointment: mapped } };
+            }}
+            onPartsHoldMarkReady={async (app, payload = {}) => {
+              const rawId = app.rawId || selectedAppointment.rawId;
+              if (!rawId || String(rawId).startsWith("mock") || String(rawId).startsWith("WO-MOCK")) {
+                throw new Error("Không thể mở lại sửa chữa trên lịch giả lập.");
+              }
+              const res = await markManagerPartsReady(rawId, payload);
+              triggerToast("Đã mở lại sửa chữa. Staff có thể lấy phụ tùng từ kho.", "success");
+              await loadManagerData();
+              const mapped = mapManagerAppointment(res.data?.appointment || {});
+              return { message: res.message, data: { appointment: mapped } };
             }}
             onAppointmentChange={(updatedAppointment) => {
               setAppointments((prev) =>
@@ -854,14 +943,6 @@ const ManagerLayout = () => {
 
       {/* Main Container */}
       <main className="main-content">
-        {/* Sleek top-level Header Bar */}
-        <header className="header">
-          <div className="header-left">
-            <h2>{getViewTitle(currentTab)}</h2>
-            <div className="breadcrumb">MANAGER / {currentTab.toUpperCase()}</div>
-          </div>
-        </header>
-
         {/* Content Body Grid */}
         <div className="manager-body">
           {renderSubPage()}

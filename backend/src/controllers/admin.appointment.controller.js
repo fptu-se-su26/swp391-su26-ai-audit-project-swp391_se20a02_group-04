@@ -853,7 +853,7 @@ const getAppointmentStatistics = async (req, res) => {
       Appointment.countDocuments(),
       Appointment.countDocuments({ status: 'PENDING' }),
       Appointment.countDocuments({ status: 'CONFIRMED' }),
-      Appointment.countDocuments({ status: 'IN_PROGRESS' }),
+      Appointment.countDocuments({ status: { $in: ['IN_PROGRESS', 'WAITING_PARTS'] } }),
       Appointment.countDocuments({ status: 'COMPLETED' }),
       Appointment.countDocuments({ status: 'CANCELLED' }),
       Appointment.countDocuments({ status: 'NO_SHOW' }),
@@ -1033,6 +1033,376 @@ const getAppointmentCalendar = async (req, res) => {
   }
 };
 
+/**
+ * Manager soạn nội dung và gửi thông báo in-app cho khách về phụ tùng cần nhập.
+ * POST /api/manager/appointments/:id/parts-hold/notify-customer
+ */
+const notifyPartsHoldCustomer = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id)
+      .populate('customer_id', 'full_name phone email')
+      .populate('staff_id', 'full_name');
+
+    if (!appointment) {
+      return errorResponse(res, 404, 'Appointment not found');
+    }
+
+    if (appointment.status !== 'WAITING_PARTS' || !appointment.parts_hold?.status) {
+      return errorResponse(res, 422, 'Lịch hẹn không đang chờ phụ tùng');
+    }
+
+    const holdStatus = String(appointment.parts_hold.status || '').toUpperCase();
+    if (!['PENDING_MANAGER', 'PENDING_CONSENT'].includes(holdStatus)) {
+      return errorResponse(res, 422, 'Yêu cầu chờ phụ tùng đã được xử lý trước đó');
+    }
+
+    const customerMessage = String(req.body.customer_message || req.body.message || '').trim();
+    if (!customerMessage) {
+      return errorResponse(res, 400, 'Nhập nội dung thông báo gửi khách');
+    }
+    if (customerMessage.length > 500) {
+      return errorResponse(res, 400, 'Nội dung thông báo không quá 500 ký tự');
+    }
+
+    let etaDays = appointment.parts_hold.eta_days || null;
+    if (req.body.eta_days !== undefined && req.body.eta_days !== null && req.body.eta_days !== '') {
+      etaDays = Number(req.body.eta_days);
+      if (!Number.isInteger(etaDays) || etaDays < 1 || etaDays > 90) {
+        return errorResponse(res, 400, 'ETA phải từ 1 đến 90 ngày');
+      }
+    }
+
+    let estimatedCost = appointment.parts_hold.estimated_cost;
+    if (estimatedCost === undefined) estimatedCost = null;
+    if (req.body.estimated_cost !== undefined && req.body.estimated_cost !== null && req.body.estimated_cost !== '') {
+      estimatedCost = Number(req.body.estimated_cost);
+      if (!Number.isFinite(estimatedCost) || estimatedCost < 0) {
+        return errorResponse(res, 400, 'Chi phí dự kiến không hợp lệ');
+      }
+    } else if (req.body.estimated_cost === null || req.body.estimated_cost === '') {
+      estimatedCost = null;
+    }
+
+    const contactNote = String(req.body.contact_note || req.body.note || '').trim();
+    const now = new Date();
+    const code = appointment.appointment_code || appointment._id;
+    const partsList = (appointment.parts_hold.items || [])
+      .map((item) => `${item.name} x${item.quantity || 1}`)
+      .join(', ');
+
+    appointment.parts_hold.customer_message = customerMessage;
+    appointment.parts_hold.eta_days = etaDays;
+    appointment.parts_hold.estimated_cost = estimatedCost;
+    appointment.parts_hold.status = 'PENDING_CONSENT';
+    if (!appointment.parts_hold.consent) {
+      appointment.parts_hold.consent = {
+        status: 'PENDING',
+        responded_at: null,
+        note: '',
+        contacted_by: null
+      };
+    } else {
+      appointment.parts_hold.consent.status = 'PENDING';
+    }
+    if (contactNote) {
+      appointment.parts_hold.consent.note = contactNote;
+      appointment.parts_hold.consent.contacted_by = req.user.userId;
+    }
+
+    await appointment.save();
+
+    const Notification = require('../models/Notification.model');
+    const customerId = appointment.customer_id?._id || appointment.customer_id;
+
+    if (customerId) {
+      try {
+        await Notification.create({
+          user_id: customerId,
+          appointment_id: appointment._id,
+          type: 'APPOINTMENT_UPDATED',
+          title: 'Garage thông báo về phụ tùng cần nhập',
+          message: `Lịch ${code}: ${customerMessage}${partsList ? ` (Thiếu: ${partsList})` : ''}${etaDays ? ` — dự kiến ~${etaDays} ngày.` : ''} Vào chi tiết lịch hẹn để xác nhận đồng ý chờ hàng.`,
+          metadata: {
+            kind: 'PARTS_HOLD_CUSTOMER_NOTIFY',
+            appointment_id: String(appointment._id),
+            appointment_code: code,
+            eta_days: etaDays,
+            estimated_cost: estimatedCost,
+            parts: appointment.parts_hold.items || []
+          }
+        });
+      } catch (err) {
+        console.warn('Parts hold customer notify failed:', err.message);
+      }
+    }
+
+    if (appointment.staff_id) {
+      const staffId = appointment.staff_id._id || appointment.staff_id;
+      try {
+        await Notification.create({
+          user_id: staffId,
+          appointment_id: appointment._id,
+          type: 'APPOINTMENT_UPDATED',
+          title: 'Manager đã thông báo khách về phụ tùng',
+          message: `Lịch ${code}: Manager đã gửi thông báo cho khách về phụ tùng thiếu.`,
+          metadata: {
+            kind: 'PARTS_HOLD_MANAGER_NOTIFIED_CUSTOMER',
+            appointment_code: code
+          }
+        });
+      } catch (err) {
+        console.warn('Parts hold staff notify failed:', err.message);
+      }
+    }
+
+    return successResponse(res, 200, 'Đã gửi thông báo cho khách về phụ tùng cần nhập', {
+      appointment
+    });
+  } catch (error) {
+    console.error('Notify parts hold customer error:', error);
+    return errorResponse(res, 500, 'Không thể gửi thông báo cho khách');
+  }
+};
+
+/**
+ * Manager contacts customer about waiting for parts, then records APPROVED/DECLINED.
+ * POST /api/manager/appointments/:id/parts-hold/contact-result
+ */
+const recordPartsHoldContactResult = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id)
+      .populate('customer_id', 'full_name phone')
+      .populate('staff_id', 'full_name');
+
+    if (!appointment) {
+      return errorResponse(res, 404, 'Appointment not found');
+    }
+
+    if (appointment.status !== 'WAITING_PARTS' || !appointment.parts_hold?.status) {
+      return errorResponse(res, 422, 'Lịch hẹn không đang chờ phụ tùng');
+    }
+
+    const holdStatus = String(appointment.parts_hold.status || '').toUpperCase();
+    if (!['PENDING_MANAGER', 'PENDING_CONSENT'].includes(holdStatus)) {
+      return errorResponse(res, 422, 'Yêu cầu chờ phụ tùng đã được xử lý trước đó');
+    }
+
+    const decision = String(req.body.decision || '').toUpperCase();
+    if (!['APPROVED', 'DECLINED'].includes(decision)) {
+      return errorResponse(res, 400, 'decision must be APPROVED or DECLINED');
+    }
+
+    const contactNote = String(req.body.contact_note || req.body.note || '').trim();
+    const customerMessage = String(req.body.customer_message || '').trim();
+
+    let etaDays = appointment.parts_hold.eta_days || null;
+    if (req.body.eta_days !== undefined && req.body.eta_days !== null && req.body.eta_days !== '') {
+      etaDays = Number(req.body.eta_days);
+      if (!Number.isInteger(etaDays) || etaDays < 1 || etaDays > 90) {
+        return errorResponse(res, 400, 'ETA phải từ 1 đến 90 ngày');
+      }
+    }
+
+    let estimatedCost = appointment.parts_hold.estimated_cost;
+    if (estimatedCost === undefined) estimatedCost = null;
+    if (req.body.estimated_cost !== undefined && req.body.estimated_cost !== null && req.body.estimated_cost !== '') {
+      estimatedCost = Number(req.body.estimated_cost);
+      if (!Number.isFinite(estimatedCost) || estimatedCost < 0) {
+        return errorResponse(res, 400, 'Chi phí dự kiến không hợp lệ');
+      }
+    }
+
+    const now = new Date();
+    const code = appointment.appointment_code || appointment._id;
+    const partsList = (appointment.parts_hold.items || [])
+      .map((item) => `${item.name} x${item.quantity || 1}`)
+      .join(', ');
+
+    if (customerMessage) {
+      appointment.parts_hold.customer_message = customerMessage;
+    }
+    appointment.parts_hold.eta_days = etaDays;
+    appointment.parts_hold.estimated_cost = estimatedCost;
+    appointment.parts_hold.consent = {
+      status: decision,
+      responded_at: now,
+      note: contactNote,
+      contacted_by: req.user.userId
+    };
+    appointment.parts_hold.status = decision === 'APPROVED' ? 'APPROVED' : 'DECLINED';
+
+    if (decision === 'DECLINED') {
+      appointment.status = 'IN_PROGRESS';
+      appointment.repair_log = {
+        status: null,
+        notes: contactNote || 'Manager đã liên hệ: khách từ chối chờ phụ tùng',
+        completed_at: null
+      };
+    }
+
+    await appointment.save();
+
+    const Notification = require('../models/Notification.model');
+
+    // Thông báo staff
+    if (appointment.staff_id) {
+      const staffId = appointment.staff_id._id || appointment.staff_id;
+      try {
+        await Notification.create({
+          user_id: staffId,
+          appointment_id: appointment._id,
+          type: 'APPOINTMENT_UPDATED',
+          title: decision === 'APPROVED'
+            ? 'Manager: khách đồng ý chờ phụ tùng'
+            : 'Manager: khách từ chối chờ phụ tùng',
+          message: decision === 'APPROVED'
+            ? `Lịch ${code}: Manager đã gọi khách — đồng ý chờ${etaDays ? ` ~${etaDays} ngày` : ''}. Khi hàng về Manager nhập kho rồi mở lại sửa chữa.`
+            : `Lịch ${code}: Manager đã gọi khách — từ chối chờ hàng. Tiếp tục xử lý (không dùng phụ tùng / trả xe).`,
+          metadata: {
+            kind: 'PARTS_HOLD_MANAGER_RESULT',
+            decision,
+            appointment_code: code
+          }
+        });
+      } catch (err) {
+        console.warn('Parts hold staff notify failed:', err.message);
+      }
+    }
+
+    // Thông báo khách (sau khi Manager đã liên hệ)
+    const customerId = appointment.customer_id?._id || appointment.customer_id;
+    const finalCustomerMessage = appointment.parts_hold.customer_message || '';
+    if (customerId) {
+      try {
+        await Notification.create({
+          user_id: customerId,
+          appointment_id: appointment._id,
+          type: 'APPOINTMENT_UPDATED',
+          title: decision === 'APPROVED' ? 'Garage sẽ chờ phụ tùng cho xe của bạn' : 'Cập nhật: không chờ phụ tùng',
+          message: decision === 'APPROVED'
+            ? (finalCustomerMessage
+              || `Lịch ${code}: garage đã trao đổi với bạn và sẽ chờ phụ tùng (${partsList || 'đang đặt hàng'})${etaDays ? `, khoảng ${etaDays} ngày` : ''}.`)
+            : `Lịch ${code}: theo trao đổi với garage, xe sẽ được xử lý mà không chờ phụ tùng thiếu.`,
+          metadata: {
+            kind: 'PARTS_HOLD_CUSTOMER_UPDATE',
+            decision,
+            appointment_code: code
+          }
+        });
+      } catch (err) {
+        console.warn('Parts hold customer notify failed:', err.message);
+      }
+    }
+
+    return successResponse(res, 200, decision === 'APPROVED'
+      ? 'Đã ghi nhận: khách đồng ý chờ phụ tùng'
+      : 'Đã ghi nhận: khách từ chối chờ phụ tùng', {
+      appointment
+    });
+  } catch (error) {
+    console.error('Record parts hold contact result error:', error);
+    return errorResponse(res, 500, 'Không thể lưu kết quả liên hệ khách');
+  }
+};
+
+const markPartsReady = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return errorResponse(res, 404, 'Appointment not found');
+
+    if (appointment.status !== 'WAITING_PARTS') {
+      return errorResponse(res, 422, 'Chỉ mở lại sửa chữa khi lịch đang chờ phụ tùng');
+    }
+
+    const consentStatus = appointment.parts_hold?.consent?.status;
+    if (consentStatus === 'DECLINED') {
+      return errorResponse(res, 422, 'Khách đã từ chối chờ hàng.');
+    }
+    if (consentStatus !== 'APPROVED') {
+      return errorResponse(res, 422, 'Chưa xác nhận khách đồng ý chờ phụ tùng');
+    }
+
+    const now = new Date();
+    const notes = String(req.body.notes || 'Manager đã nhập kho — mở lại sửa chữa').trim();
+    appointment.status = 'IN_PROGRESS';
+    if (appointment.parts_hold) {
+      appointment.parts_hold.status = 'READY';
+      appointment.parts_hold.ready_at = now;
+      appointment.parts_hold.ready_by = req.user.userId;
+    }
+    appointment.repair_log = {
+      status: null,
+      notes,
+      completed_at: null
+    };
+    await appointment.save();
+
+    try {
+      await UserAudit.create({
+        user_id: req.user.userId,
+        action: 'APPOINTMENT_PARTS_READY',
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+        status: 'SUCCESS',
+        metadata: {
+          appointment_id: appointment._id,
+          by: 'MANAGER'
+        }
+      });
+    } catch (auditError) {
+      console.warn('Parts ready audit failed:', auditError.message);
+    }
+
+    const Notification = require('../models/Notification.model');
+    const code = appointment.appointment_code || appointment._id;
+
+    try {
+      await Notification.create({
+        user_id: appointment.customer_id,
+        appointment_id: appointment._id,
+        type: 'APPOINTMENT_UPDATED',
+        title: 'Phụ tùng đã về — tiếp tục sửa xe',
+        message: `Lịch ${code}: phụ tùng đã sẵn sàng. Garage sẽ tiếp tục sửa chữa.`,
+        metadata: {
+          kind: 'PARTS_HOLD_READY',
+          appointment_code: code,
+          status: 'IN_PROGRESS'
+        }
+      });
+    } catch (notifyError) {
+      console.warn('Parts ready customer notify failed:', notifyError.message);
+    }
+
+    if (appointment.staff_id) {
+      const staffId = appointment.staff_id._id || appointment.staff_id;
+      try {
+        await Notification.create({
+          user_id: staffId,
+          appointment_id: appointment._id,
+          type: 'APPOINTMENT_UPDATED',
+          title: 'Manager đã nhập kho — lấy phụ tùng và sửa',
+          message: `Lịch ${code}: hàng đã nhập kho. Hãy chọn phụ tùng từ kho và tiếp tục sửa chữa.`,
+          metadata: {
+            kind: 'PARTS_HOLD_READY',
+            appointment_id: String(appointment._id),
+            appointment_code: code,
+            status: 'IN_PROGRESS'
+          }
+        });
+      } catch (notifyError) {
+        console.warn('Parts ready staff notify failed:', notifyError.message);
+      }
+    }
+
+    return successResponse(res, 200, 'Đã mở lại sửa chữa sau khi nhập kho', {
+      appointment
+    });
+  } catch (error) {
+    console.error('Mark parts ready error:', error);
+    return errorResponse(res, 500, 'Không thể mở lại sửa chữa');
+  }
+};
+
 module.exports = {
   getAllAppointments,
   getAppointmentById,
@@ -1051,5 +1421,8 @@ module.exports = {
   deleteRepairBay,
   getRepairBayAvailability,
   getAppointmentStatistics,
-  getAppointmentCalendar
+  getAppointmentCalendar,
+  notifyPartsHoldCustomer,
+  recordPartsHoldContactResult,
+  markPartsReady
 };

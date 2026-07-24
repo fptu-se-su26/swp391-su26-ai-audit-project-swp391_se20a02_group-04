@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Icon, PageHeader } from "./StaffComponents";
 import {
   acknowledgeStaffAppointment,
   completeStaffAppointment,
   getAppointmentMaterials,
+  getPaymentStatus,
   getStaffAppointmentById,
   getStaffInventory,
   markStaffAppointmentNoShow,
@@ -31,8 +32,37 @@ import { getAuthSession } from "../../services/authApi";
 import WorkflowStepper, { getStepState } from "./WorkflowStepper";
 import "../../styles/staff/StaffJobDetail.css";
 
+function isJobPaymentCompleted(job) {
+  return (
+    job?.status === "COMPLETED" ||
+    job?.status === "PAID" ||
+    job?.statusKey === "completed"
+  );
+}
+
+function mapStaffJobResponse(response) {
+  const mappedJob = mapAppointmentToJob(response.data?.appointment);
+  mappedJob.materialsUsed = response.data?.materials_used || [];
+  return mappedJob;
+}
+
+function shouldSyncPayosPayment(job, searchParams) {
+  if (!job || isJobPaymentCompleted(job)) return false;
+  const orderCode = job.paymentInfo?.order_code || job.raw?.payment_info?.order_code;
+  if (!orderCode) return false;
+  const paymentStatus = String(
+    job.paymentInfo?.status || job.raw?.payment_info?.status || ""
+  ).toUpperCase();
+  const hasPayosReturn =
+    searchParams?.has("code") ||
+    searchParams?.has("status") ||
+    searchParams?.has("orderCode");
+  return paymentStatus === "PENDING" || hasPayosReturn;
+}
+
 function useStaffJob() {
   const { jobId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [job, setJob] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -43,8 +73,7 @@ function useStaffJob() {
 
     try {
       const response = await getStaffAppointmentById(jobId);
-      const mappedJob = mapAppointmentToJob(response.data?.appointment);
-      mappedJob.materialsUsed = response.data?.materials_used || [];
+      let mappedJob = mapStaffJobResponse(response);
 
       if (process.env.NODE_ENV === "development") {
         const { user } = getAuthSession();
@@ -56,6 +85,26 @@ function useStaffJob() {
         });
       }
 
+      if (shouldSyncPayosPayment(mappedJob, searchParams)) {
+        try {
+          const paymentResponse = await getPaymentStatus(jobId);
+          const paid = String(paymentResponse.data?.status || "").toUpperCase() === "PAID";
+          if (paid) {
+            const refreshed = await getStaffAppointmentById(jobId);
+            mappedJob = mapStaffJobResponse(refreshed);
+          }
+          if (
+            searchParams.has("code") ||
+            searchParams.has("status") ||
+            searchParams.has("orderCode")
+          ) {
+            setSearchParams({}, { replace: true });
+          }
+        } catch {
+          // PayOS sync is best-effort; keep showing the loaded job.
+        }
+      }
+
       setJob(mappedJob);
     } catch (err) {
       setError(err.message || "Không thể tải chi tiết công việc.");
@@ -65,7 +114,7 @@ function useStaffJob() {
   };
 
   useEffect(() => {
-    loadJob();
+    void loadJob();
   }, [jobId]);
 
   return { error, isLoading, job, jobId, reload: loadJob, setJob };

@@ -256,6 +256,21 @@ export function saveRepairLog(appointmentId, { status, notes = "" } = {}) {
   });
 }
 
+export function createPartsHold(appointmentId, payload = {}) {
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  return staffRequest(`/staff/appointments/${appointmentId}/parts-hold`, {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
+}
+
+export function markPartsReady(appointmentId, { notes = "" } = {}) {
+  return staffRequest(`/staff/appointments/${appointmentId}/parts-hold/ready`, {
+    method: "POST",
+    body: JSON.stringify(notes ? { notes } : {}),
+  });
+}
+
 export function saveAddonServices(appointmentId, { items = [] } = {}) {
   return staffRequest(`/staff/appointments/${appointmentId}/addon-services`, {
     method: "PUT",
