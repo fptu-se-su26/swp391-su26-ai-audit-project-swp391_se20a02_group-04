@@ -12,6 +12,7 @@ const getAllServices = async (req, res) => {
       limit = 20,
       category = '',
       search = '',
+      allow_booking = '',
       sort_by = 'popularity_score',
       sort_order = 'desc'
     } = req.query;
@@ -21,6 +22,12 @@ const getAllServices = async (req, res) => {
 
     if (category) {
       query.category = category.toUpperCase();
+    }
+
+    if (allow_booking === 'true' || allow_booking === true) {
+      query.allow_booking = true;
+    } else if (allow_booking === 'false' || allow_booking === false) {
+      query.allow_booking = false;
     }
 
     if (search) {

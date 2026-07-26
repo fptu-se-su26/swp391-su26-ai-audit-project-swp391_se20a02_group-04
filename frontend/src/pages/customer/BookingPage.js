@@ -1,13 +1,32 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { cancelAppointment, createAppointment, getMyAppointments } from "../../services/appointmentApi";
+import { getBookableServices } from "../../services/catalogServiceApi";
 import "../../styles/customer/BookingPage.css";
 import { clearAuthSession } from "../../services/authApi";
 import { profileService } from "../../services/profileService";
 import { getNotifications, markAsRead as markNotificationAsRead, markAllAsRead as markAllNotificationsAsRead } from "../../services/notificationApi";
 import CustomerChatWidget from "../../components/CustomerChatWidget";
 
-const washPackages = [
+const UNKNOWN_REPAIR_OPTION = {
+  id: "repair-unknown-issue",
+  name: "Không rõ lỗi / Cần kiểm tra",
+  price: "Báo giá sau kiểm tra",
+  duration: "45–90 phút",
+  description:
+    "Chưa biết xe hư gì? Đặt lịch trước, kỹ thuật viên kiểm tra rồi mới chẩn đoán lỗi và báo giá công.",
+  fromCatalog: false,
+  isUnknownIssue: true,
+};
+
+function withUnknownRepairOption(packages = []) {
+  const withoutDuplicate = packages.filter(
+    (item) => item.id !== UNKNOWN_REPAIR_OPTION.id && !item.isUnknownIssue
+  );
+  return [UNKNOWN_REPAIR_OPTION, ...withoutDuplicate];
+}
+
+const FALLBACK_WASH_PACKAGES = [
   {
     id: "wash-basic",
     name: "Rửa xe máy cơ bản",
@@ -31,7 +50,7 @@ const washPackages = [
   },
 ];
 
-const maintenancePackages = [
+const FALLBACK_MAINTENANCE_PACKAGES = [
   {
     id: "maintenance-basic",
     name: "Bảo dưỡng cơ bản",
@@ -55,16 +74,115 @@ const maintenancePackages = [
   },
 ];
 
-const repairIssues = [
-  "Xe khó nổ / chết máy",
-  "Phanh kêu hoặc yếu",
-  "Động cơ ồn / rung",
-  "Điện – đèn – đề",
-  "Lốp / săm / vành",
-  "Sên, nhông, bố thắng",
-  "Thay nhớt / lọc nhớt",
-  "Kiểm tra tổng quát",
-];
+const FALLBACK_REPAIR_ISSUES = withUnknownRepairOption([
+  {
+    id: "repair-fallback-1",
+    name: "Xe khó nổ / chết máy",
+    price: "Báo giá sau kiểm tra",
+    duration: "45–90 phút",
+    description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
+  },
+  {
+    id: "repair-fallback-2",
+    name: "Phanh kêu hoặc yếu",
+    price: "Báo giá sau kiểm tra",
+    duration: "45–90 phút",
+    description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
+  },
+  {
+    id: "repair-fallback-3",
+    name: "Động cơ ồn / rung",
+    price: "Báo giá sau kiểm tra",
+    duration: "45–90 phút",
+    description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
+  },
+  {
+    id: "repair-fallback-4",
+    name: "Điện – đèn – đề",
+    price: "Báo giá sau kiểm tra",
+    duration: "45–90 phút",
+    description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
+  },
+  {
+    id: "repair-fallback-5",
+    name: "Lốp / săm / vành",
+    price: "Báo giá sau kiểm tra",
+    duration: "45–90 phút",
+    description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
+  },
+  {
+    id: "repair-fallback-6",
+    name: "Sên, nhông, bố thắng",
+    price: "Báo giá sau kiểm tra",
+    duration: "45–90 phút",
+    description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
+  },
+  {
+    id: "repair-fallback-7",
+    name: "Thay nhớt / lọc nhớt",
+    price: "Báo giá sau kiểm tra",
+    duration: "45–90 phút",
+    description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
+  },
+  {
+    id: "repair-fallback-8",
+    name: "Kiểm tra tổng quát",
+    price: "Báo giá sau kiểm tra",
+    duration: "45–90 phút",
+    description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
+  },
+]);
+
+function formatCatalogPrice(service) {
+  const category = String(service.category || "").toUpperCase();
+  const priceType = String(service.price_type || "FIXED").toUpperCase();
+  const amount = Number(service.base_price) || 0;
+  const formatted = `${amount.toLocaleString("vi-VN")}đ`;
+  const isRepairLike =
+    priceType === "QUOTE" || (category !== "WASH_CARE" && category !== "MAINTENANCE");
+
+  if (isRepairLike) {
+    if (amount > 0) return `Báo giá sau kiểm tra · Gợi ý từ ${formatted}`;
+    return "Báo giá sau kiểm tra";
+  }
+
+  if (priceType === "FROM") return `Từ ${formatted}`;
+  return formatted;
+}
+
+function mapCatalogService(service) {
+  return {
+    id: String(service._id),
+    name: service.service_name,
+    price: formatCatalogPrice(service),
+    duration: `${service.estimated_duration || 60} phút`,
+    description: service.description || "Dịch vụ garage xe máy.",
+    fromCatalog: true,
+    category: service.category,
+  };
+}
+
+function splitCatalogByBookingType(services = []) {
+  const wash = [];
+  const maintenance = [];
+  const repair = [];
+
+  services.forEach((service) => {
+    if (service.allow_booking === false) return;
+    const category = String(service.category || "").toUpperCase();
+    const mapped = mapCatalogService(service);
+
+    if (category === "WASH_CARE") {
+      wash.push(mapped);
+    } else if (category === "MAINTENANCE") {
+      maintenance.push(mapped);
+    } else {
+      repair.push(mapped);
+    }
+  });
+
+  return { wash, maintenance, repair };
+}
 
 /** Hãng xe phổ biến VN → danh sách dòng xe (cascading select trên form đặt lịch). */
 const VEHICLE_CATALOG = {
@@ -237,9 +355,13 @@ function isValidVnPhone(phone) {
 export default function BookingPage() {
   const navigate = useNavigate();
   const [serviceType, setServiceType] = useState("wash");
-  const [washPackage, setWashPackage] = useState(washPackages[0].id);
-  const [maintenancePackage, setMaintenancePackage] = useState(maintenancePackages[0].id);
-  const [repairIssue, setRepairIssue] = useState(repairIssues[0]);
+  const [washPackages, setWashPackages] = useState(FALLBACK_WASH_PACKAGES);
+  const [maintenancePackages, setMaintenancePackages] = useState(FALLBACK_MAINTENANCE_PACKAGES);
+  const [repairPackages, setRepairPackages] = useState(FALLBACK_REPAIR_ISSUES);
+  const [washPackage, setWashPackage] = useState(FALLBACK_WASH_PACKAGES[0].id);
+  const [maintenancePackage, setMaintenancePackage] = useState(FALLBACK_MAINTENANCE_PACKAGES[0].id);
+  const [repairPackage, setRepairPackage] = useState(UNKNOWN_REPAIR_OPTION.id);
+  const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
   const [daySession, setDaySession] = useState("morning");
   const [timeSlot, setTimeSlot] = useState("");
   const [appointmentDate, setAppointmentDate] = useState(getTomorrowDateValue);
@@ -399,6 +521,49 @@ export default function BookingPage() {
     loadMyAppointments();
   }, [loadMyAppointments]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCatalog = async () => {
+      setIsLoadingCatalog(true);
+      try {
+        const response = await getBookableServices();
+        if (cancelled) return;
+
+        const split = splitCatalogByBookingType(response.data?.services || []);
+        const nextWash = split.wash.length ? split.wash : FALLBACK_WASH_PACKAGES;
+        const nextMaintenance = split.maintenance.length ? split.maintenance : FALLBACK_MAINTENANCE_PACKAGES;
+        const nextRepair = withUnknownRepairOption(
+          split.repair.length
+            ? split.repair
+            : FALLBACK_REPAIR_ISSUES.filter((item) => !item.isUnknownIssue)
+        );
+
+        setWashPackages(nextWash);
+        setMaintenancePackages(nextMaintenance);
+        setRepairPackages(nextRepair);
+        setWashPackage(nextWash[0].id);
+        setMaintenancePackage(nextMaintenance[0].id);
+        setRepairPackage(UNKNOWN_REPAIR_OPTION.id);
+      } catch {
+        if (cancelled) return;
+        setWashPackages(FALLBACK_WASH_PACKAGES);
+        setMaintenancePackages(FALLBACK_MAINTENANCE_PACKAGES);
+        setRepairPackages(FALLBACK_REPAIR_ISSUES);
+        setWashPackage(FALLBACK_WASH_PACKAGES[0].id);
+        setMaintenancePackage(FALLBACK_MAINTENANCE_PACKAGES[0].id);
+        setRepairPackage(UNKNOWN_REPAIR_OPTION.id);
+      } finally {
+        if (!cancelled) setIsLoadingCatalog(false);
+      }
+    };
+
+    loadCatalog();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Đóng dropdown khi click ra ngoài
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -424,13 +589,8 @@ export default function BookingPage() {
       );
     }
 
-    return {
-      name: `Sửa chữa · ${repairIssue}`,
-      price: "Báo giá sau kiểm tra",
-      duration: "45–90 phút",
-      description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
-    };
-  }, [maintenancePackage, repairIssue, serviceType, washPackage]);
+    return repairPackages.find((item) => item.id === repairPackage) || repairPackages[0];
+  }, [maintenancePackage, maintenancePackages, repairPackage, repairPackages, serviceType, washPackage, washPackages]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -499,19 +659,38 @@ export default function BookingPage() {
     }
 
     if (serviceType === "wash") {
-      payload.service_package = washPackage;
+      if (selectedService?.fromCatalog) {
+        payload.service_id = selectedService.id;
+      } else {
+        payload.service_package = washPackage;
+      }
     }
 
     if (serviceType === "maintenance") {
-      payload.service_package = maintenancePackage;
+      if (selectedService?.fromCatalog) {
+        payload.service_id = selectedService.id;
+      } else {
+        payload.service_package = maintenancePackage;
+      }
     }
 
     if (serviceType === "repair") {
       const issueDescription = formData.get("issue_description");
-      payload.repair_issue = repairIssue;
+      const selectedRepair =
+        repairPackages.find((item) => item.id === repairPackage) || repairPackages[0];
+
+      if (selectedRepair?.fromCatalog && !selectedRepair?.isUnknownIssue) {
+        payload.service_id = selectedRepair.id;
+        payload.repair_issue = selectedRepair.name;
+      } else {
+        payload.repair_issue = selectedRepair?.name || UNKNOWN_REPAIR_OPTION.name;
+      }
 
       if (issueDescription) {
         payload.issue_description = issueDescription;
+      } else if (selectedRepair?.isUnknownIssue) {
+        payload.issue_description =
+          "Khách chưa xác định lỗi. Cần kỹ thuật viên kiểm tra và chẩn đoán trước khi báo giá.";
       }
     }
 
@@ -522,7 +701,7 @@ export default function BookingPage() {
       formElement.reset();
       setWashPackage(washPackages[0].id);
       setMaintenancePackage(maintenancePackages[0].id);
-      setRepairIssue(repairIssues[0]);
+      setRepairPackage(UNKNOWN_REPAIR_OPTION.id);
       setServiceType("wash");
       setAppointmentDate(getTomorrowDateValue());
       setTimeSlot("");
@@ -785,6 +964,10 @@ export default function BookingPage() {
               </button>
             </div>
 
+            {isLoadingCatalog && (
+              <p className="booking-panel-note">Đang tải danh mục dịch vụ từ garage...</p>
+            )}
+
             {serviceType === "wash" ? (
               <div className="booking-group">
                 <label>Chọn gói rửa xe máy</label>
@@ -827,22 +1010,30 @@ export default function BookingPage() {
               </div>
             ) : (
               <div className="booking-group">
-                <label>Tình trạng / lỗi thường gặp</label>
-                <div className="issue-grid">
-                  {repairIssues.map((issue) => (
+                <label>Chọn dịch vụ sửa chữa / kiểm tra</label>
+                <div className="package-grid">
+                  {repairPackages.map((item) => (
                     <button
-                      className={repairIssue === issue ? "selected" : ""}
-                      key={issue}
+                      className={repairPackage === item.id ? "selected" : ""}
+                      key={item.id}
                       type="button"
-                      onClick={() => setRepairIssue(issue)}
+                      onClick={() => setRepairPackage(item.id)}
                     >
-                      {issue}
+                      <strong>{item.name}</strong>
+                      <span>{item.description}</span>
+                      <small>
+                        {item.price} • {item.duration}
+                      </small>
                     </button>
                   ))}
                 </div>
                 <textarea
                   name="issue_description"
-                  placeholder="Mô tả thêm: tiếng kêu, lúc nào bị, xe số hay tay ga..."
+                  placeholder={
+                    repairPackage === UNKNOWN_REPAIR_OPTION.id
+                      ? "Không bắt buộc — nếu nhớ triệu chứng (tiếng kêu, lúc nào bị...) hãy ghi thêm để kỹ thuật viên dễ kiểm tra."
+                      : "Mô tả thêm: tiếng kêu, lúc nào bị, xe số hay tay ga..."
+                  }
                   rows="4"
                 />
               </div>

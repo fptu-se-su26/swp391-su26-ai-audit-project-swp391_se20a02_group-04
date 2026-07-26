@@ -81,12 +81,23 @@ const buildAppointmentDetail = (appointment = {}) => {
   const vehicleParts = String(appointment.vehicle || "").split(" - ");
   const vehicleName = vehicleParts[0] || "Honda CBR1000RR-R";
   const vehiclePlate = appointment.plate || vehicleParts[vehicleParts.length - 1] || "29A1-12345";
+  const serviceLabel =
+    typeof appointment.service === "string"
+      ? appointment.service
+      : appointment.service?.name ||
+        appointment.service?.repair_issue ||
+        appointment.service?.service_name ||
+        "Bảo dưỡng định kỳ 10.000km";
   const fallbackServices = [
-    { name: appointment.service || "Bảo dưỡng định kỳ 10.000km", time: "60 phút", price: 450000, quantity: 1 },
+    { name: serviceLabel, time: "60 phút", price: 450000, quantity: 1 },
     { name: "Thay nhớt Motul 7100 10W40", time: "20 phút", price: 180000, quantity: 1 }
   ];
   const services = (appointment.services && appointment.services.length ? appointment.services : fallbackServices).map((service) => ({
-    name: service.name || service.service_name || "Dịch vụ chưa cập nhật",
+    name:
+      (typeof service.name === "string" && service.name) ||
+      service.service_name ||
+      service.repair_issue ||
+      "Dịch vụ chưa cập nhật",
     time: service.time || service.duration || `${service.estimated_duration || service.estimated_duration_minutes || 0} phút`,
     price: Number(service.price || service.base_price || service.estimated_price || 0),
     quantity: Number(service.quantity || service.qty || 1),

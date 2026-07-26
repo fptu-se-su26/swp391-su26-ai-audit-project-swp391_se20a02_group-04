@@ -871,6 +871,17 @@
   line-height: 1.5;
 }
 
+.booking-panel-note {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .appointment-actions-inline {
   display: inline-flex;
   align-items: center;

@@ -144,7 +144,18 @@ function getAppointmentCode(appointment) {
 }
 
 function getAppointmentService(appointment) {
-  return appointment?.service?.name || appointment?.service || "Dịch vụ chưa xác định";
+  const service = appointment?.service;
+  if (typeof service === "string" && service.trim()) return service;
+  if (service && typeof service === "object") {
+    return (
+      service.name ||
+      service.repair_issue ||
+      service.service_name ||
+      appointment?.service_package_name ||
+      "Dịch vụ chưa xác định"
+    );
+  }
+  return appointment?.service_package_name || "Dịch vụ chưa xác định";
 }
 
 function formatAppointmentTime(appointment) {

@@ -5,22 +5,22 @@ import { getCatalogServices, saveDiagnosis } from "../../../services/staffAppoin
 
 const QUOTE_CATEGORY_OPTIONS = [
   { value: "", label: "Tất cả (trừ rửa xe)" },
+  { value: "REPAIR", label: "Sửa chữa" },
+  { value: "MAINTENANCE", label: "Bảo dưỡng" },
+  { value: "INSPECTION", label: "Kiểm tra" },
   { value: "BRAKE", label: "Phanh" },
   { value: "LUBRICANT", label: "Nhớt / dung dịch" },
   { value: "TIRE_WHEEL", label: "Lốp / bánh" },
   { value: "ELECTRICAL", label: "Điện / ắc quy" },
   { value: "ENGINE_TRANSMISSION", label: "Động cơ / truyền động" },
   { value: "SUSPENSION_FRAME", label: "Khung / phuộc" },
-  { value: "MAINTENANCE", label: "Bảo dưỡng" },
-  { value: "INSPECTION", label: "Kiểm tra" },
-  { value: "REPAIR", label: "Sửa chữa" },
   { value: "EMERGENCY", label: "Cứu hộ" },
 ];
 
 const PRICE_TYPE_LABEL = {
   FIXED: "Giá cố định",
   FROM: "Giá từ",
-  QUOTE: "Báo giá",
+  QUOTE: "Giá gợi ý",
 };
 
 function rankSuggestion(service, keyword) {

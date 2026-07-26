@@ -272,8 +272,14 @@ const createAppointmentValidation = [
     .customSanitizer(value => typeof value === 'string' ? value.trim() : value)
     .custom((value, { req }) => {
       const serviceType = req.body.service_type;
+      const serviceId = req.body.service_id;
 
       if (!SERVICE_TYPES.includes(serviceType)) {
+        return true;
+      }
+
+      // Catalog booking: service_id is the source of truth.
+      if (serviceId) {
         return true;
       }
 
@@ -299,22 +305,34 @@ const createAppointmentValidation = [
       return true;
     }),
 
+  body('service_id')
+    .optional({ nullable: true, checkFalsy: true })
+    .isMongoId().withMessage('Service ID must be a valid MongoDB ObjectId'),
+
   body('repair_issue')
     .customSanitizer(value => typeof value === 'string' ? value.trim() : value)
     .custom((value, { req }) => {
       const serviceType = req.body.service_type;
+      const serviceId = req.body.service_id;
 
       if (serviceType === 'REPAIR') {
-        if (value === undefined || value === null || value === '') {
+        // Catalog repair: service name can fill repair_issue on the server.
+        if (serviceId) {
+          if (value === undefined || value === null || value === '') {
+            return true;
+          }
+        } else if (value === undefined || value === null || value === '') {
           throw new Error('Repair issue is required for repair appointments');
         }
 
-        if (typeof value !== 'string') {
-          throw new Error('Repair issue must be a string');
-        }
+        if (value !== undefined && value !== null && value !== '') {
+          if (typeof value !== 'string') {
+            throw new Error('Repair issue must be a string');
+          }
 
-        if (value.length < 3 || value.length > 100) {
-          throw new Error('Repair issue must be between 3-100 characters');
+          if (value.length < 3 || value.length > 100) {
+            throw new Error('Repair issue must be between 3-100 characters');
+          }
         }
 
         return true;
