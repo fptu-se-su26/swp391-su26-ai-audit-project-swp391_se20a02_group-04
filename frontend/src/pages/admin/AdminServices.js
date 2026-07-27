@@ -29,26 +29,25 @@ import {
 } from "../../services/adminServiceApi";
 
 const CATEGORY_LABELS = {
-  WASH_CARE: "Rửa & chăm sóc xe",
-  MAINTENANCE: "Bảo dưỡng định kỳ",
-  LUBRICANT: "Dầu nhớt & dung dịch",
-  TIRE_WHEEL: "Lốp & bánh xe",
-  BRAKE: "Hệ thống phanh",
-  ELECTRICAL: "Điện & ắc quy",
-  ENGINE_TRANSMISSION: "Động cơ & truyền động",
-  SUSPENSION_FRAME: "Khung, phuộc & tay lái",
-  ACCESSORY: "Phụ kiện & nâng cấp",
-  INSPECTION: "Kiểm tra & chẩn đoán",
-  EMERGENCY: "Cứu hộ",
-  REPAIR: "Sửa chữa chung",
-  CUSTOMIZATION: "Độ xe",
-  OTHER: "Khác",
+  WASH_CARE: "Rửa xe",
+  MAINTENANCE: "Bảo dưỡng",
+  REPAIR: "Sửa chữa",
 };
+
+function normalizeServiceCategory(category) {
+  const value = String(category || "").toUpperCase();
+  if (value === "WASH_CARE" || value === "MAINTENANCE") return value;
+  return "REPAIR";
+}
+
+function getCategoryLabel(category) {
+  return CATEGORY_LABELS[normalizeServiceCategory(category)] || category || "—";
+}
 
 const PRICE_TYPE_LABELS = {
   FIXED: "Giá cố định",
   FROM: "Giá từ",
-  QUOTE: "Kiểm tra & báo giá",
+  QUOTE: "Báo giá sau kiểm tra",
 };
 
 const VEHICLE_TYPE_LABELS = {
@@ -83,42 +82,58 @@ const EMPTY_FORM = {
 const formatCurrency = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 
 const formatPrice = (service) => {
-  if (service.price_type === "QUOTE") return "Kiểm tra & báo giá";
-  if (service.price_type === "FROM") return `Từ ${formatCurrency(service.base_price)}`;
-  return formatCurrency(service.base_price);
+  const category = normalizeServiceCategory(service.category);
+  const amount = Number(service.base_price || 0);
+
+  // Sửa chữa: không có giá công cố định — chỉ giá gợi ý cho staff báo giá sau kiểm tra.
+  if (category === "REPAIR" || service.price_type === "QUOTE") {
+    if (amount > 0) return `Gợi ý ${formatCurrency(amount)} · Báo giá sau KT`;
+    return "Báo giá sau kiểm tra";
+  }
+
+  if (service.price_type === "FROM") return `Từ ${formatCurrency(amount)}`;
+  return formatCurrency(amount);
 };
 
-const formToPayload = (form) => ({
-  service_name: form.service_name.trim(),
-  category: form.category,
-  description: form.description.trim(),
-  base_price: Number(form.base_price || 0),
-  price_type: form.price_type,
-  vehicle_type: form.vehicle_type,
-  estimated_duration: Number(form.estimated_duration || 0),
-  image_url: form.image_url.trim(),
-  allow_booking: !!form.allow_booking,
-  reminder_enabled: !!form.reminder_enabled,
-  reminder_days: Number(form.reminder_days || 0),
-  reminder_mileage: Number(form.reminder_mileage || 0),
-  is_active: !!form.is_active,
-});
+const formToPayload = (form) => {
+  const category = normalizeServiceCategory(form.category);
+  const isRepair = category === "REPAIR";
 
-const serviceToForm = (service) => ({
-  service_name: service.service_name || "",
-  category: service.category || "OTHER",
-  description: service.description || "",
-  base_price: service.base_price ?? "",
-  price_type: service.price_type || "FIXED",
-  vehicle_type: service.vehicle_type || "ALL",
-  estimated_duration: service.estimated_duration ?? 30,
-  image_url: service.image_url || "",
-  allow_booking: service.allow_booking !== false,
-  reminder_enabled: !!service.reminder_enabled,
-  reminder_days: service.reminder_days || 0,
-  reminder_mileage: service.reminder_mileage || 0,
-  is_active: service.is_active !== false,
-});
+  return {
+    service_name: form.service_name.trim(),
+    category,
+    description: form.description.trim(),
+    base_price: Number(form.base_price || 0),
+    price_type: isRepair ? "QUOTE" : form.price_type,
+    vehicle_type: form.vehicle_type,
+    estimated_duration: Number(form.estimated_duration || 0),
+    image_url: form.image_url.trim(),
+    allow_booking: !!form.allow_booking,
+    reminder_enabled: !!form.reminder_enabled,
+    reminder_days: Number(form.reminder_days || 0),
+    reminder_mileage: Number(form.reminder_mileage || 0),
+    is_active: !!form.is_active,
+  };
+};
+
+const serviceToForm = (service) => {
+  const category = normalizeServiceCategory(service.category);
+  return {
+    service_name: service.service_name || "",
+    category,
+    description: service.description || "",
+    base_price: service.base_price ?? "",
+    price_type: category === "REPAIR" ? "QUOTE" : service.price_type || "FIXED",
+    vehicle_type: service.vehicle_type || "ALL",
+    estimated_duration: service.estimated_duration ?? 30,
+    image_url: service.image_url || "",
+    allow_booking: service.allow_booking !== false,
+    reminder_enabled: !!service.reminder_enabled,
+    reminder_days: service.reminder_days || 0,
+    reminder_mileage: service.reminder_mileage || 0,
+    is_active: service.is_active !== false,
+  };
+};
 
 export default function AdminServices({ onViewChange }) {
   const [services, setServices] = useState([]);
@@ -198,7 +213,9 @@ export default function AdminServices({ onViewChange }) {
         !searchValue ||
         (service.service_name || "").toLowerCase().includes(searchValue) ||
         (service.service_code || "").toLowerCase().includes(searchValue);
-      const matchesCategory = filters.category === "all" || service.category === filters.category;
+      const matchesCategory =
+        filters.category === "all" ||
+        normalizeServiceCategory(service.category) === filters.category;
       const matchesStatus =
         filters.status === "all" ||
         (filters.status === "active" ? service.is_active : !service.is_active);
@@ -222,7 +239,13 @@ export default function AdminServices({ onViewChange }) {
   };
 
   const updateForm = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      const next = { ...current, [field]: value };
+      if (field === "category" && normalizeServiceCategory(value) === "REPAIR") {
+        next.price_type = "QUOTE";
+      }
+      return next;
+    });
   };
 
   const saveService = async (event) => {
@@ -304,6 +327,9 @@ export default function AdminServices({ onViewChange }) {
           <div>
             <span>Quản trị danh mục</span>
             <h2>Dịch vụ garage</h2>
+            <p className="services-topbar-hint">
+              Ba hạng mục giống trang đặt lịch: Rửa xe, Bảo dưỡng, Sửa chữa. Bật “Cho phép khách đặt lịch online” để hiện trên /booking.
+            </p>
           </div>
           <button className="service-add-btn" type="button" onClick={() => openModal("add")}>
             <Plus size={18} /> Thêm dịch vụ
@@ -415,7 +441,7 @@ export default function AdminServices({ onViewChange }) {
                       <p>{VEHICLE_TYPE_LABELS[service.vehicle_type] || "Mọi loại xe"} · {service.description}</p>
                     </div>
                   </div>
-                  <span>{CATEGORY_LABELS[service.category] || service.category}</span>
+                  <span>{getCategoryLabel(service.category)}</span>
                   <span className="service-price">{formatPrice(service)}</span>
                   <span>{service.estimated_duration} phút</span>
                   <span>{service.total_bookings || 0}</span>
@@ -487,17 +513,26 @@ export default function AdminServices({ onViewChange }) {
                 </select>
               </label>
 
-              <label>
-                Kiểu giá
-                <select disabled={isReadonly} value={form.price_type} onChange={(event) => updateForm("price_type", event.target.value)}>
-                  {Object.entries(PRICE_TYPE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </label>
+              {form.category === "REPAIR" ? (
+                <label>
+                  Kiểu giá
+                  <input disabled value="Báo giá sau kiểm tra (staff nhập công)" readOnly />
+                </label>
+              ) : (
+                <label>
+                  Kiểu giá
+                  <select disabled={isReadonly} value={form.price_type} onChange={(event) => updateForm("price_type", event.target.value)}>
+                    {Object.entries(PRICE_TYPE_LABELS)
+                      .filter(([value]) => value !== "QUOTE")
+                      .map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                  </select>
+                </label>
+              )}
 
               <label>
-                {form.price_type === "QUOTE" ? "Phí kiểm tra (đ)" : "Giá công cơ bản (đ)"}
+                {form.category === "REPAIR" ? "Giá gợi ý (đ)" : form.price_type === "FROM" ? "Giá từ (đ)" : "Giá công cơ bản (đ)"}
                 <input
                   disabled={isReadonly}
                   min="0"
@@ -506,6 +541,11 @@ export default function AdminServices({ onViewChange }) {
                   value={form.base_price}
                   onChange={(event) => updateForm("base_price", event.target.value)}
                 />
+                {form.category === "REPAIR" && (
+                  <small className="service-field-hint">
+                    Không phải giá cố định. Staff dựa vào mức này để báo giá công sau khi kiểm tra xe.
+                  </small>
+                )}
               </label>
 
               <label>
@@ -559,7 +599,7 @@ export default function AdminServices({ onViewChange }) {
                   type="checkbox"
                   onChange={(event) => updateForm("allow_booking", event.target.checked)}
                 />
-                <span>Cho phép khách đặt lịch online</span>
+                <span>Cho phép khách đặt lịch online (hiện trên /booking)</span>
               </label>
 
               <label className="service-switch">

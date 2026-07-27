@@ -36,6 +36,17 @@
   line-height: 1.05;
 }
 
+.services-topbar-hint {
+  max-width: 640px;
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .service-add-btn,
 .modal-primary-btn {
   display: inline-flex;
@@ -459,6 +470,15 @@
 
 .service-form-wide {
   grid-column: 1 / -1;
+}
+
+.service-field-hint {
+  display: block;
+  margin-top: 6px;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .service-switch {

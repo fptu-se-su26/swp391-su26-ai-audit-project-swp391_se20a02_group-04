@@ -4,6 +4,7 @@ const Notification = require('../models/Notification.model');
 const Role = require('../models/Role.model');
 const UserRole = require('../models/UserRole.model');
 const InventoryTransaction = require('../models/InventoryTransaction.model');
+const Service = require('../models/Service.model');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const {
   ACTIVE_APPOINTMENT_STATUSES,
@@ -11,6 +12,44 @@ const {
   DEFAULT_TIMEZONE_OFFSET,
   getServicePackage
 } = require('../constants/appointment.constants');
+
+const BOOKING_TYPE_BY_CATEGORY = {
+  WASH_CARE: 'WASH',
+  MAINTENANCE: 'MAINTENANCE'
+};
+
+const mapCategoryToBookingType = (category = '') => {
+  return BOOKING_TYPE_BY_CATEGORY[String(category).toUpperCase()] || 'REPAIR';
+};
+
+const buildServicePayloadFromCatalog = (catalogService, serviceType, { repair_issue, issue_description } = {}) => {
+  const priceType = String(catalogService.price_type || 'FIXED').toUpperCase();
+  const name = catalogService.service_name;
+
+  // REPAIR: công luôn báo giá sau kiểm tra (staff). base_price trên catalog chỉ là gợi ý.
+  const estimatedPrice =
+    serviceType === 'REPAIR' || priceType === 'QUOTE'
+      ? null
+      : Number(catalogService.base_price) || 0;
+
+  const payload = {
+    type: serviceType,
+    name,
+    description: catalogService.description || '',
+    estimated_price: estimatedPrice,
+    estimated_duration_minutes: Number(catalogService.estimated_duration) || 60
+  };
+
+  if (serviceType === 'REPAIR') {
+    const issueName = (repair_issue && String(repair_issue).trim()) || name;
+    payload.repair_issue = issueName.slice(0, 100);
+    if (issue_description) {
+      payload.issue_description = issue_description;
+    }
+  }
+
+  return payload;
+};
 
 const buildAppointmentStartAt = (date, timeSlot) => {
   return new Date(`${date}T${timeSlot}:00${DEFAULT_TIMEZONE_OFFSET}`);
@@ -109,6 +148,7 @@ const createAppointment = async (req, res) => {
     const {
       service_type,
       service_package,
+      service_id,
       repair_issue,
       issue_description,
       vehicle_brand,
@@ -142,8 +182,34 @@ const createAppointment = async (req, res) => {
     }
 
     let servicePayload;
+    let catalogServiceId = null;
 
-    if (serviceType === 'REPAIR') {
+    if (service_id) {
+      const catalogService = await Service.findOne({
+        _id: service_id,
+        is_active: true,
+        allow_booking: true
+      });
+
+      if (!catalogService) {
+        return errorResponse(res, 400, 'Selected service is not available for online booking');
+      }
+
+      const expectedType = mapCategoryToBookingType(catalogService.category);
+      if (expectedType !== serviceType) {
+        return errorResponse(
+          res,
+          400,
+          `Service category ${catalogService.category} does not match service type ${serviceType}`
+        );
+      }
+
+      catalogServiceId = catalogService._id;
+      servicePayload = buildServicePayloadFromCatalog(catalogService, serviceType, {
+        repair_issue,
+        issue_description
+      });
+    } else if (serviceType === 'REPAIR') {
       servicePayload = {
         type: serviceType,
         name: repair_issue.trim(),
@@ -194,6 +260,7 @@ const createAppointment = async (req, res) => {
         email: user.email,
         phone: customerPhone
       },
+      service_id: catalogServiceId,
       service: servicePayload,
       vehicle: {
         brand: vehicle_brand,
