@@ -16,6 +16,7 @@ const {
 
 const createAppointmentFields = [
   'service_type',
+  'service_id',
   'service_package',
   'repair_issue',
   'issue_description',
@@ -28,6 +29,18 @@ const createAppointmentFields = [
   'contact_phone',
   'note'
 ];
+
+const normalizeCreateAppointmentBody = (req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    if (req.body.serviceId && !req.body.service_id) {
+      req.body.service_id = req.body.serviceId;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'serviceId')) {
+      delete req.body.serviceId;
+    }
+  }
+  next();
+};
 
 /**
  * @route   GET /api/appointments/reviews
@@ -45,6 +58,7 @@ router.use(authenticate, authorize('CUSTOMER'));
  */
 router.post(
   '/',
+  normalizeCreateAppointmentBody,
   validateAllowedBodyFields(createAppointmentFields),
   createAppointmentValidation,
   validate,
