@@ -23,7 +23,7 @@ const tabs = [
   { id: "info", icon: "person", label: "Thông tin" },
   { id: "password", icon: "lock", label: "Bảo mật" },
   { id: "appointments", icon: "event_available", label: "Lịch hẹn" },
-  { id: "garage", icon: "two_wheeler", label: "Tình trạng xe" },
+  { id: "garage", icon: "two_wheeler", label: "Xe của tôi" },
   { id: "vouchers", icon: "confirmation_number", label: "Ưu đãi" },
   { id: "logs", icon: "history", label: "Nhật ký" },
 ];
@@ -111,6 +111,117 @@ function matchesAppointmentStatusFilter(status, filter) {
   if (filter === "COMPLETED") return status === "COMPLETED" || status === "PAID";
   if (filter === "CANCELLED") return status === "CANCELLED" || status === "REJECTED" || status === "NO_SHOW";
   return status === filter;
+}
+
+function normalizePlate(plate) {
+  return String(plate || "")
+    .toUpperCase()
+    .replace(/[\s.-]/g, "");
+}
+
+function getVehicleFromAppointment(appointment) {
+  const brand = appointment?.vehicle?.brand || appointment?.vehicle_info?.brand || "";
+  const model = appointment?.vehicle?.model || appointment?.vehicle_info?.model || "";
+  const plate =
+    appointment?.vehicle?.license_plate ||
+    appointment?.vehicle_info?.license_plate ||
+    appointment?.license_plate ||
+    "";
+  const year = appointment?.vehicle?.year || appointment?.vehicle_info?.year || "";
+  const color = appointment?.vehicle?.color || appointment?.vehicle_info?.color || "";
+  const odometer = appointment?.vehicle?.odometer ?? appointment?.vehicle_info?.odometer;
+
+  return { brand, model, plate, year: year ? String(year) : "", color, odometer };
+}
+
+function appointmentSortValue(appointment) {
+  const date = String(appointment?.appointment_date || "").slice(0, 10);
+  const time = String(appointment?.time_slot || appointment?.start_time || "00:00");
+  return `${date}T${time}`;
+}
+
+function extractBikesFromAppointments(appointments = []) {
+  const byPlate = new Map();
+
+  appointments.forEach((appointment) => {
+    const vehicle = getVehicleFromAppointment(appointment);
+    if (!vehicle.plate) return;
+
+    const plateKey = normalizePlate(vehicle.plate);
+    const current = byPlate.get(plateKey);
+    const sortValue = appointmentSortValue(appointment);
+
+    if (!current || sortValue >= current.lastSortValue) {
+      byPlate.set(plateKey, {
+        ...vehicle,
+        plateKey,
+        lastStatus: appointment.status || "",
+        lastService: appointment.service?.name || appointment.service?.type || "",
+        lastAppointmentDate: appointment.appointment_date || "",
+        lastSortValue: sortValue,
+        source: "appointment",
+      });
+    }
+  });
+
+  return Array.from(byPlate.values());
+}
+
+function savedBikesStorageKey(email) {
+  return `motocore_saved_bikes_${String(email || "guest").toLowerCase()}`;
+}
+
+function readSavedBikes(email) {
+  try {
+    const raw = localStorage.getItem(savedBikesStorageKey(email));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSavedBikes(email, bikes) {
+  try {
+    localStorage.setItem(savedBikesStorageKey(email), JSON.stringify(bikes));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function mergeGarageBikes(appointmentBikes = [], savedBikes = []) {
+  const byPlate = new Map();
+
+  savedBikes.forEach((bike) => {
+    if (!bike?.plate) return;
+    const plateKey = normalizePlate(bike.plate);
+    byPlate.set(plateKey, {
+      brand: bike.brand || "",
+      model: bike.model || "",
+      plate: bike.plate,
+      year: bike.year || "",
+      color: bike.color || "",
+      plateKey,
+      lastStatus: "",
+      lastService: "",
+      lastAppointmentDate: "",
+      source: "saved",
+    });
+  });
+
+  appointmentBikes.forEach((bike) => {
+    const existing = byPlate.get(bike.plateKey);
+    byPlate.set(bike.plateKey, {
+      ...existing,
+      ...bike,
+      color: bike.color || existing?.color || "",
+      year: bike.year || existing?.year || "",
+    });
+  });
+
+  return Array.from(byPlate.values()).sort((a, b) =>
+    String(a.brand + a.model).localeCompare(String(b.brand + b.model), "vi")
+  );
 }
 
 function getStatusClass(status) {
@@ -307,18 +418,9 @@ export default function UserProfile() {
   const [showPassword, setShowPassword] = useState({ current: false, new: false, confirm: false });
   const [newBike, setNewBike] = useState({ brand: "", model: "", plate: "", year: "", color: "" });
   const [showAddBike, setShowAddBike] = useState(false);
-
-  const [bikes, setBikes] = useState([
-    { brand: "Honda", model: "CBR650R", plate: "29A1-999.88", year: "2023", color: "Đỏ đen" },
-    { brand: "Ducati", model: "Monster 821", plate: "29A1-123.45", year: "2022", color: "Vàng cát" },
-  ]);
+  const [savedBikes, setSavedBikes] = useState([]);
   const [selectedBike, setSelectedBike] = useState(null);
-  const bikeAppointments = selectedBike
-  ? fallbackAppointments.filter(
-      (appointment) =>
-        appointment.vehicle?.license_plate === selectedBike.plate
-    )
-  : [];
+  const [isGarageLoading, setIsGarageLoading] = useState(false);
 
   const [vouchers] = useState([
     { code: "MOTOCORE15", desc: "Giảm 15% gói rửa xe cao cấp", expiry: "30/06/2026", status: "Còn hiệu lực" },
@@ -330,7 +432,7 @@ export default function UserProfile() {
     { action: "Đặt lịch hẹn #APT-20260521-014", status: "SUCCESS", time: "21/05/2026" },
     { action: "Thay đổi mật khẩu tài khoản", status: "SUCCESS", time: "10/05/2026" },
   ]);
-  const [appointments, setAppointments] = useState(fallbackAppointments);
+  const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [appointmentView, setAppointmentView] = useState("list");
   const [appointmentStatusFilter, setAppointmentStatusFilter] = useState("ALL");
@@ -338,6 +440,22 @@ export default function UserProfile() {
   const [reviewHover, setReviewHover] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  const bikes = useMemo(
+    () => mergeGarageBikes(extractBikesFromAppointments(appointments), savedBikes),
+    [appointments, savedBikes]
+  );
+
+  const bikeAppointments = useMemo(() => {
+    if (!selectedBike?.plate) return [];
+    const selectedKey = selectedBike.plateKey || normalizePlate(selectedBike.plate);
+    return appointments
+      .filter((appointment) => {
+        const plate = getVehicleFromAppointment(appointment).plate;
+        return plate && normalizePlate(plate) === selectedKey;
+      })
+      .sort((a, b) => appointmentSortValue(b).localeCompare(appointmentSortValue(a)));
+  }, [appointments, selectedBike]);
 
   const activeTabLabel = useMemo(
     () => tabs.find((tab) => tab.id === activeTab)?.label || "Thông tin",
@@ -432,17 +550,21 @@ export default function UserProfile() {
         const res = await profileService.getMe();
         if (res?.success && res.data) {
           const apiUser = res.data.user || res.data;
+          const nextEmail = apiUser.email || user.email;
           setUser((prev) => ({
             ...prev,
             fullname: apiUser.full_name || apiUser.fullname || prev.fullname,
             email: apiUser.email || prev.email,
             phone: apiUser.phone || prev.phone,
           }));
+          setSavedBikes(readSavedBikes(nextEmail));
           setIsUsingMock(false);
         }
       } catch (err) {
         console.log("Could not load API profile, falling back to mock data:", err.message);
+        setSavedBikes(readSavedBikes(user.email));
         setIsUsingMock(true);
+        setAppointments(fallbackAppointments);
       } finally {
         setIsApiLoading(false);
       }
@@ -493,31 +615,55 @@ export default function UserProfile() {
   }, [activeTab, isUsingMock]);
 
   useEffect(() => {
-    if (activeTab !== "appointments") {
+    if (activeTab !== "appointments" && activeTab !== "garage") {
+      return;
+    }
+
+    if (isUsingMock) {
+      setAppointments(fallbackAppointments);
       return;
     }
 
     const fetchAppointments = async () => {
-      setIsAppointmentsLoading(true);
+      if (activeTab === "garage") {
+        setIsGarageLoading(true);
+      } else {
+        setIsAppointmentsLoading(true);
+      }
+
       try {
-        const res = await getMyAppointments({ page: 1, limit: 10 });
+        const res = await getMyAppointments({ page: 1, limit: activeTab === "garage" ? 50 : 10 });
         const nextAppointments = res.data?.appointments || [];
 
-        if (nextAppointments.length) {
+        if (nextAppointments.length || activeTab === "garage") {
           setAppointments(nextAppointments);
+        }
+
+        if (activeTab === "appointments") {
           setSelectedAppointment((prev) =>
             prev && nextAppointments.some((item) => item._id === prev._id) ? prev : null
           );
         }
       } catch (err) {
-        console.warn("Failed to fetch appointments, keeping fallback appointments:", err.message);
+        console.warn("Failed to fetch appointments:", err.message);
       } finally {
         setIsAppointmentsLoading(false);
+        setIsGarageLoading(false);
       }
     };
 
     fetchAppointments();
-  }, [activeTab]);
+  }, [activeTab, isUsingMock]);
+
+  useEffect(() => {
+    if (!selectedBike) return;
+    const stillExists = bikes.some(
+      (bike) => (bike.plateKey || normalizePlate(bike.plate)) === (selectedBike.plateKey || normalizePlate(selectedBike.plate))
+    );
+    if (!stillExists) {
+      setSelectedBike(null);
+    }
+  }, [bikes, selectedBike]);
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
@@ -621,10 +767,34 @@ export default function UserProfile() {
       return;
     }
 
-    setBikes((prev) => [...prev, newBike]);
+    const plateKey = normalizePlate(newBike.plate);
+    if (bikes.some((bike) => (bike.plateKey || normalizePlate(bike.plate)) === plateKey)) {
+      showToast("Biển số này đã có trong danh sách xe.", "error");
+      return;
+    }
+
+    const nextBike = {
+      brand: newBike.brand.trim(),
+      model: newBike.model.trim(),
+      plate: newBike.plate.trim().toUpperCase(),
+      year: newBike.year.trim(),
+      color: newBike.color.trim(),
+    };
+
+    const nextSaved = [...savedBikes.filter((bike) => normalizePlate(bike.plate) !== plateKey), nextBike];
+    setSavedBikes(nextSaved);
+    writeSavedBikes(user.email, nextSaved);
+    setSelectedBike({
+      ...nextBike,
+      plateKey,
+      lastStatus: "",
+      lastService: "",
+      lastAppointmentDate: "",
+      source: "saved",
+    });
     setNewBike({ brand: "", model: "", plate: "", year: "", color: "" });
     setShowAddBike(false);
-    showToast("Đã thêm xe vào nhà xe cá nhân.");
+    showToast("Đã thêm xe vào danh sách của bạn.");
   };
 
   const handleSelectAppointment = async (appointment) => {
@@ -826,7 +996,7 @@ export default function UserProfile() {
               </a>
               <a href="/profile?tab=garage" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <MaterialIcon>two_wheeler</MaterialIcon>
-                <span>Tình trạng xe của tôi</span>
+                <span>Xe của tôi</span>
               </a>
               <a href="/profile?tab=appointments" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                 <MaterialIcon>event_available</MaterialIcon>
@@ -935,7 +1105,7 @@ export default function UserProfile() {
                   {activeTab === "info" && "Thông tin cá nhân"}
                   {activeTab === "password" && "Mật khẩu và bảo mật"}
                   {activeTab === "appointments" && "Lịch hẹn của tôi"}
-                  {activeTab === "garage" && "Nhà xe cá nhân"}
+                  {activeTab === "garage" && "Xe của tôi"}
                   {activeTab === "vouchers" && "Ưu đãi thành viên"}
                   {activeTab === "logs" && "Nhật ký tài khoản"}
                 </h2>
@@ -1464,7 +1634,7 @@ export default function UserProfile() {
   <div className="pane-fade-animation">
     <div className="profile-panel-toolbar">
       <p className="profile-panel-note">
-        Lưu sẵn xe của bạn để đặt lịch nhanh hơn ở những lần tiếp theo.
+        Xe lấy từ lịch hẹn của bạn. Thêm xe mới để lưu sẵn khi đặt lịch lần sau.
       </p>
 
       <button
@@ -1477,7 +1647,6 @@ export default function UserProfile() {
       </button>
     </div>
 
-    {/* FORM thêm xe */}
     {showAddBike && (
       <form onSubmit={handleAddBike} className="add-bike-inline-form">
         <div className="user-form-grid">
@@ -1539,52 +1708,91 @@ export default function UserProfile() {
       </form>
     )}
 
-    {/* LIST XE */}
-    <div className="bikes-grid-layout">
-      {bikes.map((bike) => (
-        <article
-          key={bike.plate}
-          className={`bike-card-item ${
-            selectedBike?.plate === bike.plate ? "active" : ""
-          }`}
-          onClick={() => setSelectedBike(bike)}
-        >
-          <div className="bike-icon-box">
-            <MaterialIcon>two_wheeler</MaterialIcon>
-          </div>
-
-          <div className="bike-details-info">
-            <h3>
-              {bike.brand} {bike.model}
-            </h3>
-            <p>{bike.plate}</p>
-
-            <div>
-              <span>{bike.color || "Chưa chọn màu"}</span>
-              <span>{bike.year || "Chưa rõ đời xe"}</span>
+    {isGarageLoading ? (
+      <div className="appointment-empty-state">
+        <MaterialIcon>hourglass_top</MaterialIcon>
+        <strong>Đang tải danh sách xe...</strong>
+        <span>Hệ thống đang lấy xe từ lịch hẹn của bạn.</span>
+      </div>
+    ) : bikes.length === 0 ? (
+      <div className="appointment-empty-state">
+        <MaterialIcon>two_wheeler</MaterialIcon>
+        <strong>Chưa có xe nào</strong>
+        <span>Đặt lịch dịch vụ hoặc thêm xe thủ công để theo dõi tại đây.</span>
+      </div>
+    ) : (
+      <div className="bikes-grid-layout">
+        {bikes.map((bike) => (
+          <article
+            key={bike.plateKey || bike.plate}
+            className={`bike-card-item ${
+              (selectedBike?.plateKey || normalizePlate(selectedBike?.plate || "")) ===
+              (bike.plateKey || normalizePlate(bike.plate))
+                ? "active"
+                : ""
+            }`}
+            onClick={() => setSelectedBike(bike)}
+          >
+            <div className="bike-icon-box">
+              <MaterialIcon>two_wheeler</MaterialIcon>
             </div>
-          </div>
-        </article>
-      ))}
-    </div>
 
-    {/* DETAIL XE */}
+            <div className="bike-details-info">
+              <h3>
+                {bike.brand} {bike.model}
+              </h3>
+              <p>{bike.plate}</p>
+
+              <div>
+                {bike.lastStatus ? (
+                  <span className={`bike-status-chip ${getStatusClass(bike.lastStatus)}`}>
+                    {getStatusLabel(bike.lastStatus)}
+                  </span>
+                ) : (
+                  <span>Chưa có lịch</span>
+                )}
+                {bike.color ? <span>{bike.color}</span> : null}
+                {bike.year ? <span>{bike.year}</span> : null}
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+
     {selectedBike && (
       <div className="bike-detail-wrapper">
-        <h3>
-          {selectedBike.brand} {selectedBike.model}
-        </h3>
+        <div className="bike-detail-header">
+          <h3>
+            {selectedBike.brand} {selectedBike.model}
+          </h3>
+          <p>{selectedBike.plate}</p>
+        </div>
 
-        {bikeAppointments?.length > 0 ? (
-          bikeAppointments.map((appointment) => (
-            <div key={appointment._id}>
-              <p>Mã lịch: {appointment.appointment_code}</p>
-              <p>Dịch vụ: {appointment.service?.name}</p>
-              <p>Ngày: {appointment.appointment_date}</p>
-            </div>
-          ))
+        {bikeAppointments.length > 0 ? (
+          <div className="bike-history-list">
+            {bikeAppointments.map((appointment) => (
+              <article className="bike-history-item" key={appointment._id || appointment.appointment_code}>
+                <div>
+                  <strong>{appointment.service?.name || "Dịch vụ garage"}</strong>
+                  <span>{appointment.appointment_code || "—"}</span>
+                </div>
+                <div>
+                  <span>
+                    {appointment.appointment_date
+                      ? new Date(`${String(appointment.appointment_date).slice(0, 10)}T00:00:00`).toLocaleDateString("vi-VN")
+                      : "—"}
+                    {appointment.time_slot ? ` · ${appointment.time_slot}` : ""}
+                  </span>
+                  <span className={`bike-status-chip ${getStatusClass(appointment.status)}`}>
+                    {getStatusLabel(appointment.status)}
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
         ) : (
-          <p>Xe này chưa có lịch sử.</p>
+          <p>Xe này chưa có lịch sử dịch vụ tại garage.</p>
         )}
       </div>
     )}

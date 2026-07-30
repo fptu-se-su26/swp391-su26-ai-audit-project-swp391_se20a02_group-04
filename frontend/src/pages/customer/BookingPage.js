@@ -12,7 +12,9 @@ const UNKNOWN_REPAIR_OPTION = {
   id: "repair-unknown-issue",
   name: "Không rõ lỗi / Cần kiểm tra",
   price: "Báo giá sau kiểm tra",
+  priceAmount: null,
   duration: "45–90 phút",
+  durationMinutes: 90,
   description:
     "Chưa biết xe hư gì? Đặt lịch trước, kỹ thuật viên kiểm tra rồi mới chẩn đoán lỗi và báo giá công.",
   fromCatalog: false,
@@ -31,21 +33,27 @@ const FALLBACK_WASH_PACKAGES = [
     id: "wash-basic",
     name: "Rửa xe máy cơ bản",
     price: "40.000đ",
+    priceAmount: 40000,
     duration: "25 phút",
+    durationMinutes: 25,
     description: "Rửa thân vỏ, vành, sên/lốp và lau khô nhanh.",
   },
   {
     id: "wash-premium",
     name: "Rửa xe máy cao cấp",
     price: "80.000đ",
+    priceAmount: 80000,
     duration: "45 phút",
+    durationMinutes: 45,
     description: "Bọt tuyết, vệ sinh vành, chăm sóc nhựa nhám và kính chắn gió.",
   },
   {
     id: "engine-clean",
     name: "Vệ sinh động cơ",
     price: "120.000đ",
+    priceAmount: 120000,
     duration: "60 phút",
+    durationMinutes: 60,
     description: "Làm sạch khoang máy, kiểm tra rò nhớt/xăng cơ bản.",
   },
 ];
@@ -55,21 +63,27 @@ const FALLBACK_MAINTENANCE_PACKAGES = [
     id: "maintenance-basic",
     name: "Bảo dưỡng cơ bản",
     price: "150.000đ",
+    priceAmount: 150000,
     duration: "45 phút",
+    durationMinutes: 45,
     description: "Kiểm tra nhớt, phanh, lốp, đèn, ắc quy và ốc siết.",
   },
   {
     id: "maintenance-periodic",
     name: "Bảo dưỡng định kỳ",
     price: "280.000đ",
+    priceAmount: 280000,
     duration: "75 phút",
+    durationMinutes: 75,
     description: "Kiểm tra tổng quát, lọc gió, côn/sên, cân chỉnh phanh.",
   },
   {
     id: "maintenance-full",
     name: "Bảo dưỡng toàn diện",
     price: "450.000đ",
+    priceAmount: 450000,
     duration: "120 phút",
+    durationMinutes: 120,
     description: "Quy trình chuyên sâu cho xe chạy lâu hoặc chuẩn bị đi xa.",
   },
 ];
@@ -79,59 +93,79 @@ const FALLBACK_REPAIR_ISSUES = withUnknownRepairOption([
     id: "repair-fallback-1",
     name: "Xe khó nổ / chết máy",
     price: "Báo giá sau kiểm tra",
+    priceAmount: null,
     duration: "45–90 phút",
+    durationMinutes: 90,
     description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
   },
   {
     id: "repair-fallback-2",
     name: "Phanh kêu hoặc yếu",
     price: "Báo giá sau kiểm tra",
+    priceAmount: null,
     duration: "45–90 phút",
+    durationMinutes: 90,
     description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
   },
   {
     id: "repair-fallback-3",
     name: "Động cơ ồn / rung",
     price: "Báo giá sau kiểm tra",
+    priceAmount: null,
     duration: "45–90 phút",
+    durationMinutes: 90,
     description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
   },
   {
     id: "repair-fallback-4",
     name: "Điện – đèn – đề",
     price: "Báo giá sau kiểm tra",
+    priceAmount: null,
     duration: "45–90 phút",
+    durationMinutes: 90,
     description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
   },
   {
     id: "repair-fallback-5",
     name: "Lốp / săm / vành",
     price: "Báo giá sau kiểm tra",
+    priceAmount: null,
     duration: "45–90 phút",
+    durationMinutes: 90,
     description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
   },
   {
     id: "repair-fallback-6",
     name: "Sên, nhông, bố thắng",
     price: "Báo giá sau kiểm tra",
+    priceAmount: null,
     duration: "45–90 phút",
+    durationMinutes: 90,
     description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
   },
   {
     id: "repair-fallback-7",
     name: "Thay nhớt / lọc nhớt",
     price: "Báo giá sau kiểm tra",
+    priceAmount: null,
     duration: "45–90 phút",
+    durationMinutes: 90,
     description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
   },
   {
     id: "repair-fallback-8",
     name: "Kiểm tra tổng quát",
     price: "Báo giá sau kiểm tra",
+    priceAmount: null,
     duration: "45–90 phút",
+    durationMinutes: 90,
     description: "Kỹ thuật viên kiểm tra xe máy rồi báo giá trước khi sửa.",
   },
 ]);
+
+function formatVnd(amount) {
+  return `${Number(amount || 0).toLocaleString("vi-VN")}đ`;
+}
 
 function formatCatalogPrice(service) {
   const category = String(service.category || "").toUpperCase();
@@ -151,11 +185,19 @@ function formatCatalogPrice(service) {
 }
 
 function mapCatalogService(service) {
+  const durationMinutes = Number(service.estimated_duration) || 60;
+  const priceType = String(service.price_type || "FIXED").toUpperCase();
+  const category = String(service.category || "").toUpperCase();
+  const isRepairLike =
+    priceType === "QUOTE" || (category !== "WASH_CARE" && category !== "MAINTENANCE");
+
   return {
     id: String(service._id),
     name: service.service_name,
     price: formatCatalogPrice(service),
-    duration: `${service.estimated_duration || 60} phút`,
+    priceAmount: isRepairLike ? null : Number(service.base_price) || 0,
+    duration: `${durationMinutes} phút`,
+    durationMinutes,
     description: service.description || "Dịch vụ garage xe máy.",
     fromCatalog: true,
     category: service.category,
@@ -354,7 +396,9 @@ function isValidVnPhone(phone) {
 
 export default function BookingPage() {
   const navigate = useNavigate();
-  const [serviceType, setServiceType] = useState("wash");
+  const [includeWash, setIncludeWash] = useState(true);
+  const [includeMaintenance, setIncludeMaintenance] = useState(false);
+  const [isRepairMode, setIsRepairMode] = useState(false);
   const [washPackages, setWashPackages] = useState(FALLBACK_WASH_PACKAGES);
   const [maintenancePackages, setMaintenancePackages] = useState(FALLBACK_MAINTENANCE_PACKAGES);
   const [repairPackages, setRepairPackages] = useState(FALLBACK_REPAIR_ISSUES);
@@ -545,6 +589,9 @@ export default function BookingPage() {
         setWashPackage(nextWash[0].id);
         setMaintenancePackage(nextMaintenance[0].id);
         setRepairPackage(UNKNOWN_REPAIR_OPTION.id);
+        setIncludeWash(true);
+        setIncludeMaintenance(false);
+        setIsRepairMode(false);
       } catch {
         if (cancelled) return;
         setWashPackages(FALLBACK_WASH_PACKAGES);
@@ -553,6 +600,9 @@ export default function BookingPage() {
         setWashPackage(FALLBACK_WASH_PACKAGES[0].id);
         setMaintenancePackage(FALLBACK_MAINTENANCE_PACKAGES[0].id);
         setRepairPackage(UNKNOWN_REPAIR_OPTION.id);
+        setIncludeWash(true);
+        setIncludeMaintenance(false);
+        setIsRepairMode(false);
       } finally {
         if (!cancelled) setIsLoadingCatalog(false);
       }
@@ -577,20 +627,109 @@ export default function BookingPage() {
     };
   }, [showUserMenu]);
 
-  const selectedService = useMemo(() => {
-    if (serviceType === "wash") {
-      return washPackages.find((item) => item.id === washPackage) || washPackages[0];
+  const selectedWashService = useMemo(
+    () => washPackages.find((item) => item.id === washPackage) || washPackages[0],
+    [washPackage, washPackages]
+  );
+
+  const selectedMaintenanceService = useMemo(
+    () =>
+      maintenancePackages.find((item) => item.id === maintenancePackage) ||
+      maintenancePackages[0],
+    [maintenancePackage, maintenancePackages]
+  );
+
+  const selectedRepairService = useMemo(
+    () => repairPackages.find((item) => item.id === repairPackage) || repairPackages[0],
+    [repairPackage, repairPackages]
+  );
+
+  const selectedServices = useMemo(() => {
+    if (isRepairMode) {
+      return selectedRepairService ? [selectedRepairService] : [];
     }
 
-    if (serviceType === "maintenance") {
-      return (
-        maintenancePackages.find((item) => item.id === maintenancePackage) ||
-        maintenancePackages[0]
-      );
+    const services = [];
+    if (includeWash && selectedWashService) {
+      services.push({ ...selectedWashService, bookingType: "wash" });
+    }
+    if (includeMaintenance && selectedMaintenanceService) {
+      services.push({ ...selectedMaintenanceService, bookingType: "maintenance" });
+    }
+    return services;
+  }, [
+    includeMaintenance,
+    includeWash,
+    isRepairMode,
+    selectedMaintenanceService,
+    selectedRepairService,
+    selectedWashService,
+  ]);
+
+  const summaryTotals = useMemo(() => {
+    const durationMinutes = selectedServices.reduce(
+      (sum, item) => sum + (Number(item.durationMinutes) || 0),
+      0
+    );
+    const hasQuote = selectedServices.some(
+      (item) => item.priceAmount === null || item.priceAmount === undefined
+    );
+    const priceAmount = selectedServices.reduce(
+      (sum, item) => sum + (Number(item.priceAmount) || 0),
+      0
+    );
+
+    return {
+      title:
+        selectedServices.length > 1
+          ? selectedServices.map((item) => item.name).join(" + ")
+          : selectedServices[0]?.name || "Chưa chọn dịch vụ",
+      description:
+        selectedServices.length > 1
+          ? "Gói rửa xe và bảo dưỡng trong cùng một lần đến garage."
+          : selectedServices[0]?.description || "",
+      priceLabel: hasQuote
+        ? selectedServices[0]?.price || "Báo giá sau kiểm tra"
+        : formatVnd(priceAmount),
+      durationLabel: durationMinutes > 0 ? `${durationMinutes} phút` : "—",
+    };
+  }, [selectedServices]);
+
+  const toggleWashCategory = () => {
+    if (isRepairMode) {
+      setIsRepairMode(false);
+      setIncludeWash(true);
+      setIncludeMaintenance(false);
+      return;
     }
 
-    return repairPackages.find((item) => item.id === repairPackage) || repairPackages[0];
-  }, [maintenancePackage, maintenancePackages, repairPackage, repairPackages, serviceType, washPackage, washPackages]);
+    if (includeWash && !includeMaintenance) {
+      return;
+    }
+
+    setIncludeWash((current) => !current);
+  };
+
+  const toggleMaintenanceCategory = () => {
+    if (isRepairMode) {
+      setIsRepairMode(false);
+      setIncludeWash(false);
+      setIncludeMaintenance(true);
+      return;
+    }
+
+    if (includeMaintenance && !includeWash) {
+      return;
+    }
+
+    setIncludeMaintenance((current) => !current);
+  };
+
+  const selectRepairCategory = () => {
+    setIsRepairMode(true);
+    setIncludeWash(false);
+    setIncludeMaintenance(false);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -598,6 +737,12 @@ export default function BookingPage() {
     setIsSubmitting(true);
     setSubmitError("");
     setSubmitResult(null);
+
+    if (!isRepairMode && !includeWash && !includeMaintenance) {
+      setSubmitError("Vui lòng chọn ít nhất một dịch vụ rửa xe hoặc bảo dưỡng.");
+      setIsSubmitting(false);
+      return;
+    }
 
     if (!appointmentDate || !timeSlot || typeof timeSlot !== "string") {
       setSubmitError("Vui lòng chọn đầy đủ ngày hẹn và khung giờ.");
@@ -635,7 +780,6 @@ export default function BookingPage() {
     }
 
     const payload = {
-      service_type: serviceType.toUpperCase(),
       vehicle_brand: formData.get("vehicle_brand"),
       vehicle_model: formData.get("vehicle_model"),
       license_plate: formData.get("license_plate"),
@@ -658,26 +802,18 @@ export default function BookingPage() {
       payload.note = note;
     }
 
-    if (serviceType === "wash") {
-      if (selectedService?.fromCatalog) {
-        payload.service_id = selectedService.id;
+    const applyCatalogOrPackage = (target, service, packageId, typeKey) => {
+      if (service?.fromCatalog) {
+        target[typeKey === "primary" ? "service_id" : "additional_service_id"] = service.id;
       } else {
-        payload.service_package = washPackage;
+        target[typeKey === "primary" ? "service_package" : "additional_service_package"] =
+          packageId;
       }
-    }
+    };
 
-    if (serviceType === "maintenance") {
-      if (selectedService?.fromCatalog) {
-        payload.service_id = selectedService.id;
-      } else {
-        payload.service_package = maintenancePackage;
-      }
-    }
-
-    if (serviceType === "repair") {
-      const issueDescription = formData.get("issue_description");
-      const selectedRepair =
-        repairPackages.find((item) => item.id === repairPackage) || repairPackages[0];
+    if (isRepairMode) {
+      payload.service_type = "REPAIR";
+      const selectedRepair = selectedRepairService;
 
       if (selectedRepair?.fromCatalog && !selectedRepair?.isUnknownIssue) {
         payload.service_id = selectedRepair.id;
@@ -686,12 +822,24 @@ export default function BookingPage() {
         payload.repair_issue = selectedRepair?.name || UNKNOWN_REPAIR_OPTION.name;
       }
 
+      const issueDescription = formData.get("issue_description");
       if (issueDescription) {
         payload.issue_description = issueDescription;
       } else if (selectedRepair?.isUnknownIssue) {
         payload.issue_description =
           "Khách chưa xác định lỗi. Cần kỹ thuật viên kiểm tra và chẩn đoán trước khi báo giá.";
       }
+    } else if (includeWash && includeMaintenance) {
+      payload.service_type = "WASH";
+      applyCatalogOrPackage(payload, selectedWashService, washPackage, "primary");
+      payload.additional_service_type = "MAINTENANCE";
+      applyCatalogOrPackage(payload, selectedMaintenanceService, maintenancePackage, "additional");
+    } else if (includeWash) {
+      payload.service_type = "WASH";
+      applyCatalogOrPackage(payload, selectedWashService, washPackage, "primary");
+    } else {
+      payload.service_type = "MAINTENANCE";
+      applyCatalogOrPackage(payload, selectedMaintenanceService, maintenancePackage, "primary");
     }
 
     try {
@@ -702,7 +850,9 @@ export default function BookingPage() {
       setWashPackage(washPackages[0].id);
       setMaintenancePackage(maintenancePackages[0].id);
       setRepairPackage(UNKNOWN_REPAIR_OPTION.id);
-      setServiceType("wash");
+      setIncludeWash(true);
+      setIncludeMaintenance(false);
+      setIsRepairMode(false);
       setAppointmentDate(getTomorrowDateValue());
       setTimeSlot("");
       setVehicleBrand("");
@@ -930,37 +1080,39 @@ export default function BookingPage() {
               <span>01</span>
               <div>
                 <h2>Chọn dịch vụ cho xe máy</h2>
-                <p>Rửa xe, bảo dưỡng định kỳ hoặc sửa chữa theo tình trạng thực tế.</p>
+                <p>
+                  Có thể chọn đồng thời Rửa xe + Bảo dưỡng (mỗi loại 1 gói). Sửa chữa đặt riêng.
+                </p>
               </div>
             </div>
 
             <div className="service-type-grid">
               <button
-                className={serviceType === "wash" ? "selected" : ""}
+                className={!isRepairMode && includeWash ? "selected" : ""}
                 type="button"
-                onClick={() => setServiceType("wash")}
+                onClick={toggleWashCategory}
               >
                 <MaterialIcon>water_drop</MaterialIcon>
                 <strong>Rửa xe</strong>
-                <span>Rửa cơ bản, cao cấp, vệ sinh động cơ</span>
+                <span>Chọn 1 gói rửa · có thể ghép với bảo dưỡng</span>
               </button>
               <button
-                className={serviceType === "maintenance" ? "selected" : ""}
+                className={!isRepairMode && includeMaintenance ? "selected" : ""}
                 type="button"
-                onClick={() => setServiceType("maintenance")}
+                onClick={toggleMaintenanceCategory}
               >
                 <MaterialIcon>oil_barrel</MaterialIcon>
                 <strong>Bảo dưỡng</strong>
-                <span>Nhớt, phanh, sên, lọc gió, kiểm tra tổng</span>
+                <span>Chọn 1 gói bảo dưỡng · có thể ghép với rửa xe</span>
               </button>
               <button
-                className={serviceType === "repair" ? "selected" : ""}
+                className={isRepairMode ? "selected" : ""}
                 type="button"
-                onClick={() => setServiceType("repair")}
+                onClick={selectRepairCategory}
               >
                 <MaterialIcon>build</MaterialIcon>
                 <strong>Sửa chữa</strong>
-                <span>Chẩn đoán lỗi, thay phụ tùng, xử lý kỹ thuật</span>
+                <span>Đặt riêng, không ghép với rửa/bảo dưỡng</span>
               </button>
             </div>
 
@@ -968,9 +1120,9 @@ export default function BookingPage() {
               <p className="booking-panel-note">Đang tải danh mục dịch vụ từ garage...</p>
             )}
 
-            {serviceType === "wash" ? (
+            {!isRepairMode && includeWash && (
               <div className="booking-group">
-                <label>Chọn gói rửa xe máy</label>
+                <label>Chọn 1 gói rửa xe máy</label>
                 <div className="package-grid">
                   {washPackages.map((item) => (
                     <button
@@ -988,9 +1140,11 @@ export default function BookingPage() {
                   ))}
                 </div>
               </div>
-            ) : serviceType === "maintenance" ? (
+            )}
+
+            {!isRepairMode && includeMaintenance && (
               <div className="booking-group">
-                <label>Chọn gói bảo dưỡng</label>
+                <label>Chọn 1 gói bảo dưỡng</label>
                 <div className="package-grid">
                   {maintenancePackages.map((item) => (
                     <button
@@ -1008,7 +1162,9 @@ export default function BookingPage() {
                   ))}
                 </div>
               </div>
-            ) : (
+            )}
+
+            {isRepairMode && (
               <div className="booking-group">
                 <label>Chọn dịch vụ sửa chữa / kiểm tra</label>
                 <div className="package-grid">
@@ -1215,16 +1371,28 @@ export default function BookingPage() {
           <aside className="booking-side">
             <div className="booking-summary">
               <span className="summary-label">Tóm tắt lịch hẹn</span>
-              <h2>{selectedService.name}</h2>
-              <p>{selectedService.description}</p>
+              <h2>{summaryTotals.title}</h2>
+              <p>{summaryTotals.description}</p>
+              {selectedServices.length > 1 && (
+                <ul className="summary-service-list">
+                  {selectedServices.map((item) => (
+                    <li key={`${item.bookingType || "repair"}-${item.id}`}>
+                      <strong>{item.name}</strong>
+                      <span>
+                        {item.price} • {item.duration}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <div className="summary-list">
                 <div>
                   <MaterialIcon>payments</MaterialIcon>
-                  <span>{selectedService.price}</span>
+                  <span>{summaryTotals.priceLabel}</span>
                 </div>
                 <div>
                   <MaterialIcon>schedule</MaterialIcon>
-                  <span>{selectedService.duration}</span>
+                  <span>{summaryTotals.durationLabel}</span>
                 </div>
                 <div>
                   <MaterialIcon>event</MaterialIcon>
