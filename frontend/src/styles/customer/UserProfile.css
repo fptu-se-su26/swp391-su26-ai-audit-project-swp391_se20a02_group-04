@@ -1139,6 +1139,89 @@
   font-weight: 800;
 }
 
+.bike-card-item.active {
+  border-color: #ff6b00;
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.12);
+}
+
+.bike-status-chip.pending {
+  background: #fff4e5;
+  color: #9a6700;
+}
+
+.bike-status-chip.confirmed {
+  background: #e8f1ff;
+  color: #185fa5;
+}
+
+.bike-status-chip.progress {
+  background: #fff0e8;
+  color: #a04100;
+}
+
+.bike-status-chip.completed,
+.bike-status-chip.paid {
+  background: #e7f6ed;
+  color: #0f7b3a;
+}
+
+.bike-status-chip.cancelled,
+.bike-status-chip.rejected,
+.bike-status-chip.no_show {
+  background: #fdeceb;
+  color: #b42318;
+}
+
+.bike-detail-wrapper {
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid rgba(226, 191, 176, 0.52);
+  border-radius: 16px;
+  background: #fffaf7;
+}
+
+.bike-detail-header h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.bike-detail-header p {
+  margin: 0 0 14px;
+  color: #a04100;
+  font-weight: 800;
+}
+
+.bike-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bike-history-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #ffdbcc;
+}
+
+.bike-history-item > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bike-history-item strong {
+  color: #191c1d;
+}
+
+.bike-history-item span {
+  color: #5a4136;
+  font-size: 13px;
+}
+
 .voucher-card-item {
   align-items: stretch;
   min-height: 150px;

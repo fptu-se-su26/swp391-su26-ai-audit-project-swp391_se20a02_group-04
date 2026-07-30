@@ -309,6 +309,63 @@ const createAppointmentValidation = [
     .optional({ nullable: true, checkFalsy: true })
     .isMongoId().withMessage('Service ID must be a valid MongoDB ObjectId'),
 
+  body('additional_service_type')
+    .optional({ nullable: true, checkFalsy: true })
+    .customSanitizer(value => typeof value === 'string' ? value.trim().toUpperCase() : value)
+    .custom((value, { req }) => {
+      if (value === undefined || value === null || value === '') {
+        return true;
+      }
+
+      if (!['WASH', 'MAINTENANCE'].includes(value)) {
+        throw new Error('Additional service type must be WASH or MAINTENANCE');
+      }
+
+      const primaryType = req.body.service_type;
+      if (!['WASH', 'MAINTENANCE'].includes(primaryType)) {
+        throw new Error('Additional service is only allowed with wash or maintenance bookings');
+      }
+
+      if (value === primaryType) {
+        throw new Error('Additional service type must differ from the primary service type');
+      }
+
+      return true;
+    }),
+
+  body('additional_service_id')
+    .optional({ nullable: true, checkFalsy: true })
+    .isMongoId().withMessage('Additional service ID must be a valid MongoDB ObjectId'),
+
+  body('additional_service_package')
+    .optional({ nullable: true, checkFalsy: true })
+    .customSanitizer(value => typeof value === 'string' ? value.trim() : value)
+    .custom((value, { req }) => {
+      const additionalType = req.body.additional_service_type;
+      const additionalId = req.body.additional_service_id;
+
+      if (!additionalType) {
+        if (value || additionalId) {
+          throw new Error('additional_service_type is required when booking a second service');
+        }
+        return true;
+      }
+
+      if (additionalId) {
+        return true;
+      }
+
+      if (!value) {
+        throw new Error('Additional service package or service ID is required');
+      }
+
+      if (!getServicePackage(additionalType, value)) {
+        throw new Error('Additional service package is not valid for selected type');
+      }
+
+      return true;
+    }),
+
   body('repair_issue')
     .customSanitizer(value => typeof value === 'string' ? value.trim() : value)
     .custom((value, { req }) => {

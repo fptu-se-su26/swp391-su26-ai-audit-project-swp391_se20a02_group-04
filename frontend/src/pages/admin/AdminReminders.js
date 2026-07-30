@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock3,
+  X,
 } from "lucide-react";
 import AdminSidebar from "../../components/AdminSidebar";
 import { adminReminderApi } from "../../services/adminReminderApi";
@@ -18,6 +19,18 @@ const STATUS_LABEL = {
   FAILED: { label: "Lỗi", tone: "danger" },
   PENDING: { label: "Chờ", tone: "warning" },
   SKIPPED: { label: "Bỏ qua", tone: "neutral" },
+};
+
+const CHANNEL_LABEL = {
+  EMAIL: "Email",
+  IN_APP: "Thông báo in-app",
+  BOTH: "Email + In-app",
+  NONE: "Không gửi",
+};
+
+const TRIGGER_LABEL = {
+  CRON: "Tự động (job hệ thống)",
+  MANUAL: "Gửi tay bởi admin",
 };
 
 function formatDate(value) {
@@ -37,6 +50,14 @@ function formatDate(value) {
   });
 }
 
+function DeliveryPill({ ok, label }) {
+  return (
+    <span className={`reminder-delivery-pill ${ok ? "ok" : "off"}`}>
+      {ok ? "✓" : "–"} {label}
+    </span>
+  );
+}
+
 export default function AdminReminders({ onViewChange }) {
   const [dueItems, setDueItems] = useState([]);
   const [history, setHistory] = useState([]);
@@ -47,6 +68,7 @@ export default function AdminReminders({ onViewChange }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [selectedHistory, setSelectedHistory] = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -71,6 +93,15 @@ export default function AdminReminders({ onViewChange }) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!selectedHistory) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setSelectedHistory(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedHistory]);
 
   const handlePreview = async () => {
     setRunning(true);
@@ -106,6 +137,13 @@ export default function AdminReminders({ onViewChange }) {
     }
   };
 
+  const selectedMeta = selectedHistory
+    ? STATUS_LABEL[selectedHistory.status] || STATUS_LABEL.PENDING
+    : null;
+  const selectedVehicle = selectedHistory?.vehicle_snapshot || {};
+  const selectedVehicleLabel =
+    [selectedVehicle.brand, selectedVehicle.model].filter(Boolean).join(" ") || "—";
+
   return (
     <div className="dashboard-layout reminder-layout">
       <AdminSidebar activeView="reminders" onViewChange={onViewChange} />
@@ -114,10 +152,6 @@ export default function AdminReminders({ onViewChange }) {
           <div>
             <p className="admin-eyebrow">Vận hành</p>
             <h1>Nhắc bảo dưỡng định kỳ</h1>
-            <p className="reminder-sub">
-              Gửi email + thông báo in-app khi khách đến hạn theo chu kỳ dịch vụ
-              (ví dụ thay dầu sau N ngày). Job tự chạy mỗi ngày; admin có thể gửi tay.
-            </p>
           </div>
           <div className="reminder-actions">
             <button type="button" className="btn-secondary" onClick={loadData} disabled={loading || running}>
@@ -247,24 +281,41 @@ export default function AdminReminders({ onViewChange }) {
                     <th>Kênh</th>
                     <th>Trạng thái</th>
                     <th>Gửi lúc</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {history.map((row) => {
                     const meta = STATUS_LABEL[row.status] || STATUS_LABEL.PENDING;
                     return (
-                      <tr key={String(row._id)}>
+                      <tr
+                        key={String(row._id)}
+                        className="reminder-row-clickable"
+                        onClick={() => setSelectedHistory(row)}
+                      >
                         <td>
                           <strong>{row.customer_id?.full_name || "—"}</strong>
                           <div className="muted">{row.customer_id?.email || ""}</div>
                         </td>
                         <td>{row.service_name}</td>
                         <td>{formatDate(row.due_date)}</td>
-                        <td>{row.channel || "—"}</td>
+                        <td>{CHANNEL_LABEL[row.channel] || row.channel || "—"}</td>
                         <td>
                           <span className={`reminder-chip ${meta.tone}`}>{meta.label}</span>
                         </td>
                         <td>{formatDate(row.sent_at || row.created_at)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="reminder-detail-btn"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedHistory(row);
+                            }}
+                          >
+                            Chi tiết
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -274,6 +325,122 @@ export default function AdminReminders({ onViewChange }) {
           )}
         </section>
       </main>
+
+      {selectedHistory ? (
+        <div
+          className="reminder-modal-backdrop"
+          onClick={() => setSelectedHistory(null)}
+          role="presentation"
+        >
+          <div
+            className="reminder-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reminder-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="reminder-modal-head">
+              <div className="reminder-modal-title-block">
+                <div className="reminder-modal-title-row">
+                  <p className="admin-eyebrow">Chi tiết lịch sử gửi</p>
+                  <span className={`reminder-chip ${selectedMeta.tone}`}>{selectedMeta.label}</span>
+                </div>
+                <h2 id="reminder-detail-title">{selectedHistory.service_name || "Nhắc bảo dưỡng"}</h2>
+                <p className="reminder-modal-subtitle">
+                  {TRIGGER_LABEL[selectedHistory.triggered_by] || "—"}
+                  {" · "}
+                  {formatDate(selectedHistory.sent_at || selectedHistory.created_at)}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="reminder-modal-close"
+                onClick={() => setSelectedHistory(null)}
+                aria-label="Đóng"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="reminder-modal-body">
+              <section className="reminder-detail-section">
+                <h3>Khách hàng</h3>
+                <div className="reminder-detail-hero">
+                  <strong>{selectedHistory.customer_id?.full_name || "—"}</strong>
+                  <span>{selectedHistory.customer_id?.email || "Không có email"}</span>
+                  <span>{selectedHistory.customer_id?.phone || "Không có SĐT"}</span>
+                </div>
+              </section>
+
+              <section className="reminder-detail-section">
+                <h3>Dịch vụ & xe</h3>
+                <div className="reminder-detail-grid">
+                  <div className="reminder-detail-field">
+                    <span>Mã lịch gốc</span>
+                    <strong>
+                      {selectedHistory.appointment_id?.appointment_code ||
+                        (selectedHistory.appointment_id?._id
+                          ? String(selectedHistory.appointment_id._id).slice(-8)
+                          : "—")}
+                    </strong>
+                  </div>
+                  <div className="reminder-detail-field">
+                    <span>Ngày đến hạn</span>
+                    <strong>{formatDate(selectedHistory.due_date)}</strong>
+                  </div>
+                  <div className="reminder-detail-field">
+                    <span>Xe</span>
+                    <strong>{selectedVehicleLabel}</strong>
+                    <em>{selectedVehicle.license_plate || "Chưa có biển số"}</em>
+                  </div>
+                  <div className="reminder-detail-field">
+                    <span>Chu kỳ nhắc</span>
+                    <strong>
+                      {selectedHistory.reminder_days
+                        ? `${selectedHistory.reminder_days} ngày`
+                        : "—"}
+                    </strong>
+                    {selectedHistory.reminder_mileage ? (
+                      <em>~{Number(selectedHistory.reminder_mileage).toLocaleString("vi-VN")} km</em>
+                    ) : null}
+                    {typeof selectedVehicle.odometer === "number" && selectedVehicle.odometer > 0 ? (
+                      <em>Số km lúc làm: {selectedVehicle.odometer.toLocaleString("vi-VN")} km</em>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+
+              <section className="reminder-detail-section">
+                <h3>Kênh gửi</h3>
+                <div className="reminder-delivery-row">
+                  <DeliveryPill ok={Boolean(selectedHistory.email_sent)} label="Email" />
+                  <DeliveryPill ok={Boolean(selectedHistory.notification_sent)} label="In-app" />
+                  <span className="reminder-channel-note">
+                    {CHANNEL_LABEL[selectedHistory.channel] || selectedHistory.channel || "—"}
+                  </span>
+                </div>
+              </section>
+
+              {selectedHistory.error_message ? (
+                <section className="reminder-detail-section reminder-detail-error">
+                  <h3>Lỗi gửi</h3>
+                  <p>{selectedHistory.error_message}</p>
+                </section>
+              ) : null}
+            </div>
+
+            <div className="reminder-modal-footer">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setSelectedHistory(null)}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

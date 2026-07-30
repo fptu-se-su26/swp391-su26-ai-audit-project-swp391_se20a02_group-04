@@ -142,6 +142,71 @@ const getPublicReviews = async (req, res) => {
  * Create customer appointment
  * POST /api/appointments
  */
+const resolveBookableServicePayload = async ({
+  serviceType,
+  service_id,
+  service_package,
+  repair_issue,
+  issue_description
+}) => {
+  if (service_id) {
+    const catalogService = await Service.findOne({
+      _id: service_id,
+      is_active: true,
+      allow_booking: true
+    });
+
+    if (!catalogService) {
+      return { error: 'Selected service is not available for online booking' };
+    }
+
+    const expectedType = mapCategoryToBookingType(catalogService.category);
+    if (expectedType !== serviceType) {
+      return {
+        error: `Service category ${catalogService.category} does not match service type ${serviceType}`
+      };
+    }
+
+    return {
+      catalogServiceId: catalogService._id,
+      servicePayload: buildServicePayloadFromCatalog(catalogService, serviceType, {
+        repair_issue,
+        issue_description
+      }),
+      catalogService
+    };
+  }
+
+  if (serviceType === 'REPAIR') {
+    return {
+      catalogServiceId: null,
+      servicePayload: {
+        type: serviceType,
+        name: repair_issue.trim(),
+        repair_issue: repair_issue.trim(),
+        issue_description,
+        description: 'Repair inspection appointment',
+        estimated_price: null,
+        estimated_duration_minutes: 90
+      }
+    };
+  }
+
+  const selectedPackage = getServicePackage(serviceType, service_package);
+  if (!selectedPackage) {
+    return { error: 'Invalid service package for selected service type' };
+  }
+
+  return {
+    catalogServiceId: null,
+    servicePayload: {
+      type: serviceType,
+      package_id: service_package,
+      ...selectedPackage
+    }
+  };
+};
+
 const createAppointment = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -149,6 +214,9 @@ const createAppointment = async (req, res) => {
       service_type,
       service_package,
       service_id,
+      additional_service_type,
+      additional_service_id,
+      additional_service_package,
       repair_issue,
       issue_description,
       vehicle_brand,
@@ -162,6 +230,9 @@ const createAppointment = async (req, res) => {
     } = req.body;
 
     const serviceType = service_type.toUpperCase();
+    const additionalServiceType = additional_service_type
+      ? String(additional_service_type).toUpperCase()
+      : null;
     const normalizedLicensePlate = license_plate.toUpperCase().replace(/\s+/g, '');
     const appointmentStartAt = buildAppointmentStartAt(appointment_date, time_slot);
 
@@ -181,57 +252,70 @@ const createAppointment = async (req, res) => {
       return errorResponse(res, 400, 'Contact phone is required for booking');
     }
 
-    let servicePayload;
-    let catalogServiceId = null;
-
-    if (service_id) {
-      const catalogService = await Service.findOne({
-        _id: service_id,
-        is_active: true,
-        allow_booking: true
-      });
-
-      if (!catalogService) {
-        return errorResponse(res, 400, 'Selected service is not available for online booking');
+    if (additionalServiceType) {
+      if (!['WASH', 'MAINTENANCE'].includes(serviceType) || !['WASH', 'MAINTENANCE'].includes(additionalServiceType)) {
+        return errorResponse(res, 400, 'Combo booking only supports wash and maintenance');
       }
-
-      const expectedType = mapCategoryToBookingType(catalogService.category);
-      if (expectedType !== serviceType) {
-        return errorResponse(
-          res,
-          400,
-          `Service category ${catalogService.category} does not match service type ${serviceType}`
-        );
+      if (additionalServiceType === serviceType) {
+        return errorResponse(res, 400, 'Primary and additional service types must be different');
       }
-
-      catalogServiceId = catalogService._id;
-      servicePayload = buildServicePayloadFromCatalog(catalogService, serviceType, {
-        repair_issue,
-        issue_description
-      });
-    } else if (serviceType === 'REPAIR') {
-      servicePayload = {
-        type: serviceType,
-        name: repair_issue.trim(),
-        repair_issue: repair_issue.trim(),
-        issue_description,
-        description: 'Repair inspection appointment',
-        estimated_price: null,
-        estimated_duration_minutes: 90
-      };
-    } else {
-      const selectedPackage = getServicePackage(serviceType, service_package);
-
-      if (!selectedPackage) {
-        return errorResponse(res, 400, 'Invalid service package for selected service type');
-      }
-
-      servicePayload = {
-        type: serviceType,
-        package_id: service_package,
-        ...selectedPackage
-      };
     }
+
+    const primaryResolved = await resolveBookableServicePayload({
+      serviceType,
+      service_id,
+      service_package,
+      repair_issue,
+      issue_description
+    });
+
+    if (primaryResolved.error) {
+      return errorResponse(res, 400, primaryResolved.error);
+    }
+
+    let { catalogServiceId, servicePayload } = primaryResolved;
+    let addonServices = [];
+
+    if (additionalServiceType) {
+      const additionalResolved = await resolveBookableServicePayload({
+        serviceType: additionalServiceType,
+        service_id: additional_service_id,
+        service_package: additional_service_package
+      });
+
+      if (additionalResolved.error) {
+        return errorResponse(res, 400, additionalResolved.error);
+      }
+
+      const additionalPayload = additionalResolved.servicePayload;
+      const additionalDuration = Number(additionalPayload.estimated_duration_minutes) || 0;
+      const additionalPrice = Number(additionalPayload.estimated_price) || 0;
+
+      servicePayload = {
+        ...servicePayload,
+        name: `${servicePayload.name} + ${additionalPayload.name}`,
+        description: [servicePayload.description, additionalPayload.description]
+          .filter(Boolean)
+          .join(' | '),
+        estimated_duration_minutes:
+          (Number(servicePayload.estimated_duration_minutes) || 0) + additionalDuration
+      };
+
+      if (additionalResolved.catalogServiceId) {
+        addonServices = [{
+          service_id: additionalResolved.catalogServiceId,
+          name: additionalPayload.name,
+          price: additionalPrice,
+          quantity: 1,
+          added_by: userId
+        }];
+      } else {
+        servicePayload.estimated_price =
+          (Number(servicePayload.estimated_price) || 0) + additionalPrice;
+      }
+    }
+
+    const totalDurationMinutes = Number(servicePayload.estimated_duration_minutes) || 60;
 
     const duplicateCustomerAppointment = await Appointment.findOne({
       customer_id: userId,
@@ -262,6 +346,9 @@ const createAppointment = async (req, res) => {
       },
       service_id: catalogServiceId,
       service: servicePayload,
+      addon_services: addonServices,
+      total_service_duration_minutes: totalDurationMinutes,
+      estimated_duration: totalDurationMinutes,
       vehicle: {
         brand: vehicle_brand,
         model: vehicle_model,
